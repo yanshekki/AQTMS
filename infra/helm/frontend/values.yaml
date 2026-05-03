@@ -1,0 +1,7 @@
+replicaCount: 2
+image: { repository: aqtms-frontend, tag: latest }
+service: { port: 80 }
+ingress:
+  enabled: true
+  host: aqtms.io
+  tls: { enabled: true, secretName: aqtms-frontend-tls }

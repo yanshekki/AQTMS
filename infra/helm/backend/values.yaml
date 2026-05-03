@@ -1,0 +1,53 @@
+replicaCount: 3
+
+image:
+  repository: aqtms-backend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3001
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 15
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+env:
+  NODE_ENV: production
+  DATABASE_URL: "mysql://aqtms:${DB_PASSWORD}@mysql:3306/aqtms"
+  REDIS_URL: "redis://redis:6379"
+  CORS_ORIGIN: "*"
+  LOG_LEVEL: info
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.aqtms.io
+  tls:
+    enabled: true
+    secretName: aqtms-tls

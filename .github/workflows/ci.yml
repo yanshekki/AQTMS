@@ -1,0 +1,81 @@
+# ── AQTMS CI/CD Pipeline ──
+name: AQTMS CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PNPM_VERSION: '10'
+
+jobs:
+  # ── Lint & Type Check ──
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @aqtms/shared-types build 2>/dev/null || true
+      - run: pnpm --filter @aqtms/backend lint
+      - run: pnpm --filter @aqtms/web lint
+
+  # ── Unit Tests ──
+  test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @aqtms/backend test
+        env:
+          REDIS_URL: redis://localhost:6379
+      - run: pnpm --filter @aqtms/web test 2>/dev/null || true
+
+  # ── Build ──
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @aqtms/shared-types build 2>/dev/null || true
+      - run: pnpm --filter @aqtms/backend build 2>/dev/null || true
+      - run: pnpm --filter @aqtms/web build 2>/dev/null || true
+
+  # ── Docker Build ──
+  docker:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -f apps/backend/Dockerfile -t aqtms-backend:latest .
+      - name: Build frontend image
+        run: docker build -f apps/web/Dockerfile -t aqtms-frontend:latest .

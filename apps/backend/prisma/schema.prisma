@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(uuid())
+  walletAddress     String             @unique
+  nonce             String
+  role              String             @default("VIEWER")
+  permissions       String             @default("[]")  // JSON array
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  exchangeAccounts  ExchangeAccount[]
+  trades            Trade[]
+  auditLogs         AuditLog[]
+}
+
+model ExchangeAccount {
+  id           String        @id @default(uuid())
+  userId       String
+  exchange     String        // BINANCE, BYBIT, FUTU, IBKR
+  name         String
+  apiKey       String        // Encrypted at rest
+  apiSecret    String        // Encrypted at rest
+  testnet      Boolean       @default(false)
+  status       String        @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR, TESTING
+  testPassed   Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id])
+  trades       Trade[]
+
+  @@unique([userId, exchange, name])
+  @@index([userId])
+}
+
+model Trade {
+  id                  String        @id @default(uuid())
+  userId              String
+  exchangeAccountId   String
+  exchangeOrderId     String?
+  symbol              String
+  side                String        // BUY, SELL
+  type                String        // MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT
+  status              String        @default("PENDING") // PENDING, FILLED, PARTIALLY_FILLED, CANCELLED, REJECTED, EXPIRED
+  quantity            Float
+  price               Float?
+  stopPrice           Float?
+  timeInForce         String        @default("GTC") // GTC, IOC, FOK
+  filledQuantity      Float         @default(0)
+  idempotencyKey      String        @unique
+  errorMessage        String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  user                User          @relation(fields: [userId], references: [id])
+  exchangeAccount     ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+  @@index([symbol])
+  @@index([status])
+  @@index([idempotencyKey])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String   // trade:execute, trade:cancel, exchange:connect, user:login
+  resource   String   // trade, exchange, user
+  resourceId String?
+  details    String?  // JSON
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model NewsEvent {
+  id            String   @id @default(uuid())
+  source        String   // TELEGRAM, X, ONCHAIN
+  sourceId      String
+  channelName   String?
+  authorName    String?
+  content       String   @db.Text
+  url           String?
+  language      String   @default("en")
+  isProcessed   Boolean  @default(false)
+  isFake        Boolean?
+  truthScore    Float?
+  sentimentScore Float?
+  relevanceScore Float?
+  compositeScore Float?
+  aiAnalysis    String?  @db.Text  // JSON
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+
+  @@unique([source, sourceId])
+  @@index([compositeScore])
+  @@index([isProcessed])
+  @@index([createdAt])
+}
+
+model BacktestReport {
+  id                  String   @id @default(uuid())
+  userId              String
+  symbol              String
+  startDate           DateTime
+  endDate             DateTime
+  initialCapital      Float
+  finalCapital        Float
+  totalReturn         Float
+  totalPnL            Float
+  totalTrades         Int
+  winningTrades       Int
+  losingTrades        Int
+  winRate             Float
+  avgWin              Float
+  avgLoss             Float
+  profitFactor        Float
+  maxDrawdown         Float
+  maxDrawdownDuration Int
+  sharpeRatio         Float
+  sortinoRatio        Float
+  calmarRatio         Float
+  totalFees           Float
+  equityCurve         String   @db.LongText  // JSON
+  drawdownCurve       String   @db.LongText  // JSON  
+  monthlyReturns      String   @db.LongText  // JSON
+  trades              String   @db.LongText  // JSON
+  parameters          String   @db.LongText  // JSON
+  createdAt           DateTime @default(now())
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([createdAt])
+}
