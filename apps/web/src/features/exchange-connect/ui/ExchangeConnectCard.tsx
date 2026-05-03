@@ -4,6 +4,7 @@ import React from 'react';
 import { Button, Card, CardContent, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Stack, Chip } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
 
 const EXCHANGES = [
   { value: 'BINANCE', label: 'Binance' },
@@ -13,6 +14,7 @@ const EXCHANGES = [
 ] as const;
 
 export function ExchangeConnectCard() {
+  const { t } = useTranslation();
   const [exchange, setExchange] = React.useState('');
   const [name, setName] = React.useState('');
   const [apiKey, setApiKey] = React.useState('');
@@ -24,7 +26,6 @@ export function ExchangeConnectCard() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      // TODO: Call connectExchange API
       console.log('Connecting to', exchange, name);
     } finally {
       setConnecting(false);
@@ -35,16 +36,16 @@ export function ExchangeConnectCard() {
     <Card sx={{ bgcolor: '#111827', border: '1px solid #1f2937' }}>
       <CardContent>
         <Typography variant="h6" sx={{ color: '#f3f4f6', mb: 2 }}>
-          Connect Exchange
+          {t('exchanges.connectExchange')}
         </Typography>
 
         <Stack spacing={2}>
           <FormControl fullWidth>
-            <InputLabel sx={{ color: '#9ca3af' }}>Exchange</InputLabel>
+            <InputLabel sx={{ color: '#9ca3af' }}>{t('exchanges.exchange')}</InputLabel>
             <Select
               value={exchange}
               onChange={handleExchangeChange}
-              label="Exchange"
+              label={t('exchanges.exchange')}
               sx={{ color: '#f3f4f6', '.MuiOutlinedInput-notchedOutline': { borderColor: '#374151' } }}
             >
               {EXCHANGES.map((ex) => (
@@ -56,7 +57,7 @@ export function ExchangeConnectCard() {
           </FormControl>
 
           <TextField
-            label="Account Name"
+            label={t('exchanges.accountName')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             fullWidth
@@ -64,7 +65,7 @@ export function ExchangeConnectCard() {
           />
 
           <TextField
-            label="API Key"
+            label={t('exchanges.apiKey')}
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
@@ -73,7 +74,7 @@ export function ExchangeConnectCard() {
           />
 
           <TextField
-            label="API Secret"
+            label={t('exchanges.apiSecret')}
             type="password"
             value={apiSecret}
             onChange={(e) => setApiSecret(e.target.value)}
@@ -88,14 +89,13 @@ export function ExchangeConnectCard() {
             disabled={!exchange || !name || !apiKey || !apiSecret || connecting}
             sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
           >
-            {connecting ? 'Connecting...' : 'Connect'}
+            {connecting ? t('exchanges.connecting') : t('exchanges.connect')}
           </Button>
         </Stack>
 
-        {/* Status indicator */}
         <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-          <Chip label="Binance: not connected" size="small" sx={{ bgcolor: '#1f2937', color: '#9ca3af' }} />
-          <Chip label="Bybit: not connected" size="small" sx={{ bgcolor: '#1f2937', color: '#9ca3af' }} />
+          <Chip label={t('exchanges.binanceNotConnected')} size="small" sx={{ bgcolor: '#1f2937', color: '#9ca3af' }} />
+          <Chip label={t('exchanges.bybitNotConnected')} size="small" sx={{ bgcolor: '#1f2937', color: '#9ca3af' }} />
         </Stack>
       </CardContent>
     </Card>

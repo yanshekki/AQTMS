@@ -3,14 +3,15 @@
 
 import React from 'react';
 import { Alert, Button, Container } from '@mui/material';
+import { withTranslation, WithTranslation } from 'react-i18next';
 
 interface State {
   hasError: boolean;
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+class ErrorBoundaryClass extends React.Component<
+  { children: React.ReactNode } & WithTranslation,
   State
 > {
   state: State = { hasError: false, error: null };
@@ -20,11 +21,12 @@ export class ErrorBoundary extends React.Component<
   }
 
   render() {
+    const { t } = this.props;
     if (this.state.hasError) {
       return (
         <Container maxWidth="sm" sx={{ py: 8 }}>
           <Alert severity="error" sx={{ mb: 2 }}>
-            Something went wrong
+            {t('error.somethingWentWrong')}
           </Alert>
           <pre style={{ color: '#9ca3af', fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}>
             {this.state.error?.message}
@@ -34,7 +36,7 @@ export class ErrorBoundary extends React.Component<
             onClick={() => this.setState({ hasError: false, error: null })}
             sx={{ mt: 2 }}
           >
-            Try Again
+            {t('error.tryAgain')}
           </Button>
         </Container>
       );
@@ -42,3 +44,5 @@ export class ErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryClass) as React.ComponentType<{ children: React.ReactNode }>;

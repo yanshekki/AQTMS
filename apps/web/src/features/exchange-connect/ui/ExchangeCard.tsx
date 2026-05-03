@@ -4,6 +4,7 @@ import { Card, CardContent, Typography, Chip, Box, Stack, LinearProgress } from 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SyncIcon from '@mui/icons-material/Sync';
+import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '@/app/Providers';
 import type { ExchangeAccount } from '../lib/schemas';
 
@@ -13,12 +14,19 @@ const EXCHANGE_COLORS: Record<string, string> = { binance: '#F0B90B', bybit: '#F
 
 export function ExchangeCard({ account }: ExchangeCardProps) {
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
   const dimText = isDark ? '#6b7280' : '#94a3b8';
 
   const color = EXCHANGE_COLORS[account.exchange] ?? '#3b82f6';
+  const statusLabels: Record<string, string> = {
+    CONNECTED: t('exchanges.status.connected'),
+    ERROR: t('exchanges.status.error'),
+    TESTING: t('exchanges.status.testing'),
+    DISCONNECTED: t('exchanges.status.disconnected'),
+  };
   const statusIcon = {
     CONNECTED: <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 14 }} />,
     ERROR: <ErrorIcon sx={{ color: '#ef4444', fontSize: 14 }} />,
@@ -33,7 +41,7 @@ export function ExchangeCard({ account }: ExchangeCardProps) {
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 600, textTransform: 'capitalize', fontSize: '0.9rem' }}>{account.exchange}</Typography>
-            <Chip icon={statusIcon} label={account.status} size="small" sx={{ bgcolor: `${statusColor}15`, color: statusColor, fontWeight: 500, '.MuiChip-icon': { ml: 0.5 } }} />
+            <Chip icon={statusIcon} label={statusLabels[account.status] ?? account.status} size="small" sx={{ bgcolor: `${statusColor}15`, color: statusColor, fontWeight: 500, '.MuiChip-icon': { ml: 0.5 } }} />
           </Stack>
           <Typography variant="caption" sx={{ color: mutedText }}>{account.name}</Typography>
         </Stack>
@@ -44,14 +52,16 @@ export function ExchangeCard({ account }: ExchangeCardProps) {
                 <Typography variant="caption" sx={{ color: mutedText }}>{b.asset}</Typography>
                 <Typography variant="caption" sx={{ color: primaryText }}>
                   {parseFloat(b.free).toFixed(4)}
-                  {parseFloat(b.locked) > 0 && <span style={{ color: dimText }}> (+{parseFloat(b.locked).toFixed(4)} locked)</span>}
+                  {parseFloat(b.locked) > 0 && <span style={{ color: dimText }}> (+{parseFloat(b.locked).toFixed(4)} {t('exchanges.locked')})</span>}
                 </Typography>
               </Box>
             ))}
           </Stack>
         )}
         <Box mt={1.5}>
-          <Typography variant="caption" sx={{ color: dimText }}>{account.lastSyncAt ? `Last synced: ${new Date(account.lastSyncAt).toLocaleString()}` : 'Not yet synced'}</Typography>
+          <Typography variant="caption" sx={{ color: dimText }}>
+            {account.lastSyncAt ? `${t('exchanges.lastSynced')}: ${new Date(account.lastSyncAt).toLocaleString()}` : t('exchanges.notYetSynced')}
+          </Typography>
           {account.status === 'TESTING' && <LinearProgress sx={{ mt: 0.5, bgcolor: isDark ? '#1f2937' : '#e2e8f0', height: 2 }} />}
         </Box>
       </CardContent>

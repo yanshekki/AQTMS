@@ -9,6 +9,7 @@ import { validate } from '../middleware/validate.middleware';
 import { CreateTradeDtoSchema, CancelTradeDtoSchema } from '../dto';
 import type { ExecuteTradeUseCase } from '../../../application/use-cases/ExecuteTradeUseCase';
 import type { CancelTradeUseCase } from '../../../application/use-cases/CancelTradeUseCase';
+import { detectLang, t } from '../../../shared/i18n';
 
 export function createTradeRoutes(
   executeTradeUseCase: ExecuteTradeUseCase,
@@ -78,7 +79,8 @@ export function createTradeRoutes(
       const prisma = new PrismaClient();
       const trade = await prisma.trade.findUnique({ where: { id: String(req.params.id) } });
       if (!trade) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Trade not found' }, timestamp: new Date().toISOString() });
+        const lang = detectLang(req);
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('trade.not_found', lang) }, timestamp: new Date().toISOString() });
         return;
       }
       res.json({ success: true, data: trade, timestamp: new Date().toISOString() });

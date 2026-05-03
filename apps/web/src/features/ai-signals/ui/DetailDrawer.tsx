@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, CircularProgress, Card, CardContent } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useTranslation } from 'react-i18next';
 import { signalsApi } from '../api/signalsApi';
 import { ScoreBadge } from './ScoreBadge';
 import { useThemeMode } from '@/app/Providers';
@@ -17,6 +18,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -25,32 +27,27 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
   const cardBg = isDark ? '#0f172a' : '#f8fafc';
   const chipBg = isDark ? '#1e293b' : '#e2e8f0';
 
-  // Signal chart state
   const [signalChartData, setSignalChartData] = useState<ChartCandle[]>([]);
   const feed = useRef(new ChartDatafeed());
 
   useEffect(() => {
     if (!signalId) { setDetail(null); return; }
     setLoading(true); setError(null);
-    signalsApi.getSignalDetail(signalId).then((res) => setDetail(res.data)).catch((err) => setError(err instanceof Error ? err.message : 'Failed')).finally(() => setLoading(false));
-  }, [signalId]);
+    signalsApi.getSignalDetail(signalId).then((res) => setDetail(res.data)).catch((err) => setError(err instanceof Error ? err.message : t('common.error'))).finally(() => setLoading(false));
+  }, [signalId, t]);
 
-  // Fetch chart data when signal detail is loaded
   useEffect(() => {
     if (!detail) return;
     const symbolMatch = detail.content.match(/\b(BTC|ETH|SOL|BNB|AVAX|XRP|ADA|DOGE|MATIC|DOT)\b/i);
     const detectedSymbol = symbolMatch ? `${symbolMatch[0].toUpperCase()}USDT` : 'BTCUSDT';
-    feed.current
-      .fetchKlines(detectedSymbol, '1h', 100)
-      .then(setSignalChartData)
-      .catch(console.error);
+    feed.current.fetchKlines(detectedSymbol, '1h', 100).then(setSignalChartData).catch(console.error);
   }, [detail]);
 
   return (
     <Drawer anchor="right" open={!!signalId} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 480 }, bgcolor: isDark ? '#111827' : '#ffffff', borderLeft: 1, borderColor } }}>
       <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6" sx={{ color: primaryText }}>AI Analysis</Typography>
+          <Typography variant="h6" sx={{ color: primaryText }}>{t('aiSignals.drawer.title')}</Typography>
           <IconButton onClick={onClose} sx={{ color: dimText }}><CloseIcon /></IconButton>
         </Stack>
         <Divider sx={{ borderColor, mb: 2 }} />
@@ -59,18 +56,20 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
         {detail && (
           <>
             <Typography variant="body1" sx={{ color: isDark ? '#d1d5db' : '#334155', mb: 2, lineHeight: 1.7, fontSize: '0.9rem' }}>{detail.content}</Typography>
-            <Typography variant="caption" sx={{ color: dimText }}>{detail.source} · {detail.channelName ?? 'Unknown'} · {detail.processedAt ? new Date(detail.processedAt).toLocaleString() : 'Pending'}</Typography>
+            <Typography variant="caption" sx={{ color: dimText }}>
+              {detail.source} · {detail.channelName ?? t('aiSignals.drawer.unknown')} · {detail.processedAt ? new Date(detail.processedAt).toLocaleString() : t('aiSignals.drawer.pending')}
+            </Typography>
             <Divider sx={{ borderColor, my: 2 }} />
-            <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>Score Summary</Typography>
+            <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>{t('aiSignals.drawer.scoreSummary')}</Typography>
             <Stack direction="row" spacing={1.5} mb={2} flexWrap="wrap" useFlexGap>
-              <ScoreBadge score={detail.compositeScore} label={`Overall ${detail.compositeScore ?? '?'}`} />
-              <ScoreBadge score={detail.truthScore} label={`Truth ${detail.truthScore ?? '?'}`} />
-              <ScoreBadge score={detail.sentimentScore !== null ? Math.abs(detail.sentimentScore) : null} label={`Sent ${detail.sentimentScore ?? '?'}`} />
-              <ScoreBadge score={detail.relevanceScore} label={`Relevance ${detail.relevanceScore ?? '?'}`} />
+              <ScoreBadge score={detail.compositeScore} label={`${t('aiSignals.drawer.overall')} ${detail.compositeScore ?? '?'}`} />
+              <ScoreBadge score={detail.truthScore} label={`${t('aiSignals.drawer.truth')} ${detail.truthScore ?? '?'}`} />
+              <ScoreBadge score={detail.sentimentScore !== null ? Math.abs(detail.sentimentScore) : null} label={`${t('aiSignals.drawer.sentiment')} ${detail.sentimentScore ?? '?'}`} />
+              <ScoreBadge score={detail.relevanceScore} label={`${t('aiSignals.drawer.relevance')} ${detail.relevanceScore ?? '?'}`} />
             </Stack>
-            {detail.isFake && <Chip label="⚠️ Likely Fake" size="small" sx={{ bgcolor: '#7f1d1d30', color: '#ef4444', mb: 2 }} />}
+            {detail.isFake && <Chip label={t('aiSignals.drawer.likelyFake')} size="small" sx={{ bgcolor: '#7f1d1d30', color: '#ef4444', mb: 2 }} />}
             <Divider sx={{ borderColor, my: 2 }} />
-            <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>AI Consensus</Typography>
+            <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>{t('aiSignals.drawer.aiConsensus')}</Typography>
             {detail.aiAnalysis ? (() => {
               try {
                 const analysis = JSON.parse(detail.aiAnalysis) as { aiResponses?: Array<{ provider: string; task: string; result: { reasoning?: string; confidenceScore?: number; affectedAssets?: string[]; suggestedAction?: string; urgency?: string } }> };
@@ -92,14 +91,13 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
                     </CardContent>
                   </Card>
                 ));
-              } catch { return <Typography variant="body2" sx={{ color: mutedText }}>Parse error</Typography>; }
-            })() : <Typography variant="body2" sx={{ color: mutedText }}>No AI analysis yet.</Typography>}
+              } catch { return <Typography variant="body2" sx={{ color: mutedText }}>{t('aiSignals.drawer.parseError')}</Typography>; }
+            })() : <Typography variant="body2" sx={{ color: mutedText }}>{t('aiSignals.drawer.noAnalysis')}</Typography>}
 
-            {/* Price Chart */}
             {signalChartData.length > 0 && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 600 }}>
-                  📈 Price Chart (1H)
+                  {t('aiSignals.drawer.priceChart')}
                 </Typography>
                 <TradingViewChart symbol="CHART" timeframe="1H" height={250} showVolume={false} data={signalChartData} />
               </Box>

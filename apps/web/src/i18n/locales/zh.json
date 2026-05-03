@@ -1,0 +1,630 @@
+{
+  "app": {
+    "name": "AQTMS",
+    "fullName": "自動化量化交易管理系統",
+    "version": "v1.0 · 已投入生產",
+    "tagline": "無需 Gas 費 · 僅錢包簽名 · 私鑰永不出瀏覽器"
+  },
+  "nav": {
+    "dashboard": "儀表板",
+    "exchanges": "交易所",
+    "aiSignals": "AI 訊號",
+    "backtest": "回測",
+    "risk": "風險",
+    "portfolio": "投資組合",
+    "trades": "交易記錄",
+    "notifications": "通知",
+    "settings": "設定",
+    "adminPanel": "管理面板",
+    "admin": "管理",
+    "userManagement": "用戶管理",
+    "auditLog": "審計日誌",
+    "systemSettings": "系統設定"
+  },
+  "auth": {
+    "loginTitle": "AQTMS",
+    "loginSubtitle": "自動化量化交易管理系統",
+    "versionBadge": "v1.0 · 已投入生產",
+    "connectWallet": "連接錢包以登入",
+    "connecting": "連接中...",
+    "noWallet": "未檢測到錢包。請安裝 MetaMask 或使用 Web3 瀏覽器。",
+    "walletLoginFailed": "登入失敗",
+    "noGasFees": "無需 Gas 費 · 僅錢包簽名 · 私鑰永不出瀏覽器",
+    "walletLabels": {
+      "metamask": "MetaMask",
+      "brave": "Brave",
+      "walletConnect": "WalletConnect",
+      "coinbase": "Coinbase"
+    },
+    "noAccount": "未選擇帳戶"
+  },
+  "dashboard": {
+    "title": "儀表板",
+    "subtitle": "AQTMS — 自動化量化交易管理系統",
+    "totalPortfolioValue": "投資組合總值",
+    "todayPnL": "今日盈虧",
+    "latestAISignal": "最新 AI 訊號",
+    "openPositions": "持倉數量",
+    "riskScore": "風險評分",
+    "sharpeRatio": "夏普比率",
+    "noExchangeConnected": "未連接交易所",
+    "noDataSources": "無數據來源",
+    "noActiveTrades": "無活躍交易",
+    "connectExchangeFirst": "請先連接交易所",
+    "runBacktest": "執行回測",
+    "liveChart": "📈 即時圖表"
+  },
+  "exchanges": {
+    "title": "交易所連接",
+    "description": "管理您的交易所 API 連接。所有 API 密鑰均以 AES-256-GCM 靜態加密。",
+    "addConnection": "添加連接",
+    "noExchangeConnected": "尚未連接交易所",
+    "emptyHint": "連接 Binance 或 Bybit 以開始交易",
+    "connectFirstExchange": "連接您的第一個交易所",
+    "failedToLoad": "無法載入交易所",
+    "connectExchange": "連接交易所",
+    "cancel": "取消",
+    "connect": "連接",
+    "connecting": "連接中...",
+    "apiKeyInvalid": "API Key 無效或權限不足",
+    "status": {
+      "connected": "已連接",
+      "error": "錯誤",
+      "testing": "測試中",
+      "disconnected": "已斷開"
+    },
+    "lastSynced": "上次同步",
+    "notYetSynced": "尚未同步",
+    "locked": "鎖定",
+    "testConnection": "測試連接",
+    "testing": "測試中...",
+    "connectedOk": "已連接 ✓",
+    "failed": "失敗",
+    "exchange": "交易所",
+    "accountName": "帳戶名稱",
+    "apiKey": "API 金鑰",
+    "apiSecret": "API 密鑰",
+    "binanceNotConnected": "Binance：未連接",
+    "bybitNotConnected": "Bybit：未連接",
+    "futuPhase3": "Futu (第三階段)",
+    "ibkrPhase3": "IBKR (第三階段)"
+  },
+  "aiSignals": {
+    "title": "AI 訊號",
+    "description": "實時 AI 評分新聞。評分 ≥ 80 觸發交易訊號。",
+    "signalCount": "條訊號",
+    "refreshRate": "15 秒刷新",
+    "noSignals": "暫無 AI 訊號",
+    "noSignalsHint": "連接數據來源（Telegram / X.com）及 AI 供應商。",
+    "tableHeaders": {
+      "time": "時間",
+      "source": "來源",
+      "content": "內容",
+      "flag": "標記",
+      "score": "評分",
+      "tsr": "真/情/關"
+    },
+    "drawer": {
+      "title": "AI 分析",
+      "scoreSummary": "評分摘要",
+      "overall": "綜合",
+      "truth": "真實度",
+      "sentiment": "情緒",
+      "relevance": "相關度",
+      "aiConsensus": "AI 共識",
+      "noAnalysis": "暫無 AI 分析。",
+      "parseError": "解析錯誤",
+      "priceChart": "📈 價格圖表 (1H)",
+      "sourceInfo": "來源",
+      "pending": "等待中",
+      "unknown": "未知",
+      "likelyFake": "⚠️ 疑似假消息"
+    },
+    "filters": {
+      "source": "來源",
+      "all": "全部",
+      "telegram": "Telegram",
+      "xcom": "X.com",
+      "onchain": "鏈上",
+      "asset": "資產",
+      "minScore": "最低評分"
+    },
+    "sourceIcons": {
+      "TELEGRAM": "📡",
+      "X": "🐦",
+      "ONCHAIN": "⛓️"
+    },
+    "fake": "虛假"
+  },
+  "backtest": {
+    "title": "回測引擎",
+    "description": "使用歷史 Binance 數據測試交易策略。通過公共 API 獲取實時 1 小時 K 線。",
+    "strategyParams": "策略參數",
+    "symbol": "交易對",
+    "startDate": "開始日期",
+    "endDate": "結束日期",
+    "initialCapital": "初始資金 ($)",
+    "fee": "手續費",
+    "slippage": "滑點",
+    "strategy": "均線交叉策略",
+    "fastMA": "快線",
+    "slowMA": "慢線",
+    "runBacktest": "執行回測",
+    "running": "執行中...",
+    "metrics": {
+      "totalReturn": "總回報",
+      "winRate": "勝率",
+      "sharpe": "夏普",
+      "maxDD": "最大回撤",
+      "profitFactor": "盈利因子",
+      "trades": "交易次數"
+    },
+    "charts": {
+      "equityCurve": "權益曲線",
+      "drawdown": "回撤"
+    },
+    "tableHeaders": {
+      "time": "時間",
+      "side": "方向",
+      "price": "價格",
+      "pnl": "盈虧",
+      "reason": "原因"
+    },
+    "emptyState": "配置參數後點擊「執行回測」開始。",
+    "emptyHint": "使用 Binance 公共 API — 無需 API 金鑰。",
+    "backtestFailed": "回測失敗"
+  },
+  "risk": {
+    "title": "風險儀表板",
+    "subtitle": "VaR · 回撤 · 集中度 · Beta · 相關性",
+    "riskScore": "風險評分",
+    "var95_1Day": "VaR 95% (1日)",
+    "var95Sub": "5% 概率損失",
+    "var99_1Day": "VaR 99% (1日)",
+    "var99Sub": "1% 概率損失",
+    "cvar95": "CVaR 95%",
+    "cvar95Sub": "預期虧損",
+    "maxDrawdown": "最大回撤",
+    "currentDrawdown": "當前",
+    "concentrationRisk": "集中度風險",
+    "concentrationSub": "最大資產權重",
+    "concentrationTitle": "集中度風險",
+    "ofPortfolio": "佔組合比例",
+    "betaExposure": "Beta 曝險",
+    "correlationMatrix": "相關性矩陣",
+    "riskAlerts": "風險警報與建議操作",
+    "riskLevels": {
+      "low": "低風險",
+      "medium": "中風險",
+      "high": "高風險"
+    },
+    "concentrationLevels": {
+      "LOW": "低",
+      "MEDIUM": "中",
+      "HIGH": "高",
+      "CRITICAL": "嚴重"
+    },
+    "alertStatus": {
+      "WARNING": "警告",
+      "BREACHED": "已觸發"
+    },
+    "legend": {
+      "negative": "負相關",
+      "low": "低 (0–0.3)",
+      "moderate": "中等 (0.3–0.5)",
+      "high": "高 (0.5–0.7)",
+      "veryHigh": "極高 (0.7+)"
+    },
+    "tableHeaders": {
+      "rule": "規則",
+      "status": "狀態",
+      "message": "訊息",
+      "suggestedAction": "建議操作"
+    },
+    "actions": {
+      "copy": "複製",
+      "retry": "重試",
+      "refresh": "刷新",
+      "refreshing": "刷新中…",
+      "auto15s": "自動 15 秒",
+      "copyHedge": "複製對沖建議"
+    },
+    "loading": "載入風險指標…",
+    "failedToLoad": "無法載入風險數據",
+    "failedToFetch": "無法獲取風險數據",
+    "noData": "暫無風險數據",
+    "noDataHint": "連接交易所並啟用風險監控以查看指標。"
+  },
+  "portfolio": {
+    "title": "投資組合",
+    "subtitle": "資產配置 · 表現分析 · 盈虧分解",
+    "totalPortfolioValue": "投資組合總值",
+    "today": "今日",
+    "realizedPnL": "已實現盈虧",
+    "unrealizedPnL": "未實現盈虧",
+    "assetAllocation": "資產配置",
+    "filtered": "已篩選",
+    "topHoldings": "主要持倉",
+    "historicalPerformance": "歷史表現",
+    "portfolioValue": "組合價值",
+    "pnlRanking": "盈虧排名",
+    "clickToClearFilter": "點擊清除篩選",
+    "noData": "暫無投資組合數據",
+    "noDataHint": "連接交易所或添加資產以開始。",
+    "noDataAvailable": "暫無投資組合數據。",
+    "failedToLoad": "無法載入投資組合數據，請重試。",
+    "failedToLoadPerformance": "無法載入表現數據",
+    "showingPeriod": "顯示週期",
+    "tableHeaders": {
+      "rank": "#",
+      "asset": "資產",
+      "value": "價值",
+      "allocPct": "配置%",
+      "pnl": "盈虧",
+      "pnlPct": "盈虧%"
+    },
+    "periods": {
+      "30d": "30日",
+      "90d": "90日",
+      "1y": "1年"
+    }
+  },
+  "trades": {
+    "title": "交易記錄",
+    "subtitle": "筆交易 · 實時記錄含 AI 上下文",
+    "tradeCount": "筆交易",
+    "tradeCount_plural": "筆交易",
+    "exportCsv": "匯出 CSV",
+    "exporting": "匯出中…",
+    "loading": "載入交易記錄…",
+    "failedToLoad": "無法載入交易記錄",
+    "noTradesFound": "未找到交易記錄",
+    "noTradesHint": "連接交易所並開始交易以查看記錄。",
+    "noTradesFilterHint": "沒有符合當前篩選條件的交易。",
+    "clearFilters": "清除篩選",
+    "resetFilters": "重置篩選",
+    "filters": {
+      "dateFrom": "開始日期",
+      "dateTo": "結束日期",
+      "exchange": "交易所",
+      "all": "全部",
+      "symbol": "交易對",
+      "side": "方向",
+      "buy": "買入",
+      "sell": "賣出",
+      "status": "狀態",
+      "filled": "已成交",
+      "partial": "部分成交",
+      "cancelled": "已取消",
+      "rejected": "已拒絕"
+    },
+    "tableHeaders": {
+      "time": "時間",
+      "exchange": "交易所",
+      "symbol": "交易對",
+      "side": "方向",
+      "qty": "數量",
+      "price": "價格",
+      "pnl": "盈虧",
+      "fee": "手續費",
+      "status": "狀態"
+    },
+    "drawer": {
+      "title": "交易詳情",
+      "orderId": "訂單編號",
+      "na": "不適用",
+      "exchange": "交易所",
+      "unknown": "未知",
+      "symbol": "交易對",
+      "sideType": "方向 · 類型",
+      "quantity": "數量",
+      "price": "價格",
+      "pnl": "盈虧",
+      "fee": "手續費",
+      "status": "狀態",
+      "riskScore": "風險評分",
+      "aiDecision": "AI 決策",
+      "noAiReason": "無 AI 決策記錄",
+      "riskAssessment": "風險評估",
+      "riskLow": "低風險交易 — 所有風險參數均在範圍內。已設置適當止損。",
+      "riskModerate": "中等風險 — VaR 貢獻在限制範圍內。請密切監控。",
+      "riskHigh": "高風險 — 超出一個或多個風險閾值。請檢查持倉規模。",
+      "created": "創建時間"
+    },
+    "status": {
+      "FILLED": "已成交",
+      "PARTIALLY_FILLED": "部分成交",
+      "CANCELLED": "已取消",
+      "REJECTED": "已拒絕"
+    },
+    "toast": {
+      "filtersReset": "篩選已重置",
+      "exportSuccess": "已匯出交易記錄至 CSV",
+      "exportFailed": "匯出 CSV 失敗",
+      "copied": "已複製到剪貼板",
+      "copyFailed": "複製失敗",
+      "refreshing": "刷新中…"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "subtitle": "用戶偏好 · 通知 · API 金鑰管理 · 安全",
+    "appearance": "外觀",
+    "darkMode": "深色模式",
+    "lightMode": "淺色模式",
+    "switchToLight": "切換至淺色",
+    "switchToDark": "切換至深色",
+    "tabs": {
+      "profile": "個人資料",
+      "apiKeys": "API 金鑰",
+      "notifications": "通知",
+      "security": "安全"
+    },
+    "profile": {
+      "name": "名稱",
+      "email": "電郵",
+      "timezone": "時區",
+      "saveChanges": "儲存更改",
+      "saving": "儲存中…",
+      "saved": "個人資料已成功儲存"
+    },
+    "apiKeys": {
+      "connected": "個交易所",
+      "connectedCount": "個交易所已連接",
+      "addApiKey": "添加 API 金鑰",
+      "noExchanges": "暫無交易所連接",
+      "connectFirst": "連接您的第一個交易所",
+      "tableHeaders": {
+        "exchange": "交易所",
+        "status": "狀態",
+        "lastUsed": "上次使用",
+        "actions": "操作"
+      },
+      "status": {
+        "connected": "已連接",
+        "error": "錯誤",
+        "disconnected": "已斷開"
+      },
+      "testConnection": "測試連接",
+      "delete": "刪除",
+      "addModal": {
+        "title": "添加 API 金鑰",
+        "exchange": "交易所",
+        "apiKey": "API 金鑰",
+        "apiSecret": "API 密鑰",
+        "description": "描述（可選）",
+        "cancel": "取消",
+        "addKey": "添加金鑰",
+        "adding": "添加中…",
+        "fillAllFields": "請填寫所有必填欄位",
+        "added": "API 金鑰已添加"
+      },
+      "deleteModal": {
+        "title": "移除 API 金鑰？",
+        "message": "這將斷開交易所連接並刪除其 API 金鑰。此操作無法撤銷。活躍交易不受影響。",
+        "cancel": "取消",
+        "remove": "移除"
+      },
+      "toast": {
+        "testSuccess": "連接測試成功",
+        "testFailed": "連接測試失敗 — 請檢查 API 金鑰權限",
+        "removed": "連接已移除"
+      }
+    },
+    "notifications": {
+      "title": "通知渠道",
+      "emailNotifications": "電郵通知",
+      "emailDesc": "交易確認、風險警報、週報",
+      "telegramAlerts": "Telegram 警報",
+      "telegramDesc": "實時訊號、緊急風險觸發",
+      "inAppNotifications": "應用內通知",
+      "inAppDesc": "儀表板警報、系統健康更新",
+      "riskThreshold": "風險警報閾值",
+      "thresholdDesc": "當風險評分超過以下值時觸發警報：",
+      "saveThreshold": "儲存閾值",
+      "saving": "儲存中…",
+      "enabled": "通知已啟用",
+      "disabled": "通知已停用",
+      "thresholdSaved": "風險警報閾值已設定"
+    },
+    "security": {
+      "changePassword": "更改密碼",
+      "passwordComingSoon": "密碼管理功能即將推出。",
+      "comingSoon": "即將推出",
+      "twoFactorAuth": "雙重認證",
+      "twoFactorComingSoon": "Google Authenticator / TOTP 支援即將推出。",
+      "connectedWallet": "已連接錢包",
+      "walletNetwork": "Ethereum 主網 · 通過 MetaMask 連接",
+      "apiKeyEncryption": "API 金鑰加密",
+      "encryptionLabel": "AES-256-GCM",
+      "encryptionDesc": "所有 API 金鑰均以 AES-256-GCM 靜態加密。金鑰永不被記錄或明文儲存。",
+      "walletCopied": "錢包地址已複製",
+      "copyFailed": "複製失敗"
+    }
+  },
+  "scoringRules": {
+    "title": "評分規則",
+    "description": "設計評分規則 — 配置權重、閾值及操作對應。",
+    "rules": "規則",
+    "new": "新增",
+    "newRule": "新規則",
+    "ruleEditor": "規則編輯器",
+    "ruleName": "規則名稱",
+    "signalWeights": "訊號權重",
+    "totalWeight": "總計",
+    "weightExceeds": "總計超過 100% — 請減少部分權重。",
+    "weightMustBe100": "總計必須等於 100%。",
+    "weights": {
+      "truth": "真實度權重",
+      "sentiment": "情緒權重",
+      "relevance": "相關度權重",
+      "confidence": "可信度權重"
+    },
+    "signalThreshold": "訊號閾值",
+    "actionOnSignal": "訊號操作",
+    "actions": {
+      "BUY": "買入（市價單）",
+      "SELL": "賣出（市價單）",
+      "ALERT": "僅警報",
+      "IGNORE": "忽略"
+    },
+    "saveChanges": "儲存更改",
+    "saving": "儲存中...",
+    "createRule": "創建規則",
+    "versionHistory": "版本歷史",
+    "current": "當前",
+    "rollback": "回滾",
+    "noHistory": "暫無版本歷史",
+    "confirmRollback": "確認回滾",
+    "rollbackMessage": "回滾至此配置？這將創建一個包含先前設置的新版本：",
+    "confirm": "確認回滾",
+    "weightAction": "操作",
+    "weightThreshold": "閾值",
+    "status": {
+      "Active": "啟用",
+      "Draft": "草稿"
+    },
+    "selectRule": "選擇規則或創建新規則",
+    "selectRuleHint": "從左側列表中選擇以編輯其配置",
+    "noRules": "暫無評分規則",
+    "toast": {
+      "enabled": "規則已啟用",
+      "disabled": "規則已停用",
+      "updateFailed": "更新規則失敗",
+      "saved": "規則已成功儲存",
+      "saveFailed": "儲存規則失敗",
+      "created": "規則已成功創建",
+      "createFailed": "創建規則失敗",
+      "deleted": "規則已刪除",
+      "deleteFailed": "刪除規則失敗",
+      "weightsWarning": "權重總和必須為 100%",
+      "rollbackSuccess": "已回滾至先前配置",
+      "rollbackFailed": "回滾失敗",
+      "loadFailed": "無法載入評分規則"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "pageTitle": "通知",
+    "unreadCount": "條未讀",
+    "subtitle": "應用內通知中心",
+    "markAllRead": "全部標為已讀",
+    "marking": "標記中...",
+    "noNotifications": "暫無通知",
+    "caughtUp": "全部已讀！新通知將在此顯示。",
+    "noUnread": "沒有未讀通知 — 全部已讀！🎉",
+    "noFilterMatch": "沒有符合此篩選的通知。",
+    "failedToLoad": "無法載入通知。",
+    "actionFailed": "操作失敗",
+    "markedAsRead": "已標為已讀 · 導航至",
+    "navigating": "導航至",
+    "markedAllRead": "條通知已標為已讀",
+    "markAllFailed": "全部標記失敗",
+    "noUnreadToMark": "沒有未讀通知",
+    "filters": {
+      "all": "全部",
+      "unread": "未讀",
+      "trade": "交易",
+      "signal": "訊號",
+      "risk": "風險",
+      "system": "系統"
+    },
+    "typeLabels": {
+      "trade": "交易",
+      "signal": "訊號",
+      "risk": "風險",
+      "system": "系統"
+    },
+    "relativeTime": {
+      "justNow": "剛剛",
+      "minAgo": "分鐘前",
+      "hourAgo": "小時前",
+      "hoursAgo": "小時前",
+      "dayAgo": "天前",
+      "daysAgo": "天前"
+    }
+  },
+  "admin": {
+    "title": "管理面板",
+    "subtitle": "管理面板 — 限制存取",
+    "userManagement": "用戶管理",
+    "auditLog": "審計日誌",
+    "systemSettings": "系統設定",
+    "users": {
+      "tableHeaders": {
+        "wallet": "錢包",
+        "role": "角色",
+        "status": "狀態",
+        "joined": "加入日期",
+        "actions": "操作"
+      },
+      "save": "儲存",
+      "disable": "停用",
+      "status": {
+        "active": "活躍",
+        "inactive": "非活躍"
+      }
+    },
+    "audit": {
+      "tableHeaders": {
+        "time": "時間",
+        "user": "用戶",
+        "action": "操作",
+        "resource": "資源",
+        "ip": "IP"
+      },
+      "exportCsv": "匯出 CSV"
+    },
+    "system": {
+      "aiModelManagement": "AI 模型管理",
+      "rateLimiting": "速率限制",
+      "maxRequests": "每 IP 每分鐘最大請求數",
+      "enableRateLimiting": "啟用速率限制",
+      "modelStatus": "就緒"
+    }
+  },
+  "common": {
+    "loading": "載入中...",
+    "error": "錯誤",
+    "save": "儲存",
+    "cancel": "取消",
+    "delete": "刪除",
+    "confirm": "確認",
+    "close": "關閉",
+    "copy": "複製",
+    "search": "搜尋",
+    "reset": "重置",
+    "retry": "重試",
+    "refresh": "刷新",
+    "export": "匯出",
+    "noData": "暫無數據",
+    "na": "不適用",
+    "unknown": "未知",
+    "all": "全部",
+    "enabled": "已啟用",
+    "disabled": "已停用",
+    "comingSoon": "即將推出"
+  },
+  "roles": {
+    "SUPER_ADMIN": "超級管理員",
+    "ADMIN": "管理員",
+    "TRADER": "交易員",
+    "ANALYST": "分析師",
+    "VIEWER": "查看者"
+  },
+  "error": {
+    "somethingWentWrong": "發生錯誤",
+    "tryAgain": "重試",
+    "unauthorized": "您沒有權限訪問此頁面。",
+    "notFound": "頁面未找到"
+  },
+  "toast": {
+    "copiedToClipboard": "已複製到剪貼板",
+    "failedToCopy": "複製失敗",
+    "refreshing": "刷新中...",
+    "saved": "儲存成功",
+    "saveFailed": "儲存失敗",
+    "exported": "匯出成功",
+    "exportFailed": "匯出失敗"
+  }
+}

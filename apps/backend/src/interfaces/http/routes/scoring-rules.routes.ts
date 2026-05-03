@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { permission } from '../middleware/permission.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { z } from 'zod';
+import { detectLang, t } from '../../../shared/i18n';
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(100),
@@ -71,7 +72,8 @@ export function createScoringRulesRoutes(): Router {
   router.put('/:id', permission(['scoring:manage']), validate(UpdateRuleSchema), async (req, res) => {
     const rule = rules.get(String(req.params.id));
     if (!rule) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Rule not found' }, timestamp: new Date().toISOString() });
+      const lang = detectLang(req);
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('rule.not_found', lang) }, timestamp: new Date().toISOString() });
       return;
     }
     const body = req.body as any;
@@ -93,7 +95,8 @@ export function createScoringRulesRoutes(): Router {
 
   router.delete('/:id', permission(['scoring:manage']), async (req, res) => {
     if (!rules.delete(String(req.params.id))) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Rule not found' }, timestamp: new Date().toISOString() });
+      const lang = detectLang(req);
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('rule.not_found', lang) }, timestamp: new Date().toISOString() });
       return;
     }
     res.json({ success: true, data: { deleted: true }, timestamp: new Date().toISOString() });

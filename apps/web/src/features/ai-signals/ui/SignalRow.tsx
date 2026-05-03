@@ -5,17 +5,17 @@ import { TableRow, TableCell, Typography, Chip, Stack, IconButton, Collapse, Box
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useTranslation } from 'react-i18next';
 import { ScoreBadge } from './ScoreBadge';
 import { useThemeMode } from '@/app/Providers';
 import type { AISignal } from '../lib/types';
-
-const SOURCE_ICONS: Record<string, string> = { TELEGRAM: '📡', X: '🐦', ONCHAIN: '⛓️' };
 
 interface SignalRowProps { signal: AISignal; onSelect: (id: string) => void; }
 
 export const SignalRow = memo(function SignalRow({ signal, onSelect }: SignalRowProps) {
   const [expanded, setExpanded] = useState(false);
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -24,6 +24,12 @@ export const SignalRow = memo(function SignalRow({ signal, onSelect }: SignalRow
   const expandedBg = isDark ? '#1e293b' : '#f1f5f9';
   const score = signal.compositeScore;
 
+  const sourceIcons: Record<string, string> = {
+    TELEGRAM: t('aiSignals.sourceIcons.TELEGRAM'),
+    X: t('aiSignals.sourceIcons.X'),
+    ONCHAIN: t('aiSignals.sourceIcons.ONCHAIN'),
+  };
+
   return (
     <>
       <TableRow hover onClick={() => setExpanded(!expanded)} sx={{ cursor: 'pointer', bgcolor: expanded ? expandedBg : 'inherit', borderLeft: score !== null && score >= 80 ? '3px solid #22c55e' : '3px solid transparent', '&:hover': { bgcolor: expandedBg } }}>
@@ -31,7 +37,7 @@ export const SignalRow = memo(function SignalRow({ signal, onSelect }: SignalRow
           {signal.processedAt ? new Date(signal.processedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
         </TableCell>
         <TableCell sx={{ color: mutedText, borderColor, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
-          {SOURCE_ICONS[signal.source] ?? '📰'} <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>{signal.source}</Box>
+          {sourceIcons[signal.source] ?? '📰'} <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>{signal.source}</Box>
         </TableCell>
         <TableCell sx={{ borderColor, maxWidth: { xs: 120, md: 300 } }}>
           <Typography variant="body2" sx={{ color: primaryText, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
@@ -39,7 +45,7 @@ export const SignalRow = memo(function SignalRow({ signal, onSelect }: SignalRow
           </Typography>
         </TableCell>
         <TableCell sx={{ borderColor, display: { xs: 'none', md: 'table-cell' } }}>
-          {signal.isFake && <Chip label="FAKE" size="small" sx={{ bgcolor: '#7f1d1d20', color: '#ef4444', fontSize: '0.65rem' }} />}
+          {signal.isFake && <Chip label={t('aiSignals.fake')} size="small" sx={{ bgcolor: '#7f1d1d20', color: '#ef4444', fontSize: '0.65rem' }} />}
         </TableCell>
         <TableCell align="center" sx={{ borderColor }}>
           <ScoreBadge score={score} />
@@ -63,9 +69,9 @@ export const SignalRow = memo(function SignalRow({ signal, onSelect }: SignalRow
               <Box sx={{ p: { xs: 1.5, md: 2 } }}>
                 <Typography variant="body2" sx={{ color: primaryText, mb: 1, fontSize: { xs: '0.75rem', md: '0.85rem' } }}>{signal.content}</Typography>
                 <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
-                  <Chip label={`Truth: ${signal.truthScore ?? '?'}%`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
-                  <Chip label={`Sentiment: ${signal.sentimentScore ?? '?'}`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
-                  <Chip label={`Relevance: ${signal.relevanceScore ?? '?'}%`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
+                  <Chip label={`${t('aiSignals.drawer.truth')}: ${signal.truthScore ?? '?'}%`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
+                  <Chip label={`${t('aiSignals.drawer.sentiment')}: ${signal.sentimentScore ?? '?'}`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
+                  <Chip label={`${t('aiSignals.drawer.relevance')}: ${signal.relevanceScore ?? '?'}%`} size="small" sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText }} />
                 </Stack>
               </Box>
             </Collapse>

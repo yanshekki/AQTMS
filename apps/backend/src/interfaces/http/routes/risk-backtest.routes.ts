@@ -7,6 +7,7 @@ import { BacktestService } from '../../../application/services/BacktestService';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../../../shared/logger';
 import { permission } from '../middleware/permission.middleware';
+import { detectLang, t } from '../../../shared/i18n';
 
 const prisma = new PrismaClient();
 const riskEngine = new RiskEngine();
@@ -117,7 +118,8 @@ export function createBacktestRoutes(): Router {
     try {
       const report = await prisma.backtestReport.findUnique({ where: { id: String(req.params.id) } });
       if (!report) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Backtest not found' }, timestamp: new Date().toISOString() });
+        const lang = detectLang(req);
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('backtest.not_found', lang) }, timestamp: new Date().toISOString() });
         return;
       }
       res.json({

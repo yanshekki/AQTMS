@@ -24,9 +24,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '@/app/Providers';
-
-// ── Types ──
 
 interface ExchangeConnection {
   id: string;
@@ -42,8 +41,6 @@ interface ExchangeFormData {
   description: string;
 }
 
-// ── Mock exchange data ──
-
 const EXCHANGE_OPTIONS = ['Binance', 'Bybit', 'OKX', 'KuCoin', 'Coinbase'];
 const TIMEZONE_OPTIONS = [
   'UTC', 'Asia/Hong_Kong', 'Asia/Tokyo', 'Asia/Singapore',
@@ -58,16 +55,11 @@ function generateMockExchanges(): ExchangeConnection[] {
   ];
 }
 
-// ── Tab panel wrapper ──
-
 function TabPanel({ children, value, index }: { children: React.ReactNode; value: number; index: number }) {
   if (value !== index) return null;
   return <Box sx={{ pt: 3 }}>{children}</Box>;
 }
 
-// ── Sub-components ──
-
-/** Profile tab content */
 function ProfileTab({
   isDark, primaryText, mutedText, borderColor, onToast,
 }: {
@@ -77,25 +69,20 @@ function ProfileTab({
   borderColor: string;
   onToast: (msg: string, sev: 'success' | 'error' | 'info') => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('Ki');
   const [email, setEmail] = useState('ki@aqtms.io');
   const [timezone, setTimezone] = useState('Asia/Hong_Kong');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Simulate loading
   React.useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => setLoading(false), 400);
+    return () => clearTimeout(tm);
   }, []);
 
   const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      color: primaryText,
-      '& fieldset': { borderColor },
-      '&:hover fieldset': { borderColor: '#3b82f6' },
-      borderRadius: 3,
-    },
+    '& .MuiOutlinedInput-root': { color: primaryText, '& fieldset': { borderColor }, '&:hover fieldset': { borderColor: '#3b82f6' }, borderRadius: 3 },
     '& .MuiInputLabel-root': { color: mutedText },
   };
 
@@ -103,7 +90,7 @@ function ProfileTab({
     setSaving(true);
     await new Promise((r) => setTimeout(r, 800));
     setSaving(false);
-    onToast('Profile saved successfully', 'success');
+    onToast(t('settings.profile.saved'), 'success');
   };
 
   if (loading) {
@@ -119,51 +106,28 @@ function ProfileTab({
 
   return (
     <Stack spacing={3} alignItems="center">
-      {/* Avatar */}
       <Avatar sx={{ width: 80, height: 80, bgcolor: '#3b82f6', fontSize: '2rem', fontWeight: 700 }}>
         {name.charAt(0).toUpperCase()}
       </Avatar>
-
       <Stack spacing={2.5} width="100%" maxWidth={480}>
-        <TextField
-          label="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          fullWidth
-          sx={inputSx}
-        />
-        <TextField
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          fullWidth
-          sx={inputSx}
-        />
+        <TextField label={t('settings.profile.name')} value={name} onChange={(e) => setName(e.target.value)} fullWidth sx={inputSx} />
+        <TextField label={t('settings.profile.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth sx={inputSx} />
         <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { color: primaryText, '& fieldset': { borderColor }, borderRadius: 3 } }}>
-          <InputLabel sx={{ color: mutedText }}>Timezone</InputLabel>
-          <Select value={timezone} onChange={(e) => setTimezone(e.target.value)} label="Timezone">
-            {TIMEZONE_OPTIONS.map((tz) => (
-              <MenuItem key={tz} value={tz}>{tz}</MenuItem>
-            ))}
+          <InputLabel sx={{ color: mutedText }}>{t('settings.profile.timezone')}</InputLabel>
+          <Select value={timezone} onChange={(e) => setTimezone(e.target.value)} label={t('settings.profile.timezone')}>
+            {TIMEZONE_OPTIONS.map((tz) => <MenuItem key={tz} value={tz}>{tz}</MenuItem>)}
           </Select>
         </FormControl>
-
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={saving}
+        <Button variant="contained" onClick={handleSave} disabled={saving}
           sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none', py: 1.2 }}
-          startIcon={saving ? <CircularProgress size={18} sx={{ color: 'inherit' }} /> : null}
-        >
-          {saving ? 'Saving…' : 'Save Changes'}
+          startIcon={saving ? <CircularProgress size={18} sx={{ color: 'inherit' }} /> : null}>
+          {saving ? t('settings.profile.saving') : t('settings.profile.saveChanges')}
         </Button>
       </Stack>
     </Stack>
   );
 }
 
-/** API Keys tab content */
 function ApiKeysTab({
   isDark, primaryText, mutedText, cardBg, borderColor, onToast,
 }: {
@@ -174,6 +138,7 @@ function ApiKeysTab({
   borderColor: string;
   onToast: (msg: string, sev: 'success' | 'error' | 'info') => void;
 }) {
+  const { t } = useTranslation();
   const [exchanges, setExchanges] = useState<ExchangeConnection[]>(generateMockExchanges);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ExchangeConnection | null>(null);
@@ -183,39 +148,29 @@ function ApiKeysTab({
   const [submitting, setSubmitting] = useState(false);
 
   const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      '& fieldset': { borderColor },
-      '&:hover fieldset': { borderColor: '#3b82f6' },
-      borderRadius: 3,
-      color: primaryText,
-    },
+    '& .MuiOutlinedInput-root': { '& fieldset': { borderColor }, '&:hover fieldset': { borderColor: '#3b82f6' }, borderRadius: 3, color: primaryText },
     '& .MuiInputLabel-root': { color: mutedText },
   };
 
   const handleAdd = async () => {
     if (!form.exchange || !form.apiKey || !form.secret) {
-      onToast('Please fill all required fields', 'error');
+      onToast(t('settings.apiKeys.addModal.fillAllFields'), 'error');
       return;
     }
     setSubmitting(true);
     await new Promise((r) => setTimeout(r, 800));
-    const newEx: ExchangeConnection = {
-      id: `ex-${Date.now()}`,
-      exchange: form.exchange,
-      status: 'connected',
-      lastUsed: new Date().toISOString(),
-    };
-    setExchanges((prev) => [...prev, newEx]);
+    const newEx: ExchangeConnection = { id: `ex-${Date.now()}`, exchange: form.exchange, status: 'connected', lastUsed: new Date().toISOString() };
+    setExchanges(prev => [...prev, newEx]);
     setForm({ exchange: '', apiKey: '', secret: '', description: '' });
     setShowAddModal(false);
     setSubmitting(false);
-    onToast(`${form.exchange} API key added`, 'success');
+    onToast(`${form.exchange} ${t('settings.apiKeys.addModal.added')}`, 'success');
   };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
-    setExchanges((prev) => prev.filter((e) => e.id !== deleteTarget.id));
-    onToast(`${deleteTarget.exchange} connection removed`, 'info');
+    setExchanges(prev => prev.filter(e => e.id !== deleteTarget.id));
+    onToast(`${deleteTarget.exchange} ${t('settings.apiKeys.toast.removed')}`, 'info');
     setDeleteTarget(null);
   };
 
@@ -223,58 +178,46 @@ function ApiKeysTab({
     setTesting(id);
     await new Promise((r) => setTimeout(r, 1200));
     setTesting(null);
-    // Simulate 90% success
     const success = Math.random() > 0.1;
     if (success) {
-      setExchanges((prev) => prev.map((e) => e.id === id ? { ...e, status: 'connected' as const, lastUsed: new Date().toISOString() } : e));
-      onToast('Connection test successful', 'success');
+      setExchanges(prev => prev.map(e => e.id === id ? { ...e, status: 'connected' as const, lastUsed: new Date().toISOString() } : e));
+      onToast(t('settings.apiKeys.toast.testSuccess'), 'success');
     } else {
-      setExchanges((prev) => prev.map((e) => e.id === id ? { ...e, status: 'error' as const } : e));
-      onToast('Connection test failed — check API key permissions', 'error');
+      setExchanges(prev => prev.map(e => e.id === id ? { ...e, status: 'error' as const } : e));
+      onToast(t('settings.apiKeys.toast.testFailed'), 'error');
     }
   };
 
   const statusChip = (status: ExchangeConnection['status']) => {
     const config = {
-      connected: { bg: '#22c55e20', color: '#22c55e', label: 'Connected' },
-      error: { bg: '#ef444420', color: '#ef4444', label: 'Error' },
-      disconnected: { bg: '#f59e0b20', color: '#f59e0b', label: 'Disconnected' },
+      connected: { bg: '#22c55e20', color: '#22c55e', label: t('settings.apiKeys.status.connected') },
+      error: { bg: '#ef444420', color: '#ef4444', label: t('settings.apiKeys.status.error') },
+      disconnected: { bg: '#f59e0b20', color: '#f59e0b', label: t('settings.apiKeys.status.disconnected') },
     };
     const c = config[status];
-    return (
-      <Chip
-        icon={status === 'connected' ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <ErrorOutlineIcon sx={{ fontSize: 14 }} />}
-        label={c.label}
-        size="small"
-        sx={{ bgcolor: c.bg, color: c.color, fontWeight: 600, fontSize: '0.65rem', height: 22 }}
-      />
-    );
+    return <Chip icon={status === 'connected' ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <ErrorOutlineIcon sx={{ fontSize: 14 }} />}
+      label={c.label} size="small" sx={{ bgcolor: c.bg, color: c.color, fontWeight: 600, fontSize: '0.65rem', height: 22 }} />;
   };
 
   return (
     <Stack spacing={3}>
-      {/* Header */}
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1}>
         <Typography variant="body2" sx={{ color: mutedText }}>
-          {exchanges.length} exchange{exchanges.length !== 1 ? 's' : ''} connected
+          {exchanges.length} {t('settings.apiKeys.connectedCount')}
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setShowAddModal(true)}
-          sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}
-        >
-          Add API Key
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)}
+          sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}>
+          {t('settings.apiKeys.addApiKey')}
         </Button>
       </Stack>
 
-      {/* Exchange List */}
       {exchanges.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 6, bgcolor: cardBg, borderRadius: 3, border: '1px solid', borderColor }}>
           <VpnKeyIcon sx={{ fontSize: 48, color: mutedText, mb: 2 }} />
-          <Typography variant="body1" sx={{ color: mutedText, mb: 2 }}>No exchange connections yet</Typography>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)} sx={{ borderRadius: 3, borderColor: '#3b82f6', color: '#3b82f6' }}>
-            Connect Your First Exchange
+          <Typography variant="body1" sx={{ color: mutedText, mb: 2 }}>{t('settings.apiKeys.noExchanges')}</Typography>
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)}
+            sx={{ borderRadius: 3, borderColor: '#3b82f6', color: '#3b82f6' }}>
+            {t('settings.apiKeys.connectFirst')}
           </Button>
         </Box>
       ) : (
@@ -282,10 +225,10 @@ function ApiKeysTab({
           <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: isDark ? '#0f172a' : '#f1f5f9' }}>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Exchange</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Status</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Last Used</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }} align="center">Actions</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('settings.apiKeys.tableHeaders.exchange')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('settings.apiKeys.tableHeaders.status')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('settings.apiKeys.tableHeaders.lastUsed')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }} align="center">{t('settings.apiKeys.tableHeaders.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -293,22 +236,15 @@ function ApiKeysTab({
                 <TableRow key={ex.id} hover>
                   <TableCell sx={{ color: primaryText, fontSize: '0.75rem', borderColor, fontWeight: 600 }}>{ex.exchange}</TableCell>
                   <TableCell sx={{ borderColor }}>{statusChip(ex.status)}</TableCell>
-                  <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>
-                    {new Date(ex.lastUsed).toLocaleString()}
-                  </TableCell>
+                  <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{new Date(ex.lastUsed).toLocaleString()}</TableCell>
                   <TableCell sx={{ borderColor }} align="center">
                     <Stack direction="row" spacing={0.5} justifyContent="center">
-                      <Tooltip title="Test Connection">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleTest(ex.id)}
-                          disabled={testing === ex.id}
-                          sx={{ color: mutedText }}
-                        >
+                      <Tooltip title={t('settings.apiKeys.testConnection')}>
+                        <IconButton size="small" onClick={() => handleTest(ex.id)} disabled={testing === ex.id} sx={{ color: mutedText }}>
                           {testing === ex.id ? <CircularProgress size={16} /> : <PlayArrowIcon sx={{ fontSize: 18 }} />}
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete">
+                      <Tooltip title={t('settings.apiKeys.delete')}>
                         <IconButton size="small" onClick={() => setDeleteTarget(ex)} sx={{ color: '#ef4444' }}>
                           <DeleteIcon sx={{ fontSize: 18 }} />
                         </IconButton>
@@ -322,82 +258,54 @@ function ApiKeysTab({
         </TableContainer>
       )}
 
-      {/* Add API Key Modal */}
       <Dialog open={showAddModal} onClose={() => setShowAddModal(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { bgcolor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 4, border: '1px solid', borderColor } }}
-      >
-        <DialogTitle sx={{ color: primaryText, fontWeight: 700 }}>Add API Key</DialogTitle>
+        PaperProps={{ sx: { bgcolor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 4, border: '1px solid', borderColor } }}>
+        <DialogTitle sx={{ color: primaryText, fontWeight: 700 }}>{t('settings.apiKeys.addModal.title')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <FormControl fullWidth>
-              <InputLabel sx={{ color: mutedText }}>Exchange</InputLabel>
-              <Select
-                value={form.exchange}
-                onChange={(e) => setForm((f) => ({ ...f, exchange: e.target.value }))}
-                label="Exchange"
-                sx={{ color: primaryText, '& fieldset': { borderColor }, '&:hover fieldset': { borderColor: '#3b82f6' }, borderRadius: 3 }}
-              >
-                {EXCHANGE_OPTIONS.map((ex) => (
-                  <MenuItem key={ex} value={ex}>{ex}</MenuItem>
-                ))}
+              <InputLabel sx={{ color: mutedText }}>{t('settings.apiKeys.addModal.exchange')}</InputLabel>
+              <Select value={form.exchange} onChange={(e) => setForm(f => ({ ...f, exchange: e.target.value }))} label={t('settings.apiKeys.addModal.exchange')}
+                sx={{ color: primaryText, '& fieldset': { borderColor }, '&:hover fieldset': { borderColor: '#3b82f6' }, borderRadius: 3 }}>
+                {EXCHANGE_OPTIONS.map(ex => <MenuItem key={ex} value={ex}>{ex}</MenuItem>)}
               </Select>
             </FormControl>
-            <TextField label="API Key" value={form.apiKey} onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))} fullWidth sx={inputSx} />
-            <TextField
-              label="API Secret"
-              type={showSecret ? 'text' : 'password'}
-              value={form.secret}
-              onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-              InputProps={{
-                endAdornment: (
-                  <IconButton size="small" onClick={() => setShowSecret(!showSecret)} sx={{ color: mutedText }}>
-                    {showSecret ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                  </IconButton>
-                ),
-              }}
-            />
-            <TextField label="Description (optional)" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} fullWidth sx={inputSx} />
+            <TextField label={t('settings.apiKeys.addModal.apiKey')} value={form.apiKey}
+              onChange={(e) => setForm(f => ({ ...f, apiKey: e.target.value }))} fullWidth sx={inputSx} />
+            <TextField label={t('settings.apiKeys.addModal.apiSecret')} type={showSecret ? 'text' : 'password'} value={form.secret}
+              onChange={(e) => setForm(f => ({ ...f, secret: e.target.value }))} fullWidth sx={inputSx}
+              InputProps={{ endAdornment: <IconButton size="small" onClick={() => setShowSecret(!showSecret)} sx={{ color: mutedText }}>{showSecret ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}</IconButton> }} />
+            <TextField label={t('settings.apiKeys.addModal.description')} value={form.description}
+              onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} fullWidth sx={inputSx} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setShowAddModal(false)} sx={{ color: mutedText, borderRadius: 3, textTransform: 'none' }}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleAdd}
-            disabled={submitting}
+          <Button onClick={() => setShowAddModal(false)} sx={{ color: mutedText, borderRadius: 3, textTransform: 'none' }}>{t('settings.apiKeys.addModal.cancel')}</Button>
+          <Button variant="contained" onClick={handleAdd} disabled={submitting}
             startIcon={submitting ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : null}
-            sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}
-          >
-            {submitting ? 'Adding…' : 'Add Key'}
+            sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}>
+            {submitting ? t('settings.apiKeys.addModal.adding') : t('settings.apiKeys.addModal.addKey')}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirm Dialog */}
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}
-        PaperProps={{ sx: { bgcolor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 4, border: '1px solid', borderColor } }}
-      >
-        <DialogTitle sx={{ color: primaryText, fontWeight: 700 }}>Remove API Key?</DialogTitle>
+        PaperProps={{ sx: { bgcolor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 4, border: '1px solid', borderColor } }}>
+        <DialogTitle sx={{ color: primaryText, fontWeight: 700 }}>{t('settings.apiKeys.deleteModal.title')}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: mutedText }}>
-            This will disconnect <strong style={{ color: primaryText }}>{deleteTarget?.exchange}</strong> and delete its API key.
-            This action cannot be undone. Active trades will not be affected.
+            {t('settings.apiKeys.deleteModal.message')}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteTarget(null)} sx={{ color: mutedText, borderRadius: 3, textTransform: 'none' }}>Cancel</Button>
-          <Button onClick={handleDelete} variant="contained" color="error" sx={{ borderRadius: 3, textTransform: 'none' }}>
-            Remove
-          </Button>
+          <Button onClick={() => setDeleteTarget(null)} sx={{ color: mutedText, borderRadius: 3, textTransform: 'none' }}>{t('settings.apiKeys.deleteModal.cancel')}</Button>
+          <Button onClick={handleDelete} variant="contained" color="error" sx={{ borderRadius: 3, textTransform: 'none' }}>{t('settings.apiKeys.deleteModal.remove')}</Button>
         </DialogActions>
       </Dialog>
     </Stack>
   );
 }
 
-/** Notifications tab content */
 function NotificationsTab({
   primaryText, mutedText, cardBg, borderColor, onToast,
 }: {
@@ -408,95 +316,58 @@ function NotificationsTab({
   borderColor: string;
   onToast: (msg: string, sev: 'success' | 'error' | 'info') => void;
 }) {
-  const [settings, setSettings] = useState({
-    emailEnabled: true,
-    telegramEnabled: true,
-    inAppEnabled: true,
-    riskThreshold: 60,
-  });
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState({ emailEnabled: true, telegramEnabled: true, inAppEnabled: true, riskThreshold: 60 });
   const [saving, setSaving] = useState(false);
 
   const handleToggle = (key: 'emailEnabled' | 'telegramEnabled' | 'inAppEnabled') => {
-    setSettings((prev) => {
+    setSettings(prev => {
       const next = { ...prev, [key]: !prev[key] };
       return next;
     });
-    onToast(`${key.replace('Enabled', '')} notifications ${settings[key] ? 'disabled' : 'enabled'}`, 'success');
+    const chName = key === 'emailEnabled' ? 'Email' : key === 'telegramEnabled' ? 'Telegram' : 'In-App';
+    onToast(`${chName} ${settings[key] ? t('settings.notifications.disabled') : t('settings.notifications.enabled')}`, 'success');
   };
 
   const handleSaveThreshold = async () => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 600));
     setSaving(false);
-    onToast(`Risk alert threshold set to ${settings.riskThreshold}`, 'success');
+    onToast(`${t('settings.notifications.thresholdSaved')} ${settings.riskThreshold}`, 'success');
   };
 
-  const switchSx = {
-    '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' },
-    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' },
-  };
+  const switchSx = { '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' } };
 
   return (
     <Stack spacing={3}>
-      {/* Notification channels */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>Notification Channels</Typography>
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>{t('settings.notifications.title')}</Typography>
           <Stack spacing={1.5}>
-            <FormControlLabel
-              control={<Switch checked={settings.emailEnabled} onChange={() => handleToggle('emailEnabled')} sx={switchSx} />}
-              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>Email Notifications</Typography><Typography variant="caption" sx={{ color: mutedText }}>Trade confirmations, risk alerts, weekly reports</Typography></Box>}
-            />
-            <FormControlLabel
-              control={<Switch checked={settings.telegramEnabled} onChange={() => handleToggle('telegramEnabled')} sx={switchSx} />}
-              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>Telegram Alerts</Typography><Typography variant="caption" sx={{ color: mutedText }}>Real-time signals, urgent risk breaches</Typography></Box>}
-            />
-            <FormControlLabel
-              control={<Switch checked={settings.inAppEnabled} onChange={() => handleToggle('inAppEnabled')} sx={switchSx} />}
-              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>In-App Notifications</Typography><Typography variant="caption" sx={{ color: mutedText }}>Dashboard alerts, system health updates</Typography></Box>}
-            />
+            <FormControlLabel control={<Switch checked={settings.emailEnabled} onChange={() => handleToggle('emailEnabled')} sx={switchSx} />}
+              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{t('settings.notifications.emailNotifications')}</Typography><Typography variant="caption" sx={{ color: mutedText }}>{t('settings.notifications.emailDesc')}</Typography></Box>} />
+            <FormControlLabel control={<Switch checked={settings.telegramEnabled} onChange={() => handleToggle('telegramEnabled')} sx={switchSx} />}
+              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{t('settings.notifications.telegramAlerts')}</Typography><Typography variant="caption" sx={{ color: mutedText }}>{t('settings.notifications.telegramDesc')}</Typography></Box>} />
+            <FormControlLabel control={<Switch checked={settings.inAppEnabled} onChange={() => handleToggle('inAppEnabled')} sx={switchSx} />}
+              label={<Box><Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{t('settings.notifications.inAppNotifications')}</Typography><Typography variant="caption" sx={{ color: mutedText }}>{t('settings.notifications.inAppDesc')}</Typography></Box>} />
           </Stack>
         </CardContent>
       </Card>
-
-      {/* Risk threshold */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 3 }}>Risk Alert Threshold</Typography>
-          <Typography variant="body2" sx={{ color: mutedText, mb: 0.5 }}>
-            Trigger alerts when risk score exceeds:
-          </Typography>
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 3 }}>{t('settings.notifications.riskThreshold')}</Typography>
+          <Typography variant="body2" sx={{ color: mutedText, mb: 0.5 }}>{t('settings.notifications.thresholdDesc')}</Typography>
           <Box sx={{ px: 1 }}>
-            <Slider
-              value={settings.riskThreshold}
-              onChange={(_, val) => setSettings((s) => ({ ...s, riskThreshold: val as number }))}
-              min={0}
-              max={100}
-              step={5}
-              valueLabelDisplay="auto"
-              valueLabelFormat={(v) => `${v}`}
-              marks={[
-                { value: 0, label: '0' },
-                { value: 30, label: '30' },
-                { value: 60, label: '60' },
-                { value: 100, label: '100' },
-              ]}
-              sx={{
-                color: settings.riskThreshold <= 30 ? '#22c55e' : settings.riskThreshold <= 60 ? '#f59e0b' : '#ef4444',
-                '& .MuiSlider-thumb': { boxShadow: 'none' },
-                '& .MuiSlider-markLabel': { color: mutedText, fontSize: '0.7rem' },
-              }}
-            />
+            <Slider value={settings.riskThreshold} onChange={(_, val) => setSettings(s => ({ ...s, riskThreshold: val as number }))}
+              min={0} max={100} step={5} valueLabelDisplay="auto" valueLabelFormat={v => `${v}`}
+              marks={[{ value: 0, label: '0' }, { value: 30, label: '30' }, { value: 60, label: '60' }, { value: 100, label: '100' }]}
+              sx={{ color: settings.riskThreshold <= 30 ? '#22c55e' : settings.riskThreshold <= 60 ? '#f59e0b' : '#ef4444',
+                '& .MuiSlider-thumb': { boxShadow: 'none' }, '& .MuiSlider-markLabel': { color: mutedText, fontSize: '0.7rem' } }} />
             <Stack direction="row" justifyContent="center" mt={2}>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={handleSaveThreshold}
-                disabled={saving}
+              <Button variant="contained" size="small" onClick={handleSaveThreshold} disabled={saving}
                 startIcon={saving ? <CircularProgress size={14} sx={{ color: 'inherit' }} /> : null}
-                sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}
-              >
-                {saving ? 'Saving…' : 'Save Threshold'}
+                sx={{ borderRadius: 3, bgcolor: '#3b82f6', textTransform: 'none' }}>
+                {saving ? t('settings.notifications.saving') : t('settings.notifications.saveThreshold')}
               </Button>
             </Stack>
           </Box>
@@ -506,7 +377,6 @@ function NotificationsTab({
   );
 }
 
-/** Security tab content */
 function SecurityTab({
   isDark, primaryText, mutedText, cardBg, borderColor, onToast,
 }: {
@@ -517,73 +387,59 @@ function SecurityTab({
   borderColor: string;
   onToast: (msg: string, sev: 'success' | 'error' | 'info') => void;
 }) {
+  const { t } = useTranslation();
+
   const handleCopyWallet = async () => {
     try {
       await navigator.clipboard.writeText('0xB8c77482e45F1F44dE1745F52C74426C631bDD52');
-      onToast('Wallet address copied', 'success');
+      onToast(t('settings.security.walletCopied'), 'success');
     } catch {
-      onToast('Failed to copy', 'error');
+      onToast(t('settings.security.copyFailed'), 'error');
     }
   };
 
   return (
     <Stack spacing={3}>
-      {/* Change Password */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>Change Password</Typography>
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>{t('settings.security.changePassword')}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: mutedText }}>Password management is coming soon.</Typography>
-            <Chip label="Coming Soon" size="small" sx={{ bgcolor: '#f59e0b20', color: '#f59e0b', fontWeight: 600 }} />
+            <Typography variant="body2" sx={{ color: mutedText }}>{t('settings.security.passwordComingSoon')}</Typography>
+            <Chip label={t('settings.security.comingSoon')} size="small" sx={{ bgcolor: '#f59e0b20', color: '#f59e0b', fontWeight: 600 }} />
           </Box>
         </CardContent>
       </Card>
-
-      {/* 2FA */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>Two-Factor Authentication</Typography>
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>{t('settings.security.twoFactorAuth')}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: mutedText }}>Google Authenticator / TOTP support is coming soon.</Typography>
-            <Chip label="Coming Soon" size="small" sx={{ bgcolor: '#f59e0b20', color: '#f59e0b', fontWeight: 600 }} />
+            <Typography variant="body2" sx={{ color: mutedText }}>{t('settings.security.twoFactorComingSoon')}</Typography>
+            <Chip label={t('settings.security.comingSoon')} size="small" sx={{ bgcolor: '#f59e0b20', color: '#f59e0b', fontWeight: 600 }} />
           </Box>
         </CardContent>
       </Card>
-
-      {/* Wallet */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>Connected Wallet</Typography>
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>{t('settings.security.connectedWallet')}</Typography>
           <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" useFlexGap>
-            <Chip
-              label="0xB8c7...bDD52"
-              size="small"
-              sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText, fontFamily: 'monospace', fontWeight: 600 }}
-            />
-            <Tooltip title="Copy address">
-              <IconButton size="small" onClick={handleCopyWallet} sx={{ color: mutedText }}>
-                <ContentCopyIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+            <Chip label="0xB8c7...bDD52" size="small"
+              sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText, fontFamily: 'monospace', fontWeight: 600 }} />
+            <Tooltip title={t('common.copy')}>
+              <IconButton size="small" onClick={handleCopyWallet} sx={{ color: mutedText }}><ContentCopyIcon sx={{ fontSize: 16 }} /></IconButton>
             </Tooltip>
           </Stack>
           <Typography variant="caption" sx={{ color: mutedText, display: 'block', mt: 1 }}>
-            Ethereum Mainnet · Connected via MetaMask
+            {t('settings.security.walletNetwork')}
           </Typography>
         </CardContent>
       </Card>
-
-      {/* Encryption info */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>API Key Encryption</Typography>
-          <Chip
-            icon={<SecurityIcon sx={{ fontSize: 16 }} />}
-            label="AES-256-GCM"
-            size="small"
-            sx={{ bgcolor: '#22c55e20', color: '#22c55e', fontWeight: 700 }}
-          />
+          <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 2 }}>{t('settings.security.apiKeyEncryption')}</Typography>
+          <Chip icon={<SecurityIcon sx={{ fontSize: 16 }} />} label={t('settings.security.encryptionLabel')}
+            size="small" sx={{ bgcolor: '#22c55e20', color: '#22c55e', fontWeight: 700 }} />
           <Typography variant="caption" sx={{ color: mutedText, display: 'block', mt: 1 }}>
-            All API keys are encrypted at rest using AES-256-GCM. Keys are never logged or stored in plaintext.
+            {t('settings.security.encryptionDesc')}
           </Typography>
         </CardContent>
       </Card>
@@ -591,11 +447,10 @@ function SecurityTab({
   );
 }
 
-// ── Main Page ──
-
 export function SettingsPage() {
   const { mode, toggle } = useThemeMode();
   const theme = useTheme();
+  const { t, i18n } = useTranslation();
   const isDark = mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -605,101 +460,65 @@ export function SettingsPage() {
   const borderColor = isDark ? 'rgba(30,41,59,0.5)' : 'rgba(226,232,240,0.8)';
 
   const [tabValue, setTabValue] = useState(0);
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
-    open: false, message: '', severity: 'info',
-  });
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' });
 
   const showToast = useCallback((message: string, severity: 'success' | 'error' | 'info') => {
     setToast({ open: true, message, severity });
   }, []);
 
   const tabs = [
-    { label: 'Profile', icon: <PersonIcon sx={{ fontSize: 20 }} />, component: ProfileTab },
-    { label: 'API Keys', icon: <VpnKeyIcon sx={{ fontSize: 20 }} />, component: ApiKeysTab },
-    { label: 'Notifications', icon: <NotificationsIcon sx={{ fontSize: 20 }} />, component: NotificationsTab },
-    { label: 'Security', icon: <SecurityIcon sx={{ fontSize: 20 }} />, component: SecurityTab },
+    { label: t('settings.tabs.profile'), icon: <PersonIcon sx={{ fontSize: 20 }} />, component: ProfileTab },
+    { label: t('settings.tabs.apiKeys'), icon: <VpnKeyIcon sx={{ fontSize: 20 }} />, component: ApiKeysTab },
+    { label: t('settings.tabs.notifications'), icon: <NotificationsIcon sx={{ fontSize: 20 }} />, component: NotificationsTab },
+    { label: t('settings.tabs.security'), icon: <SecurityIcon sx={{ fontSize: 20 }} />, component: SecurityTab },
   ];
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
-      {/* Header */}
       <Box className="fade-in-up">
         <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-          Settings
+          {t('settings.title')}
         </Typography>
         <Typography variant="body2" sx={{ color: mutedText, mb: 1 }}>
-          User preferences · Notification · API Key Management · Security
+          {t('settings.subtitle')}
         </Typography>
       </Box>
 
-      {/* Theme Toggle */}
       <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, mb: 2, backdropFilter: 'blur(12px)' }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>Appearance</Typography>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isDark}
-                onChange={toggle}
-                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' } }}
-              />
-            }
-            label={<Typography variant="body2" sx={{ color: primaryText }}>{isDark ? 'Dark Mode' : 'Light Mode'}</Typography>}
-          />
+          <Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{t('settings.appearance')}</Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <FormControlLabel
+              control={<Switch checked={isDark} onChange={toggle}
+                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' } }} />}
+              label={<Typography variant="body2" sx={{ color: primaryText }}>{isDark ? t('settings.darkMode') : t('settings.lightMode')}</Typography>} />
+            <FormControl size="small" sx={{ minWidth: 100 }}>
+              <InputLabel sx={{ color: mutedText }}>🌐 {t('common.search')}</InputLabel>
+              <Select value={i18n.language} onChange={(e) => i18n.changeLanguage(e.target.value)}
+                label={`🌐 ${t('common.search')}`}
+                sx={{ color: primaryText, '.MuiOutlinedInput-notchedOutline': { borderColor }, borderRadius: 3 }}>
+                <MenuItem value="zh">🇭🇰 繁體中文</MenuItem>
+                <MenuItem value="en">🇬🇧 English</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
         </CardContent>
       </Card>
 
-      {/* Tabs */}
-      <Tabs
-        value={tabValue}
-        onChange={(_, v) => setTabValue(v)}
-        variant={isMobile ? 'scrollable' : 'fullWidth'}
-        scrollButtons="auto"
-        sx={{
-          '& .MuiTab-root': {
-            color: mutedText,
-            textTransform: 'none',
-            fontWeight: 600,
-            minHeight: 48,
-            '&.Mui-selected': { color: '#3b82f6' },
-          },
-          '& .MuiTabs-indicator': { bgcolor: '#3b82f6' },
-        }}
-      >
-        {tabs.map((t) => (
-          <Tab key={t.label} icon={t.icon} label={t.label} iconPosition="start" />
-        ))}
+      <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant={isMobile ? 'scrollable' : 'fullWidth'} scrollButtons="auto"
+        sx={{ '& .MuiTab-root': { color: mutedText, textTransform: 'none', fontWeight: 600, minHeight: 48, '&.Mui-selected': { color: '#3b82f6' } }, '& .MuiTabs-indicator': { bgcolor: '#3b82f6' } }}>
+        {tabs.map((t) => <Tab key={t.label} icon={t.icon} label={t.label} iconPosition="start" />)}
       </Tabs>
 
       <Divider sx={{ borderColor, mt: '-1px' }} />
 
-      {/* Tab Content */}
-      <TabPanel value={tabValue} index={0}>
-        <ProfileTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} borderColor={borderColor} onToast={showToast} />
-      </TabPanel>
-      <TabPanel value={tabValue} index={1}>
-        <ApiKeysTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} />
-      </TabPanel>
-      <TabPanel value={tabValue} index={2}>
-        <NotificationsTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} />
-      </TabPanel>
-      <TabPanel value={tabValue} index={3}>
-        <SecurityTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} />
-      </TabPanel>
+      <TabPanel value={tabValue} index={0}><ProfileTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} borderColor={borderColor} onToast={showToast} /></TabPanel>
+      <TabPanel value={tabValue} index={1}><ApiKeysTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} /></TabPanel>
+      <TabPanel value={tabValue} index={2}><NotificationsTab primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} /></TabPanel>
+      <TabPanel value={tabValue} index={3}><SecurityTab isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} onToast={showToast} /></TabPanel>
 
-      {/* Toast */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={3000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          severity={toast.severity}
-          variant="filled"
-          sx={{ borderRadius: 3, fontWeight: 600 }}
-        >
+      <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast(prev => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setToast(prev => ({ ...prev, open: false }))} severity={toast.severity} variant="filled" sx={{ borderRadius: 3, fontWeight: 600 }}>
           {toast.message}
         </Alert>
       </Snackbar>

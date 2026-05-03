@@ -11,6 +11,7 @@ import { errorMiddleware, authMiddleware } from './interfaces/http/middleware';
 import { permission } from './interfaces/http/middleware/permission.middleware';
 import { metricsMiddleware } from './interfaces/http/middleware/metrics.middleware';
 import { rateLimitMiddleware, authRateLimitMiddleware, strictRateLimitMiddleware } from './interfaces/http/middleware/rate-limit.middleware';
+import { detectLang, t } from './shared/i18n';
 import { createTradeRoutes } from './interfaces/http/routes/trade.routes';
 import { createExchangeRoutes } from './interfaces/http/routes/exchange.routes';
 import { createAuthRoutes } from './interfaces/http/routes/auth.routes';
@@ -255,7 +256,8 @@ app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
       where: { id: String(req.params.id) },
     });
     if (!news) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'News not found' }, timestamp: new Date().toISOString() });
+      const lang = detectLang(req);
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('news.not_found', lang) }, timestamp: new Date().toISOString() });
       return;
     }
     res.json({

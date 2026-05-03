@@ -1,24 +1,29 @@
 // ── Global Error Middleware ──
 // Catches all errors and returns structured JSON responses.
+// Supports i18n via Accept-Language header.
 
 import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '../../../shared/errors';
 import { logger } from '../../../shared/logger';
+import { detectLang, t } from '../../../shared/i18n';
 
 export function errorMiddleware(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
+  const lang = detectLang(req);
+
   // Known application errors
   if (err instanceof AppError) {
     logger.warn({ err, code: err.code }, 'Application error');
+    const message = t(err.code, lang);
     res.status(err.statusCode).json({
       success: false,
       error: {
         code: err.code,
-        message: err.message,
+        message: message !== err.code ? message : err.message,
         ...(err.details ? { details: err.details } : {}),
       },
       timestamp: new Date().toISOString(),
@@ -32,7 +37,7 @@ export function errorMiddleware(
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Request validation failed',
+        message: t('validation.failed', lang),
         details: (err as unknown as { issues: unknown[] }).issues,
       },
       timestamp: new Date().toISOString(),
@@ -47,7 +52,7 @@ export function errorMiddleware(
     error: {
       code: 'INTERNAL_ERROR',
       message: process.env.NODE_ENV === 'production'
-        ? 'An unexpected error occurred'
+        ? t('internal_error', lang)
         : err.message,
     },
     timestamp: new Date().toISOString(),

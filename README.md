@@ -1,8 +1,8 @@
-# 🏦 AQTMS — 全自動化量化交易管理系統
+[English](README.md) | [繁體中文](README.zh.md)
 
-**Automated Quantitative Trading Management System**
+# 🏦 AQTMS — Automated Quantitative Trading Management System
 
-企業級全自動量化交易平台 — 整合多交易所（CEX + DEX）、多 AI 模型、多資訊來源、專業風險控制，實現智能無人值守交易。
+Enterprise-grade fully automated quantitative trading platform — integrating multiple exchanges (CEX + DEX), multiple AI models, multiple data sources, and professional risk control for intelligent unattended trading.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4+-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev)
@@ -14,67 +14,67 @@
 
 ---
 
-## 📖 項目簡介
+## 📖 Overview
 
-AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 統一交易執行**，全流程自動化。
+AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-Dimensional Scoring → Strategy Trigger → Unified Trade Execution**.
 
-**核心價值：**
-- 🚀 全自動化：不需要人手盯盤，AI 自動判斷 + 執行
-- 🧠 多 AI 協作：Grok 驗真 + Gemini 評分 + DeepSeek 決策 + 自動降級
-- 🏦 全資產：加密貨幣 + 港股美股 + DEX 統一交易
-- 🛡 專業風控：VaR/CVaR · Kelly · 動態倉位 · 強制平倉規則
-- 📊 完整回測：歷史數據回放 + Sharpe/Sortino/Calmar 報告
-- 🔬 企業級架構：Hexagonal + DDD + Clean Architecture · 零 any 類型
-- ☸️ 生產就緒：K8s Helm · Prometheus · Docker Compose · CI/CD
-
----
-
-## 🎯 核心功能
-
-| 功能 | 說明 | 狀態 |
-|------|------|------|
-| **多交易所交易** | Binance · Bybit · Futu · IBKR · Uniswap V3 · PancakeSwap · Raydium | ✅ |
-| **AI 評分引擎** | 5 模型協作（OpenAI/DeepSeek/Grok/Gemini/Ollama）· 綜合評分 0-100 → 自動觸發交易 | ✅ |
-| **風險管理** | VaR 95%/99% · CVaR · Kelly (Full/Half) · Fixed Fractional · Fixed Ratio · ATR · 風險規則引擎 | ✅ |
-| **回測系統** | MA Cross + Score Threshold 策略 · Sharpe/Sortino/Calmar · 盈虧 + Drawdown 圖 · 月回報 | ✅ |
-| **資訊來源** | Telegram · X.com 即時監控 · 自動評分 + 信號觸發 → Trade Queue | ✅ |
-| **實時推送** | WebSocket（Socket.io JWT）· price/signal/order/risk/position 5 事件類型 | ✅ |
-| **監控告警** | Prometheus（12 metric types）+ Grafana · p95 延遲 · 交易成功率 · Queue 健康 | ✅ |
-| **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · 5 角色 RBAC · Rate Limiting | ✅ |
-| **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS | ✅ |
-| **團隊協作** | 5 角色（Super Admin/Admin/Trader/Analyst/Viewer）· 審計日誌 · CSV 導出 | ✅ |
-| **完整文檔** | API 文件 · 架構文件 · 用戶指南 · Demo 腳本 · 部署指南 · 交易測試清單 | ✅ |
+**Core Value:**
+- 🚀 Fully Automated: No manual monitoring — AI judges and executes automatically
+- 🧠 Multi-AI Collaboration: Grok verification + Gemini scoring + DeepSeek decision-making + auto-fallback
+- 🏦 Multi-Asset: Crypto + HK/US Stocks + DEX unified trading
+- 🛡 Professional Risk Control: VaR/CVaR · Kelly · Dynamic Position Sizing · Forced Liquidation Rules
+- 📊 Complete Backtesting: Historical data replay + Sharpe/Sortino/Calmar reports
+- 🔬 Enterprise Architecture: Hexagonal + DDD + Clean Architecture · Zero `any` types
+- ☸️ Production-Ready: K8s Helm · Prometheus · Docker Compose · CI/CD
 
 ---
 
-## 🚀 快速開始
+## 🎯 Core Features
 
-### 環境要求
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Multi-Exchange Trading** | Binance · Bybit · Futu · IBKR · Uniswap V3 · PancakeSwap · Raydium | ✅ |
+| **AI Scoring Engine** | 5-model collaboration (OpenAI/DeepSeek/Grok/Gemini/Ollama) · Composite score 0-100 → auto-trigger trades | ✅ |
+| **Risk Management** | VaR 95%/99% · CVaR · Kelly (Full/Half) · Fixed Fractional · Fixed Ratio · ATR · Risk Rule Engine | ✅ |
+| **Backtest System** | MA Cross + Score Threshold strategies · Sharpe/Sortino/Calmar · P&L + Drawdown charts · Monthly returns | ✅ |
+| **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue | ✅ |
+| **Real-time Push** | WebSocket (Socket.io JWT) · 5 event types: price/signal/order/risk/position | ✅ |
+| **Monitoring & Alerts** | Prometheus (12 metric types) + Grafana · p95 latency · Trade success rate · Queue health | ✅ |
+| **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · 5-role RBAC · Rate Limiting | ✅ |
+| **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS | ✅ |
+| **Team Collaboration** | 5 roles (Super Admin/Admin/Trader/Analyst/Viewer) · Audit logs · CSV export | ✅ |
+| **Complete Documentation** | API docs · Architecture docs · User guide · Demo scripts · Deployment guide · Trade test checklist | ✅ |
 
-| 依賴 | 版本 | 用途 |
-|------|------|------|
+---
+
+## 🚀 Quick Start
+
+### Requirements
+
+| Dependency | Version | Purpose |
+|------------|---------|---------|
 | Node.js | ≥ 22 | Runtime |
 | pnpm | ≥ 10 | Package manager |
-| MySQL | ≥ 8 | 主數據庫 |
-| Redis | ≥ 7 | 快取、隊列、Session |
+| MySQL | ≥ 8 | Primary database |
+| Redis | ≥ 7 | Cache, Queue, Session |
 
-### 安裝
+### Installation
 
 ```bash
 # 1. Clone
 git clone <repo-url> aqtms && cd aqtms
 
-# 2. 安裝依賴
+# 2. Install dependencies
 pnpm install
 
-# 3. 設定環境變數
+# 3. Configure environment variables
 cp apps/backend/.env.example apps/backend/.env
-# 編輯 .env — 填入 DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
+# Edit .env — fill in DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
 
-# 4. 初始化數據庫
+# 4. Initialize database
 cd apps/backend && npx prisma db push && cd ../..
 
-# 5. 啟動（開發模式）
+# 5. Start (development mode)
 # Backend: http://localhost:3001
 cd apps/backend && pnpm dev
 
@@ -82,13 +82,13 @@ cd apps/backend && pnpm dev
 cd apps/web && pnpm dev
 ```
 
-### 使用 Docker Compose（完整生產環境）
+### Using Docker Compose (Full Production Environment)
 
 ```bash
-# 啟動全部服務（Backend + Frontend + MySQL + Redis + Prometheus + Grafana）
+# Start all services (Backend + Frontend + MySQL + Redis + Prometheus + Grafana)
 docker-compose up -d
 
-# 訪問
+# Access
 # Frontend:  http://localhost
 # Backend:   http://localhost:3001
 # Grafana:   http://localhost:3000 (admin/admin)
@@ -97,18 +97,18 @@ docker-compose up -d
 
 ---
 
-## 🏗 架構
+## 🏗 Architecture
 
 ### Backend — Hexagonal Architecture + DDD + Clean Architecture
 
 ```
 apps/backend/src/
-├── domain/           # 純領域層（entities, value-objects, repository interfaces）
-├── application/      # 用例層（ExecuteTradeUseCase, ProcessNewsUseCase）
-├── infrastructure/   # 技術實現（Prisma, Adapters, BeeQueue, AI Providers）
-├── interfaces/       # HTTP/WS 邊界（controllers, dto, middleware, routes）
-├── shared/           # 跨層共用（errors, logger, config, redis, websocket, metrics）
-└── main.ts           # 入口
+├── domain/           # Pure domain layer (entities, value-objects, repository interfaces)
+├── application/      # Use-case layer (ExecuteTradeUseCase, ProcessNewsUseCase)
+├── infrastructure/   # Technical implementation (Prisma, Adapters, BeeQueue, AI Providers)
+├── interfaces/       # HTTP/WS boundaries (controllers, dto, middleware, routes)
+├── shared/           # Cross-cutting (errors, logger, config, redis, websocket, metrics, i18n)
+└── main.ts           # Entry point
 ```
 
 ### Frontend — Feature-Sliced Design + Atomic
@@ -116,56 +116,56 @@ apps/backend/src/
 ```
 apps/web/src/
 ├── app/              # Providers, Router, ErrorBoundary, ProtectedRoute
-├── features/         # 業務功能（exchange-connect, ai-signals）
-├── pages/            # 頁面（Dashboard, Exchanges, AISignals, Backtest）
-├── components/       # 共用組件（layout/Header, ui/）
+├── features/         # Business features (exchange-connect, ai-signals)
+├── pages/            # Pages (Dashboard, Exchanges, AISignals, Backtest)
+├── components/       # Shared components (layout/Header, ui/)
 ├── shared/           # api/, lib/, hooks/
 └── store/            # Jotai state
 ```
 
-### 微服務演進路徑
+### Microservice Evolution Path
 
 ```
-當前：模組化單體
+Current: Modular Monolith
   ↓ Phase 3
-提取 Data Ingestion + AI Orchestration 為獨立微服務 + NATS
+Extract Data Ingestion + AI Orchestration as independent microservices + NATS
   ↓ Phase 4
-全量微服務 + K8s + Istio + OpenTelemetry + Saga
+Full microservices + K8s + Istio + OpenTelemetry + Saga
 ```
 
 ---
 
-## 📡 API 總覽
+## 📡 API Overview
 
-> 完整 API 文件：參閱 [docs/api.md](docs/api.md)
+> Full API documentation: see [docs/api.md](docs/api.md)
 
-| Method | Endpoint | 說明 |
-|--------|----------|------|
-| GET | `/health` | 健康檢查 + Redis + Queue 狀態 |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check + Redis + Queue status |
 | GET | `/metrics` | Prometheus metrics |
-| POST | `/auth/challenge` | Wallet 登入挑戰 |
-| POST | `/auth/authenticate` | 簽名驗證 → JWT |
-| POST | `/api/v1/trades` | 下單 |
-| DELETE | `/api/v1/trades` | 撤單 |
-| POST | `/api/v1/exchanges/connect` | 連接交易所（AES-256 加密） |
-| GET | `/api/v1/exchanges` | 已連接交易所列表 |
-| POST | `/api/v1/exchanges/:id/test` | 測試連接 |
-| POST | `/api/v1/risk/metrics` | 計算風險指標 |
-| POST | `/api/v1/risk/position-size` | 倉位計算（4 算法） |
-| POST | `/api/v1/risk/evaluate` | 交易前風險檢查 |
-| POST | `/api/v1/backtest/run` | 執行回測 |
-| GET | `/api/v1/backtest/history` | 回測歷史 |
-| GET | `/api/v1/ai/providers` | AI Provider 狀態 |
-| GET | `/api/v1/news/recent` | 最新 AI 評分新聞 |
-| GET | `/api/v1/audit/export` | 審計日誌 CSV 下載 |
+| POST | `/auth/challenge` | Wallet login challenge |
+| POST | `/auth/authenticate` | Signature verification → JWT |
+| POST | `/api/v1/trades` | Place order |
+| DELETE | `/api/v1/trades` | Cancel order |
+| POST | `/api/v1/exchanges/connect` | Connect exchange (AES-256 encrypted) |
+| GET | `/api/v1/exchanges` | List connected exchanges |
+| POST | `/api/v1/exchanges/:id/test` | Test connection |
+| POST | `/api/v1/risk/metrics` | Calculate risk metrics |
+| POST | `/api/v1/risk/position-size` | Position sizing (4 algorithms) |
+| POST | `/api/v1/risk/evaluate` | Pre-trade risk check |
+| POST | `/api/v1/backtest/run` | Run backtest |
+| GET | `/api/v1/backtest/history` | Backtest history |
+| GET | `/api/v1/ai/providers` | AI Provider status |
+| GET | `/api/v1/news/recent` | Latest AI-scored news |
+| GET | `/api/v1/audit/export` | Audit log CSV download |
 
 ---
 
-## 🛠 技術棧
+## 🛠 Tech Stack
 
 ### Backend
-| 類別 | 技術 |
-|------|------|
+| Category | Technology |
+|----------|------------|
 | Runtime | Node.js 22 + TypeScript 5.4 (strict) |
 | Framework | Express 5 |
 | Database | Prisma 5 + MySQL 8 |
@@ -177,10 +177,11 @@ apps/web/src/
 | Monitoring | Prometheus + Prom-client (12 metric types) |
 | WebSocket | Socket.io (JWT auth + 5 event types) |
 | Security | Helmet · AES-256-GCM · Rate Limiting · RBAC |
+| i18n | Accept-Language header detection (en / 繁體中文) |
 
 ### Frontend
-| 類別 | 技術 |
-|------|------|
+| Category | Technology |
+|----------|------------|
 | Framework | React 18 + TypeScript 5.4 (strict) |
 | Build | Vite 6 |
 | UI | MUI 5 + Tailwind CSS 3 |
@@ -191,8 +192,8 @@ apps/web/src/
 | Testing | Vitest + React Testing Library + MSW |
 
 ### DevOps
-| 類別 | 技術 |
-|------|------|
+| Category | Technology |
+|----------|------------|
 | CI/CD | GitHub Actions (lint → test → build → docker) |
 | Container | Docker + Docker Compose (6 services) |
 | Orchestration | Kubernetes + Helm (2 charts) |
@@ -201,9 +202,9 @@ apps/web/src/
 
 ---
 
-## 🐳 部署
+## 🐳 Deployment
 
-### Docker Compose（開發/小型生產）
+### Docker Compose (Dev / Small Production)
 
 ```bash
 docker-compose up -d
@@ -214,7 +215,7 @@ docker-compose up -d
 - MySQL 8.4 + Redis 7
 - Prometheus + Grafana
 
-### Kubernetes（生產）
+### Kubernetes (Production)
 
 ```bash
 # Backend (with HPA auto-scaling)
@@ -224,11 +225,11 @@ helm install aqtms-backend ./infra/helm/backend -f values-prod.yaml
 helm install aqtms-frontend ./infra/helm/frontend -f values-prod.yaml
 ```
 
-> 完整部署指南：參閱 [docs/deployment.md](docs/deployment.md)
+> Full deployment guide: see [docs/deployment.md](docs/deployment.md)
 
 ---
 
-## 🧪 測試
+## 🧪 Testing
 
 ### E2E Tests (Playwright)
 
@@ -242,7 +243,7 @@ cd e2e && npx playwright test
 cd apps/backend && pnpm test
 ```
 
-### 測試覆蓋
+### Test Coverage
 
 - 🔐 Auth flow (login, redirect)
 - 💱 Exchange connect (form, modal, test)
@@ -253,7 +254,7 @@ cd apps/backend && pnpm test
 
 ---
 
-## 📊 數據庫 Schema
+## 📊 Database Schema
 
 ```
 User (id, walletAddress, role, permissions)
@@ -264,11 +265,11 @@ NewsEvent (id, source, content, compositeScore, aiAnalysis)
 BacktestReport (id, symbol, totalReturn, sharpeRatio, equityCurve)
 ```
 
-> 🔒 `apiKey`/`apiSecret` 使用 AES-256-GCM 加密儲存
+> 🔒 `apiKey`/`apiSecret` stored with AES-256-GCM encryption
 
 ---
 
-## 📂 項目結構
+## 📂 Project Structure
 
 ```
 aqtms/
@@ -292,68 +293,68 @@ aqtms/
 
 ---
 
-## 🤝 貢獻
+## 🤝 Contributing
 
-歡迎貢獻！無論係 Bug Report、Feature Request 定係 PR。
+Contributions are welcome! Whether it's a Bug Report, Feature Request, or PR.
 
-### 點樣貢獻
+### How to Contribute
 
-1. **Fork** 本倉庫
-2. **建立 Branch**：`git checkout -b feat/amazing-feature`
-3. **Commit**：`git commit -m 'feat: add amazing feature'`
-4. **Push**：`git push origin feat/amazing-feature`
-5. **開 Pull Request** → 填寫 PR Template
+1. **Fork** this repository
+2. **Create a Branch**: `git checkout -b feat/amazing-feature`
+3. **Commit**: `git commit -m 'feat: add amazing feature'`
+4. **Push**: `git push origin feat/amazing-feature`
+5. **Open a Pull Request** → fill in the PR Template
 
 ### Issue Templates
 
-| Template | 用途 |
-|----------|------|
-| 🐛 [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md) | 報告錯誤 |
-| ✨ [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md) | 建議新功能 |
-| ❓ [Question](.github/ISSUE_TEMPLATE/question.md) | 一般問題 |
+| Template | Purpose |
+|----------|---------|
+| 🐛 [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md) | Report a bug |
+| ✨ [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md) | Suggest a feature |
+| ❓ [Question](.github/ISSUE_TEMPLATE/question.md) | General questions |
 
-### Commit 規範
+### Commit Convention
 
-使用 [Conventional Commits](https://www.conventionalcommits.org/)：
-- `feat:` 新功能
-- `fix:` 錯誤修復
-- `docs:` 文檔更新
-- `perf:` 性能優化
-- `test:` 測試相關
-- `chore:` 構建/依賴
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation update
+- `perf:` Performance improvement
+- `test:` Testing related
+- `chore:` Build/dependencies
 
 ### PR Checklist
 
-提交 PR 前請確認：
-- [ ] 代碼符合項目風格
-- [ ] 無 `any` 類型
-- [ ] 權限在 Route / Middleware 處理
-- [ ] API I/O 有 Zod 驗證
-- [ ] 錯誤使用 AppError
-- [ ] 無跨層架構違反
+Before submitting a PR, please confirm:
+- [ ] Code follows project style
+- [ ] No `any` types
+- [ ] Permissions handled at Route / Middleware level
+- [ ] API I/O validated with Zod
+- [ ] Errors use AppError
+- [ ] No cross-layer architecture violations
 
 ---
 
-## 📄 授權
+## 📄 License
 
 MIT © AQTMS
 
 ---
 
-## ✅ 驗收標準
+## ✅ Acceptance Criteria
 
-| 對象 | 時間 | 目標 | 達成方式 |
-|------|------|------|----------|
-| **開發者** | 30 分鐘 | 成功啟動項目 | `pnpm install` → `cp .env.example .env` → `prisma db push` → `pnpm dev` |
-| **投資人** | 5 分鐘 | 理解項目價值 | 閱讀 README 項目簡介 + 核心功能表 |
-| **用戶** | 10 分鐘 | 完成首次交易 | Login → Exchange Connect → 查看 AI Signals → Backtest |
-
----
-
-## 🏢 團隊
-
-AQTMS 由專業量化開發團隊構建。如需商業支持或定制開發，請聯繫我們。
+| Audience | Time | Goal | How |
+|----------|------|------|-----|
+| **Developer** | 30 minutes | Successfully start the project | `pnpm install` → `cp .env.example .env` → `prisma db push` → `pnpm dev` |
+| **Investor** | 5 minutes | Understand project value | Read README overview + Core Features table |
+| **User** | 10 minutes | Complete first trade | Login → Exchange Connect → View AI Signals → Backtest |
 
 ---
 
-**AQTMS — 讓 AI 為你交易。** 🤖📈
+## 🏢 Team
+
+AQTMS is built by a professional quantitative development team. For commercial support or custom development, please contact us.
+
+---
+
+**AQTMS — Let AI trade for you.** 🤖📈

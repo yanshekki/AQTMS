@@ -11,12 +11,12 @@ import {
   Paper, useMediaQuery, useTheme,
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
-
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '@/app/Providers';
 import { riskApi } from '@/shared/api/riskApi';
 
@@ -61,11 +61,9 @@ interface RiskData {
   alerts: RiskAlert[];
 }
 
-// ── Mock Data Generator ──
-
 const ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'AVAX', 'DOT', 'LINK'];
 function generateMockRiskData(): RiskData {
-  const riskScore = Math.floor(20 + Math.random() * 55); // 20–75 range
+  const riskScore = Math.floor(20 + Math.random() * 55);
   const baseVar = 800 + Math.random() * 3000;
 
   const concentration: ConcentrationItem[] = [
@@ -95,7 +93,7 @@ function generateMockRiskData(): RiskData {
   const correlationPairs: CorrelationPair[] = [];
   for (let i = 0; i < ASSETS.length; i++) {
     for (let j = i + 1; j < ASSETS.length; j++) {
-      const baseCorr = 0.3 + Math.random() * 0.65; // 0.3–0.95
+      const baseCorr = 0.3 + Math.random() * 0.65;
       correlationPairs.push({ pair: `${ASSETS[i]}-${ASSETS[j]}`, value: Math.round(baseCorr * 100) / 100 });
     }
   }
@@ -142,9 +140,7 @@ function generateMockRiskData(): RiskData {
   };
 }
 
-// ── Sub-components ──
-
-/** Big risk score gauge card */
+// Sub-components use local useTranslation
 function RiskScoreCard({
   score, isDark, mutedText, cardBg, borderColor,
 }: {
@@ -154,13 +150,14 @@ function RiskScoreCard({
   cardBg: string;
   borderColor: string;
 }) {
+  const { t } = useTranslation();
   const color = score <= 30 ? '#22c55e' : score <= 60 ? '#f59e0b' : '#ef4444';
-  const label = score <= 30 ? 'Low Risk' : score <= 60 ? 'Medium Risk' : 'High Risk';
+  const label = score <= 30 ? t('risk.riskLevels.low') : score <= 60 ? t('risk.riskLevels.medium') : t('risk.riskLevels.high');
   return (
     <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, textAlign: 'center', backdropFilter: 'blur(12px)', height: '100%' }}>
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Typography variant="caption" sx={{ color: mutedText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Risk Score
+          {t('risk.riskScore')}
         </Typography>
         <Typography variant="h2" sx={{ color, fontWeight: 900, mt: 1, fontSize: { xs: '2.5rem', md: '3.5rem' } }}>
           {score}
@@ -170,25 +167,13 @@ function RiskScoreCard({
           value={score}
           sx={{ mt: 1, height: 6, borderRadius: 3, bgcolor: isDark ? '#1f2937' : '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 3 } }}
         />
-        <Chip
-          label={label}
-          size="small"
-          sx={{ mt: 1.5, bgcolor: `${color}20`, color, fontWeight: 700 }}
-        />
+        <Chip label={label} size="small" sx={{ mt: 1.5, bgcolor: `${color}20`, color, fontWeight: 700 }} />
       </CardContent>
     </Card>
   );
 }
 
-/** Single risk metric card */
-function RiskMetricCard({
-  label, value, sub, color,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  color?: string;
-}) {
+function RiskMetricCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   const { mode } = useThemeMode();
   const isDark = mode === 'dark';
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
@@ -211,7 +196,6 @@ function RiskMetricCard({
   );
 }
 
-/** Concentration risk breakdown card */
 function ConcentrationCard({
   items, isDark, primaryText, mutedText, cardBg, borderColor,
 }: {
@@ -222,28 +206,23 @@ function ConcentrationCard({
   cardBg: string;
   borderColor: string;
 }) {
+  const { t } = useTranslation();
   const levelColor = (level: string) =>
     level === 'CRITICAL' ? '#ef4444' : level === 'HIGH' ? '#f59e0b' : '#22c55e';
   return (
     <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, backdropFilter: 'blur(12px)', height: '100%' }}>
       <CardContent>
-        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>Concentration Risk</Typography>
+        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>{t('risk.concentrationTitle')}</Typography>
         {items.map((c) => (
           <Box key={c.asset} mb={1.5}>
             <Stack direction="row" justifyContent="space-between" mb={0.5}>
               <Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{c.asset}</Typography>
-              <Chip
-                label={c.riskLevel}
-                size="small"
-                sx={{ bgcolor: `${levelColor(c.riskLevel)}20`, color: levelColor(c.riskLevel), fontSize: '0.6rem', height: 20 }}
-              />
+              <Chip label={t(`risk.concentrationLevels.${c.riskLevel}` as any, c.riskLevel)} size="small"
+                sx={{ bgcolor: `${levelColor(c.riskLevel)}20`, color: levelColor(c.riskLevel), fontSize: '0.6rem', height: 20 }} />
             </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={Math.min(c.weight, 100)}
-              sx={{ height: 6, borderRadius: 3, bgcolor: isDark ? '#1f2937' : '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: levelColor(c.riskLevel), borderRadius: 3 } }}
-            />
-            <Typography variant="caption" sx={{ color: mutedText }}>{c.weight.toFixed(1)}% of portfolio</Typography>
+            <LinearProgress variant="determinate" value={Math.min(c.weight, 100)}
+              sx={{ height: 6, borderRadius: 3, bgcolor: isDark ? '#1f2937' : '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: levelColor(c.riskLevel), borderRadius: 3 } }} />
+            <Typography variant="caption" sx={{ color: mutedText }}>{c.weight.toFixed(1)}% {t('risk.ofPortfolio')}</Typography>
           </Box>
         ))}
       </CardContent>
@@ -251,7 +230,6 @@ function ConcentrationCard({
   );
 }
 
-/** Beta exposure card */
 function BetaExposureCard({
   items, onCopyHedge, isDark, primaryText, mutedText, cardBg, borderColor,
 }: {
@@ -263,33 +241,22 @@ function BetaExposureCard({
   cardBg: string;
   borderColor: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, backdropFilter: 'blur(12px)', height: '100%' }}>
       <CardContent>
-        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>Beta Exposure</Typography>
+        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>{t('risk.betaExposure')}</Typography>
         {items.map((b) => (
-          <Stack
-            key={b.asset}
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ py: 1, borderBottom: '1px solid', borderColor: isDark ? '#1f2937' : '#f1f5f9' }}
-          >
+          <Stack key={b.asset} direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap"
+            sx={{ py: 1, borderBottom: '1px solid', borderColor: isDark ? '#1f2937' : '#f1f5f9' }}>
             <Typography variant="body2" sx={{ color: primaryText, fontWeight: 600, minWidth: 60 }}>{b.asset}</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Chip
-                label={`β BTC: ${b.betaVsBTC.toFixed(2)}`}
-                size="small"
-                sx={{ bgcolor: Math.abs(b.betaVsBTC) > 1.5 ? '#ef444420' : '#22c55e20', color: Math.abs(b.betaVsBTC) > 1.5 ? '#ef4444' : '#22c55e', fontSize: '0.6rem' }}
-              />
-              <Chip
-                label={`β ETH: ${b.betaVsETH.toFixed(2)}`}
-                size="small"
-                sx={{ bgcolor: Math.abs(b.betaVsETH) > 1.5 ? '#ef444420' : '#22c55e20', color: Math.abs(b.betaVsETH) > 1.5 ? '#ef4444' : '#22c55e', fontSize: '0.6rem' }}
-              />
+              <Chip label={`β BTC: ${b.betaVsBTC.toFixed(2)}`} size="small"
+                sx={{ bgcolor: Math.abs(b.betaVsBTC) > 1.5 ? '#ef444420' : '#22c55e20', color: Math.abs(b.betaVsBTC) > 1.5 ? '#ef4444' : '#22c55e', fontSize: '0.6rem' }} />
+              <Chip label={`β ETH: ${b.betaVsETH.toFixed(2)}`} size="small"
+                sx={{ bgcolor: Math.abs(b.betaVsETH) > 1.5 ? '#ef444420' : '#22c55e20', color: Math.abs(b.betaVsETH) > 1.5 ? '#ef4444' : '#22c55e', fontSize: '0.6rem' }} />
               {b.hedgeSuggestion && (
-                <Tooltip title="Copy hedge suggestion">
+                <Tooltip title={t('risk.actions.copyHedge')}>
                   <IconButton size="small" onClick={() => onCopyHedge(b.hedgeSuggestion!)}>
                     <ContentCopyIcon sx={{ fontSize: 14, color: mutedText }} />
                   </IconButton>
@@ -303,7 +270,6 @@ function BetaExposureCard({
   );
 }
 
-/** Correlation Matrix heatmap */
 function CorrelationMatrix({
   matrix, isDark, primaryText, mutedText, cardBg, borderColor,
 }: {
@@ -314,33 +280,28 @@ function CorrelationMatrix({
   cardBg: string;
   borderColor: string;
 }) {
-  // Extract unique assets from pairs
+  const { t } = useTranslation();
   const assetSet = new Set<string>();
   matrix.forEach((p) => {
     const parts = p.pair.split('-');
-    const a = parts[0] ?? '';
-    const b = parts[1] ?? '';
-    if (a) assetSet.add(a);
-    if (b) assetSet.add(b);
+    if (parts[0]) assetSet.add(parts[0]);
+    if (parts[1]) assetSet.add(parts[1]);
   });
-  const assets = Array.from(assetSet).slice(0, 8); // limit to 8 for readability
+  const assets = Array.from(assetSet).slice(0, 8);
 
-  // Build lookup map
   const lookup = new Map<string, number>();
   matrix.forEach((p) => {
     lookup.set(p.pair, p.value);
     const parts = p.pair.split('-');
-    const a = parts[0] ?? '';
-    const b = parts[1] ?? '';
-    if (a && b) lookup.set(`${b}-${a}`, p.value);
+    if (parts[0] && parts[1]) lookup.set(`${parts[1]}-${parts[0]}`, p.value);
   });
 
   function corrColor(v: number): string {
-    if (v < 0) return '#22c55e'; // negative = good (diversification)
+    if (v < 0) return '#22c55e';
     if (v < 0.3) return '#4ade80';
     if (v < 0.5) return '#fbbf24';
     if (v < 0.7) return '#f97316';
-    return '#ef4444'; // high positive = bad
+    return '#ef4444';
   }
 
   const cellSize = { xs: 36, md: 48 };
@@ -348,26 +309,20 @@ function CorrelationMatrix({
   return (
     <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, backdropFilter: 'blur(12px)', height: '100%' }}>
       <CardContent sx={{ overflowX: 'auto' }}>
-        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>Correlation Matrix</Typography>
+        <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>{t('risk.correlationMatrix')}</Typography>
         <Box sx={{ overflowX: 'auto' }}>
-          {/* Header row */}
           <Stack direction="row" alignItems="center" spacing={0}>
             <Box sx={{ width: cellSize, minWidth: cellSize, height: cellSize }} />
             {assets.map((a) => (
               <Box key={a} sx={{ width: cellSize, minWidth: cellSize, height: cellSize, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="caption" sx={{ color: mutedText, fontWeight: 700, fontSize: '0.55rem' }}>
-                  {a}
-                </Typography>
+                <Typography variant="caption" sx={{ color: mutedText, fontWeight: 700, fontSize: '0.55rem' }}>{a}</Typography>
               </Box>
             ))}
           </Stack>
-          {/* Grid rows */}
           {assets.map((rowAsset) => (
             <Stack key={rowAsset} direction="row" alignItems="center" spacing={0}>
               <Box sx={{ width: cellSize, minWidth: cellSize, height: cellSize, display: 'flex', alignItems: 'center' }}>
-                <Typography variant="caption" sx={{ color: mutedText, fontWeight: 700, fontSize: '0.55rem' }}>
-                  {rowAsset}
-                </Typography>
+                <Typography variant="caption" sx={{ color: mutedText, fontWeight: 700, fontSize: '0.55rem' }}>{rowAsset}</Typography>
               </Box>
               {assets.map((colAsset) => {
                 if (rowAsset === colAsset) {
@@ -379,18 +334,14 @@ function CorrelationMatrix({
                 }
                 const val = lookup.get(`${rowAsset}-${colAsset}`);
                 return (
-                  <Box
-                    key={colAsset}
-                    sx={{
-                      width: cellSize, minWidth: cellSize, height: cellSize,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      bgcolor: val != null ? `${corrColor(val)}30` : 'transparent',
-                      border: '1px solid', borderColor: val != null ? corrColor(val) : 'transparent',
-                      borderRadius: 1,
-                      transition: 'all 0.2s',
-                      '&:hover': { transform: 'scale(1.1)', zIndex: 1 },
-                    }}
-                  >
+                  <Box key={colAsset} sx={{
+                    width: cellSize, minWidth: cellSize, height: cellSize,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    bgcolor: val != null ? `${corrColor(val)}30` : 'transparent',
+                    border: '1px solid', borderColor: val != null ? corrColor(val) : 'transparent',
+                    borderRadius: 1, transition: 'all 0.2s',
+                    '&:hover': { transform: 'scale(1.1)', zIndex: 1 },
+                  }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', color: val != null ? corrColor(val) : mutedText, fontWeight: 600 }}>
                       {val != null ? val.toFixed(2) : '—'}
                     </Typography>
@@ -400,20 +351,18 @@ function CorrelationMatrix({
             </Stack>
           ))}
         </Box>
-        {/* Legend */}
         <Stack direction="row" spacing={1} mt={2} flexWrap="wrap" justifyContent="center">
-          <Chip label="Negative" size="small" sx={{ bgcolor: '#22c55e20', color: '#22c55e', fontSize: '0.6rem', height: 20 }} />
-          <Chip label="Low (0–0.3)" size="small" sx={{ bgcolor: '#4ade8020', color: '#4ade80', fontSize: '0.6rem', height: 20 }} />
-          <Chip label="Moderate (0.3–0.5)" size="small" sx={{ bgcolor: '#fbbf2420', color: '#fbbf24', fontSize: '0.6rem', height: 20 }} />
-          <Chip label="High (0.5–0.7)" size="small" sx={{ bgcolor: '#f9731620', color: '#f97316', fontSize: '0.6rem', height: 20 }} />
-          <Chip label="Very High (0.7+)" size="small" sx={{ bgcolor: '#ef444420', color: '#ef4444', fontSize: '0.6rem', height: 20 }} />
+          <Chip label={t('risk.legend.negative')} size="small" sx={{ bgcolor: '#22c55e20', color: '#22c55e', fontSize: '0.6rem', height: 20 }} />
+          <Chip label={t('risk.legend.low')} size="small" sx={{ bgcolor: '#4ade8020', color: '#4ade80', fontSize: '0.6rem', height: 20 }} />
+          <Chip label={t('risk.legend.moderate')} size="small" sx={{ bgcolor: '#fbbf2420', color: '#fbbf24', fontSize: '0.6rem', height: 20 }} />
+          <Chip label={t('risk.legend.high')} size="small" sx={{ bgcolor: '#f9731620', color: '#f97316', fontSize: '0.6rem', height: 20 }} />
+          <Chip label={t('risk.legend.veryHigh')} size="small" sx={{ bgcolor: '#ef444420', color: '#ef4444', fontSize: '0.6rem', height: 20 }} />
         </Stack>
       </CardContent>
     </Card>
   );
 }
 
-/** Risk alerts table with copyable actions */
 function RiskAlertList({
   alerts, onCopyAction, isDark, primaryText, mutedText, cardBg, borderColor,
 }: {
@@ -425,21 +374,22 @@ function RiskAlertList({
   cardBg: string;
   borderColor: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, backdropFilter: 'blur(12px)' }}>
       <CardContent>
         <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>
           <WarningAmberIcon sx={{ fontSize: 18, mr: 0.5, verticalAlign: 'middle', color: '#f59e0b' }} />
-          Risk Alerts & Suggested Actions
+          {t('risk.riskAlerts')}
         </Typography>
         <TableContainer component={Paper} sx={{ bgcolor: 'transparent', boxShadow: 'none' }}>
           <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: isDark ? '#0f172a' : '#f1f5f9' }}>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Rule</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Status</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Message</TableCell>
-                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>Suggested Action</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('risk.tableHeaders.rule')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('risk.tableHeaders.status')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('risk.tableHeaders.message')}</TableCell>
+                <TableCell sx={{ color: mutedText, fontSize: '0.7rem', fontWeight: 700, borderColor }}>{t('risk.tableHeaders.suggestedAction')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -449,21 +399,17 @@ function RiskAlertList({
                   <TableCell sx={{ borderColor }}>
                     <Chip
                       icon={a.status === 'BREACHED' ? <ErrorOutlineIcon sx={{ fontSize: 14 }} /> : <WarningAmberIcon sx={{ fontSize: 14 }} />}
-                      label={a.status}
+                      label={t(`risk.alertStatus.${a.status}` as any, a.status)}
                       size="small"
                       sx={{ bgcolor: a.status === 'BREACHED' ? '#ef444420' : '#f59e0b20', color: a.status === 'BREACHED' ? '#ef4444' : '#f59e0b', fontSize: '0.6rem', height: 22 }}
                     />
                   </TableCell>
                   <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{a.message}</TableCell>
                   <TableCell sx={{ borderColor }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
+                    <Button size="small" variant="outlined" startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
                       onClick={() => onCopyAction(a.action)}
-                      sx={{ borderColor: '#3b82f6', color: '#3b82f6', fontSize: '0.65rem', borderRadius: 2, textTransform: 'none', whiteSpace: 'nowrap' }}
-                    >
-                      Copy
+                      sx={{ borderColor: '#3b82f6', color: '#3b82f6', fontSize: '0.65rem', borderRadius: 2, textTransform: 'none', whiteSpace: 'nowrap' }}>
+                      {t('risk.actions.copy')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -476,11 +422,10 @@ function RiskAlertList({
   );
 }
 
-// ── Main Page ──
-
 export function RiskPage() {
   const { mode } = useThemeMode();
   const theme = useTheme();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -489,7 +434,6 @@ export function RiskPage() {
   const cardBg = isDark ? 'rgba(17,24,39,0.7)' : 'rgba(255,255,255,0.7)';
   const borderColor = isDark ? 'rgba(30,41,59,0.5)' : 'rgba(226,232,240,0.8)';
 
-  // ── State ──
   const [data, setData] = useState<RiskData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -499,7 +443,6 @@ export function RiskPage() {
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Fetch from API (fallback to mock) ──
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -512,52 +455,46 @@ export function RiskPage() {
       ]);
       setData(response.data as RiskData);
     } catch (err: unknown) {
-      // Fallback to mock data on API failure
       const mock = generateMockRiskData();
       setData(mock);
-      const msg = err instanceof Error ? err.message : 'Failed to fetch risk data';
+      const msg = err instanceof Error ? err.message : t('risk.failedToFetch');
       setError(msg);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
-  // Auto-refresh every 15 seconds
   useEffect(() => {
     fetchData();
     intervalRef.current = setInterval(() => fetchData(true), 15_000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [fetchData]);
 
-  // ── Actions ──
   const handleCopy = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setToast({ open: true, message: 'Copied to clipboard', severity: 'success' });
+      setToast({ open: true, message: t('toast.copiedToClipboard'), severity: 'success' });
     } catch {
-      setToast({ open: true, message: 'Failed to copy', severity: 'error' });
+      setToast({ open: true, message: t('toast.failedToCopy'), severity: 'error' });
     }
-  }, []);
+  }, [t]);
 
   const handleManualRefresh = useCallback(() => {
     fetchData(true);
-    setToast({ open: true, message: 'Refreshing risk data...', severity: 'info' });
-  }, [fetchData]);
+    setToast({ open: true, message: t('toast.refreshing'), severity: 'info' });
+  }, [fetchData, t]);
 
   const riskScoreColor = (data?.riskScore ?? 0) <= 30 ? '#22c55e' : (data?.riskScore ?? 0) <= 60 ? '#f59e0b' : '#ef4444';
 
-  // ── Loading Skeleton ──
   if (loading && !data) {
     return (
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
         <Box className="fade-in-up">
           <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, mb: 1 }}>
-            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: mutedText }} />Risk Dashboard
+            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: mutedText }} />{t('risk.title')}
           </Typography>
-          <Typography variant="body2" sx={{ color: mutedText, mb: 3 }}>Loading risk metrics…</Typography>
+          <Typography variant="body2" sx={{ color: mutedText, mb: 3 }}>{t('risk.loading')}</Typography>
         </Box>
         <Grid container spacing={{ xs: 1.5, md: 3 }}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -565,76 +502,66 @@ export function RiskPage() {
               <Skeleton variant="rounded" height={isMobile ? 140 : 180} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} />
             </Grid>
           ))}
-          <Grid item xs={12} md={6}>
-            <Skeleton variant="rounded" height={300} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Skeleton variant="rounded" height={300} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} />
-          </Grid>
-          <Grid item xs={12}>
-            <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} />
-          </Grid>
+          <Grid item xs={12} md={6}><Skeleton variant="rounded" height={300} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} /></Grid>
+          <Grid item xs={12} md={6}><Skeleton variant="rounded" height={300} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} /></Grid>
+          <Grid item xs={12}><Skeleton variant="rounded" height={280} sx={{ borderRadius: 3, bgcolor: isDark ? '#1e293b' : '#e2e8f0' }} /></Grid>
         </Grid>
       </Container>
     );
   }
 
-  // ── Error State ──
   if (error && !data) {
     return (
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
         <Box className="fade-in-up">
           <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, mb: 1 }}>
-            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#ef4444' }} />Risk Dashboard
+            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#ef4444' }} />{t('risk.title')}
           </Typography>
         </Box>
         <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, textAlign: 'center', py: 8, px: 3 }}>
           <ErrorOutlineIcon sx={{ fontSize: 64, color: '#ef4444', mb: 2 }} />
-          <Typography variant="h6" sx={{ color: '#ef4444', mb: 1, fontWeight: 700 }}>Failed to Load Risk Data</Typography>
+          <Typography variant="h6" sx={{ color: '#ef4444', mb: 1, fontWeight: 700 }}>{t('risk.failedToLoad')}</Typography>
           <Typography variant="body2" sx={{ color: mutedText, mb: 3 }}>{error}</Typography>
           <Button variant="contained" onClick={handleManualRefresh} startIcon={<RefreshIcon />} sx={{ borderRadius: 3 }}>
-            Retry
+            {t('risk.actions.retry')}
           </Button>
         </Card>
       </Container>
     );
   }
 
-  // ── Empty State ──
   if (!data) {
     return (
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
         <Box className="fade-in-up">
           <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, mb: 1 }}>
-            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: mutedText }} />Risk Dashboard
+            <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: mutedText }} />{t('risk.title')}
           </Typography>
         </Box>
         <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, textAlign: 'center', py: 8, px: 3 }}>
           <CheckCircleOutlineIcon sx={{ fontSize: 64, color: mutedText, mb: 2 }} />
-          <Typography variant="h6" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>No Risk Data Available</Typography>
-          <Typography variant="body2" sx={{ color: isDark ? '#374151' : '#cbd5e1' }}>Connect an exchange and enable risk monitoring to see metrics.</Typography>
+          <Typography variant="h6" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>{t('risk.noData')}</Typography>
+          <Typography variant="body2" sx={{ color: isDark ? '#374151' : '#cbd5e1' }}>{t('risk.noDataHint')}</Typography>
         </Card>
       </Container>
     );
   }
 
-  // ── Main Render ──
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
-      {/* Header */}
       <Box className="fade-in-up">
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} mb={1} spacing={1}>
           <Box>
             <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-              <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: riskScoreColor }} />Risk Dashboard
+              <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: riskScoreColor }} />{t('risk.title')}
             </Typography>
-            <Typography variant="body2" sx={{ color: mutedText }}>VaR · Drawdown · Concentration · Beta · Correlation</Typography>
+            <Typography variant="body2" sx={{ color: mutedText }}>{t('risk.subtitle')}</Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
             {refreshing && <CircularProgress size={16} sx={{ color: mutedText }} />}
             <Chip
               icon={<RefreshIcon sx={{ fontSize: 14 }} />}
-              label={refreshing ? 'Refreshing…' : 'Auto 15s'}
+              label={refreshing ? t('risk.actions.refreshing') : t('risk.actions.auto15s')}
               size="small"
               onClick={handleManualRefresh}
               sx={{ bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: mutedText, cursor: 'pointer', fontSize: '0.65rem' }}
@@ -644,76 +571,45 @@ export function RiskPage() {
       </Box>
 
       <Grid container spacing={{ xs: 1.5, md: 3 }} className="stagger-children">
-        {/* Risk Score */}
         <Grid item xs={12} sm={6} md={3}>
           <RiskScoreCard score={data.riskScore} isDark={isDark} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} />
         </Grid>
-
-        {/* Metric Cards */}
         <Grid item xs={6} sm={6} md={3}>
-          <RiskMetricCard label="VaR 95% (1-Day)" value={`$${data.var95.toLocaleString()}`} sub="5% probability loss" color={data.var95 > 3000 ? '#ef4444' : '#22c55e'} />
+          <RiskMetricCard label={t('risk.var95_1Day')} value={`$${data.var95.toLocaleString()}`} sub={t('risk.var95Sub')} color={data.var95 > 3000 ? '#ef4444' : '#22c55e'} />
         </Grid>
         <Grid item xs={6} sm={6} md={3}>
-          <RiskMetricCard label="VaR 99% (1-Day)" value={`$${data.var99.toLocaleString()}`} sub="1% probability loss" />
+          <RiskMetricCard label={t('risk.var99_1Day')} value={`$${data.var99.toLocaleString()}`} sub={t('risk.var99Sub')} />
         </Grid>
         <Grid item xs={6} sm={6} md={3}>
-          <RiskMetricCard label="CVaR 95%" value={`$${data.cvar95.toLocaleString()}`} sub="Expected shortfall" />
-        </Grid>
-
-        {/* Drawdown */}
-        <Grid item xs={6} sm={6} md={3}>
-          <RiskMetricCard
-            label="Max Drawdown"
-            value={`${data.maxDrawdown}%`}
-            sub={`Current: ${data.currentDrawdown}%`}
-            color={data.maxDrawdown > 25 ? '#ef4444' : data.maxDrawdown > 15 ? '#f59e0b' : '#22c55e'}
-          />
+          <RiskMetricCard label={t('risk.cvar95')} value={`$${data.cvar95.toLocaleString()}`} sub={t('risk.cvar95Sub')} />
         </Grid>
         <Grid item xs={6} sm={6} md={3}>
-          <RiskMetricCard
-            label="Concentration Risk"
-            value={data.concentrationRisk}
-            sub="Top asset weight"
-            color={
-              data.concentrationRisk === 'CRITICAL' ? '#ef4444'
-              : data.concentrationRisk === 'HIGH' ? '#f59e0b'
-              : '#22c55e'
-            }
-          />
+          <RiskMetricCard label={t('risk.maxDrawdown')} value={`${data.maxDrawdown}%`}
+            sub={`${t('risk.currentDrawdown')}: ${data.currentDrawdown}%`}
+            color={data.maxDrawdown > 25 ? '#ef4444' : data.maxDrawdown > 15 ? '#f59e0b' : '#22c55e'} />
         </Grid>
-
-        {/* Concentration & Beta */}
+        <Grid item xs={6} sm={6} md={3}>
+          <RiskMetricCard label={t('risk.concentrationRisk')} value={t(`risk.concentrationLevels.${data.concentrationRisk}` as any, data.concentrationRisk)}
+            sub={t('risk.concentrationSub')}
+            color={data.concentrationRisk === 'CRITICAL' ? '#ef4444' : data.concentrationRisk === 'HIGH' ? '#f59e0b' : '#22c55e'} />
+        </Grid>
         <Grid item xs={12} md={6}>
           <ConcentrationCard items={data.concentration} isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} />
         </Grid>
         <Grid item xs={12} md={6}>
           <BetaExposureCard items={data.betaExposure} onCopyHedge={handleCopy} isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} />
         </Grid>
-
-        {/* Correlation Matrix */}
         <Grid item xs={12} lg={6}>
           <CorrelationMatrix matrix={data.correlationMatrix} isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} />
         </Grid>
-
-        {/* Risk Alerts */}
         <Grid item xs={12} lg={6}>
           <RiskAlertList alerts={data.alerts} onCopyAction={handleCopy} isDark={isDark} primaryText={primaryText} mutedText={mutedText} cardBg={cardBg} borderColor={borderColor} />
         </Grid>
       </Grid>
 
-      {/* Toast */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={3000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          severity={toast.severity}
-          variant="filled"
-          sx={{ borderRadius: 3, fontWeight: 600 }}
-        >
+      <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setToast((prev) => ({ ...prev, open: false }))} severity={toast.severity} variant="filled" sx={{ borderRadius: 3, fontWeight: 600 }}>
           {toast.message}
         </Alert>
       </Snackbar>

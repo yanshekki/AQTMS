@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSetAtom } from 'jotai';
 import { Container, Card, CardContent, Typography, Button, Alert, CircularProgress, Box, Stack } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
+import { useTranslation } from 'react-i18next';
 import { requestChallenge, authenticate } from '@/shared/api/authApi';
 import { authAtom } from '@/store/auth';
 import { useThemeMode } from '@/app/Providers';
@@ -13,6 +14,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useSetAtom(authAtom);
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -22,36 +24,29 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      // Check if ethereum provider exists (MetaMask, Brave, etc.)
       if (!window.ethereum) {
-        // Try WalletConnect deep link as fallback
-        setError('No wallet detected. Please install MetaMask or use a Web3 browser.');
+        setError(t('auth.noWallet'));
         setLoading(false);
         return;
       }
 
-      // Request accounts
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
       if (!accounts?.[0]) {
-        throw new Error('No account selected');
+        throw new Error(t('auth.noAccount'));
       }
 
       const address = accounts[0].toLowerCase();
       setWalletAddress(address);
 
-      // Step 1: Request challenge
       const message = await requestChallenge(address);
 
-      // Step 2: Sign the challenge
       const signature = await window.ethereum.request({
         method: 'personal_sign',
         params: [message, address],
       }) as string;
 
-      // Step 3: Authenticate
       const authData = await authenticate(address, signature);
 
-      // Step 4: Store auth state
       setAuth({
         isAuthenticated: true,
         token: authData.token,
@@ -61,11 +56,10 @@ export function LoginPage() {
         permissions: authData.user.permissions,
       });
 
-      // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {
       console.error('Login failed:', err);
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : t('auth.walletLoginFailed'));
     } finally {
       setLoading(false);
     }
@@ -87,7 +81,6 @@ export function LoginPage() {
         overflow: 'hidden',
       }}
     >
-      {/* Background data grid pattern */}
       <Box
         sx={{
           position: 'absolute', inset: 0,
@@ -112,7 +105,6 @@ export function LoginPage() {
             }}
           >
             <CardContent sx={{ p: { xs: 4, sm: 6 }, textAlign: 'center' }}>
-              {/* Logo */}
               <Box
                 component="img"
                 src="/logo.svg"
@@ -132,10 +124,10 @@ export function LoginPage() {
                   letterSpacing: '-0.03em',
                 }}
               >
-                AQTMS
+                {t('auth.loginTitle')}
               </Typography>
               <Typography variant="body2" sx={{ color: mode === 'dark' ? '#9ca3af' : '#64748b', mb: 1 }}>
-                Automated Quantitative Trading Management System
+                {t('auth.loginSubtitle')}
               </Typography>
               <Typography
                 variant="caption"
@@ -151,7 +143,7 @@ export function LoginPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                v1.0 · Production Ready
+                {t('auth.versionBadge')}
               </Typography>
 
               {error && (
@@ -181,7 +173,7 @@ export function LoginPage() {
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
-                {loading ? 'Connecting...' : 'Connect Wallet to Login'}
+                {loading ? t('auth.connecting') : t('auth.connectWallet')}
               </Button>
 
               {walletAddress && (
@@ -191,9 +183,14 @@ export function LoginPage() {
               )}
 
               <Stack direction="row" justifyContent="center" spacing={1} mt={3}>
-                {['MetaMask', 'Brave', 'WalletConnect', 'Coinbase'].map((wallet) => (
+                {[
+                  { key: 'metamask', label: t('auth.walletLabels.metamask') },
+                  { key: 'brave', label: t('auth.walletLabels.brave') },
+                  { key: 'walletConnect', label: t('auth.walletLabels.walletConnect') },
+                  { key: 'coinbase', label: t('auth.walletLabels.coinbase') },
+                ].map((wallet) => (
                   <Typography
-                    key={wallet}
+                    key={wallet.key}
                     variant="caption"
                     sx={{
                       color: mode === 'dark' ? '#374151' : '#cbd5e1',
@@ -201,13 +198,13 @@ export function LoginPage() {
                       fontWeight: 500,
                     }}
                   >
-                    {wallet}
+                    {wallet.label}
                   </Typography>
                 ))}
               </Stack>
 
               <Typography variant="caption" sx={{ color: mode === 'dark' ? '#374151' : '#cbd5e1', mt: 3, display: 'block' }}>
-                No gas fees · Wallet signature only · Your keys never leave your browser
+                {t('auth.noGasFees')}
               </Typography>
             </CardContent>
           </Card>
@@ -217,7 +214,6 @@ export function LoginPage() {
   );
 }
 
-// Type declaration for window.ethereum
 declare global {
   interface Window {
     ethereum?: {

@@ -3,6 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { TextField, FormControl, InputLabel, Select, MenuItem, Stack } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { ConnectExchangeSchema, type ConnectExchangeForm } from '../lib/schemas';
 import { useThemeMode } from '@/app/Providers';
 
@@ -10,6 +11,7 @@ interface ApiKeyFormProps { onSubmit: (data: ConnectExchangeForm) => void; disab
 
 export function ApiKeyForm({ onSubmit, disabled }: ApiKeyFormProps) {
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -24,14 +26,14 @@ export function ApiKeyForm({ onSubmit, disabled }: ApiKeyFormProps) {
     <form onSubmit={handleSubmit(onSubmit)}>
       <Stack spacing={2.5}>
         <FormControl fullWidth>
-          <InputLabel sx={{ color: mutedText }}>Exchange</InputLabel>
-          <Select {...register('exchange')} defaultValue="binance" label="Exchange" sx={{ color: primaryText, '.MuiOutlinedInput-notchedOutline': { borderColor } }}>
+          <InputLabel sx={{ color: mutedText }}>{t('exchanges.exchange')}</InputLabel>
+          <Select {...register('exchange')} defaultValue="binance" label={t('exchanges.exchange')} sx={{ color: primaryText, '.MuiOutlinedInput-notchedOutline': { borderColor } }}>
             <MenuItem value="BINANCE">Binance</MenuItem>
             <MenuItem value="BYBIT">Bybit</MenuItem>
           </Select>
         </FormControl>
-        <TextField label="API Key" type="password" {...register('apiKey')} error={!!errors.apiKey} helperText={errors.apiKey?.message} fullWidth disabled={disabled ?? false} sx={inputSx} />
-        <TextField label="API Secret" type="password" {...register('apiSecret')} error={!!errors.apiSecret} helperText={errors.apiSecret?.message} fullWidth disabled={disabled ?? false} sx={inputSx} />
+        <TextField label={t('exchanges.apiKey')} type="password" {...register('apiKey')} error={!!errors.apiKey} helperText={errors.apiKey?.message} fullWidth disabled={disabled ?? false} sx={inputSx} />
+        <TextField label={t('exchanges.apiSecret')} type="password" {...register('apiSecret')} error={!!errors.apiSecret} helperText={errors.apiSecret?.message} fullWidth disabled={disabled ?? false} sx={inputSx} />
       </Stack>
     </form>
   );

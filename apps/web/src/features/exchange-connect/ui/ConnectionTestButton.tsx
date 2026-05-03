@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button, CircularProgress } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useTranslation } from 'react-i18next';
 
 interface ConnectionTestButtonProps {
   onTest: () => Promise<boolean>;
@@ -13,6 +14,7 @@ interface ConnectionTestButtonProps {
 export function ConnectionTestButton({ onTest, disabled }: ConnectionTestButtonProps) {
   const [testResult, setTestResult] = useState<boolean | null>(null);
   const [testing, setTesting] = useState(false);
+  const { t } = useTranslation();
 
   const handleTest = async () => {
     setTesting(true);
@@ -25,6 +27,13 @@ export function ConnectionTestButton({ onTest, disabled }: ConnectionTestButtonP
     } finally {
       setTesting(false);
     }
+  };
+
+  const getLabel = () => {
+    if (testing) return t('exchanges.testing');
+    if (testResult === true) return t('exchanges.connectedOk');
+    if (testResult === false) return t('exchanges.failed');
+    return t('exchanges.testConnection');
   };
 
   return (
@@ -47,7 +56,7 @@ export function ConnectionTestButton({ onTest, disabled }: ConnectionTestButtonP
         '&:hover': { borderColor: testResult === true ? '#22c55e' : '#6b7280' },
       }}
     >
-      {testing ? 'Testing...' : testResult === true ? 'Connected ✓' : testResult === false ? 'Failed' : 'Test Connection'}
+      {getLabel()}
     </Button>
   );
 }

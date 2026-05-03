@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { permission } from '../middleware/permission.middleware';
+import { detectLang, t } from '../../../shared/i18n';
 
 export function createNotificationsRoutes(): Router {
   const router = Router();
@@ -27,7 +28,8 @@ export function createNotificationsRoutes(): Router {
   router.put('/:id/read', permission(['user:read']), async (req, res) => {
     const n = notifications.find((n) => n.id === String(req.params.id));
     if (!n) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' }, timestamp: new Date().toISOString() });
+      const lang = detectLang(req);
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('notification.not_found', lang) }, timestamp: new Date().toISOString() });
       return;
     }
     n.read = true;

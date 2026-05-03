@@ -5,6 +5,7 @@ import {
   Container, Typography, Grid, Button, Alert, Box, CircularProgress, Stack
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
 import { ExchangeCard } from '@/features/exchange-connect/ui/ExchangeCard';
 import { ConnectExchangeModal } from '@/features/exchange-connect/ui/ConnectExchangeModal';
 import { useExchangeConnection } from '@/features/exchange-connect/model/useExchangeConnection';
@@ -14,6 +15,7 @@ import type { ConnectExchangeForm } from '@/features/exchange-connect/lib/schema
 export function ExchangesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const {
     exchanges, isLoading, error, connect, isConnecting, connectError, testConnection,
@@ -35,27 +37,27 @@ export function ExchangesPage() {
       <Box className="fade-in-up">
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} mb={1} spacing={1}>
           <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-            Exchange Connections
+            {t('exchanges.title')}
           </Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalOpen(true)}
             sx={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', borderRadius: 3, fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' }, '&:hover': { background: 'linear-gradient(135deg, #2563eb, #7c3aed)', transform: 'translateY(-1px)', boxShadow: '0 4px 20px rgba(59,130,246,0.3)' } }}>
-            Add Connection
+            {t('exchanges.addConnection')}
           </Button>
         </Stack>
         <Typography variant="body2" sx={{ color: mutedText, mb: { xs: 2, md: 4 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-          Manage your exchange API connections. All API keys are encrypted at rest with AES-256-GCM.
+          {t('exchanges.description')}
         </Typography>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>Failed to load exchanges: {error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{t('exchanges.failedToLoad')}: {error}</Alert>}
 
       {isLoading ? (
         <Box display="flex" justifyContent="center" py={8}><CircularProgress sx={{ color: '#3b82f6' }} /></Box>
       ) : exchanges.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: { xs: 4, md: 8 }, borderRadius: 3, bgcolor: emptyBg, border: 1, borderColor: emptyBorder, px: 2 }}>
-          <Typography variant="h6" sx={{ color: dimText, mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>No Exchange Connected</Typography>
-          <Typography variant="body2" sx={{ color: mutedText, mb: 3, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Connect Binance or Bybit to start trading</Typography>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setModalOpen(true)} sx={{ borderColor: isDark ? '#374151' : '#cbd5e1', color: mutedText, borderRadius: 3 }}>Connect Your First Exchange</Button>
+          <Typography variant="h6" sx={{ color: dimText, mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>{t('exchanges.noExchangeConnected')}</Typography>
+          <Typography variant="body2" sx={{ color: mutedText, mb: 3, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{t('exchanges.emptyHint')}</Typography>
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setModalOpen(true)} sx={{ borderColor: isDark ? '#374151' : '#cbd5e1', color: mutedText, borderRadius: 3 }}>{t('exchanges.connectFirstExchange')}</Button>
         </Box>
       ) : (
         <Grid container spacing={{ xs: 1.5, md: 2 }} className="stagger-children">

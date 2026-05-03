@@ -2,6 +2,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './i18n';
 import { AppProviders } from './app';
 import { AppRouter } from './app/AppRouter';
 import './index.css';

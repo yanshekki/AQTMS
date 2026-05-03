@@ -1,0 +1,631 @@
+{
+  "app": {
+    "name": "AQTMS",
+    "fullName": "Automated Quantitative Trading Management System",
+    "version": "v1.0 · Production Ready",
+    "tagline": "No gas fees · Wallet signature only · Your keys never leave your browser"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "exchanges": "Exchanges",
+    "aiSignals": "AI Signals",
+    "backtest": "Backtest",
+    "risk": "Risk",
+    "portfolio": "Portfolio",
+    "trades": "Trades",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "adminPanel": "Admin Panel",
+    "admin": "Admin",
+    "userManagement": "User Management",
+    "auditLog": "Audit Log",
+    "systemSettings": "System Settings"
+  },
+  "auth": {
+    "loginTitle": "AQTMS",
+    "loginSubtitle": "Automated Quantitative Trading Management System",
+    "versionBadge": "v1.0 · Production Ready",
+    "connectWallet": "Connect Wallet to Login",
+    "connecting": "Connecting...",
+    "noWallet": "No wallet detected. Please install MetaMask or use a Web3 browser.",
+    "walletLoginFailed": "Login failed",
+    "noGasFees": "No gas fees · Wallet signature only · Your keys never leave your browser",
+    "walletLabels": {
+      "metamask": "MetaMask",
+      "brave": "Brave",
+      "walletConnect": "WalletConnect",
+      "coinbase": "Coinbase"
+    },
+    "noAccount": "No account selected"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "AQTMS — Automated Quantitative Trading Management System",
+    "totalPortfolioValue": "Total Portfolio Value",
+    "todayPnL": "Today P&L",
+    "latestAISignal": "Latest AI Signal",
+    "openPositions": "Open Positions",
+    "riskScore": "Risk Score",
+    "sharpeRatio": "Sharpe Ratio",
+    "noExchangeConnected": "No exchange connected",
+    "noDataSources": "No data sources",
+    "noActiveTrades": "No active trades",
+    "connectExchangeFirst": "Connect exchange first",
+    "runBacktest": "Run backtest",
+    "liveChart": "📈 Live Chart"
+  },
+  "exchanges": {
+    "title": "Exchange Connections",
+    "description": "Manage your exchange API connections. All API keys are encrypted at rest with AES-256-GCM.",
+    "addConnection": "Add Connection",
+    "noExchangeConnected": "No Exchange Connected",
+    "emptyHint": "Connect Binance or Bybit to start trading",
+    "connectFirstExchange": "Connect Your First Exchange",
+    "failedToLoad": "Failed to load exchanges",
+    "connectExchange": "Connect Exchange",
+    "cancel": "Cancel",
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "apiKeyInvalid": "API Key 無效或權限不足",
+    "status": {
+      "connected": "CONNECTED",
+      "error": "ERROR",
+      "testing": "TESTING",
+      "disconnected": "DISCONNECTED"
+    },
+    "lastSynced": "Last synced",
+    "notYetSynced": "Not yet synced",
+    "locked": "locked",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "connectedOk": "Connected ✓",
+    "failed": "Failed",
+    "exchange": "Exchange",
+    "accountName": "Account Name",
+    "apiKey": "API Key",
+    "apiSecret": "API Secret",
+    "binanceNotConnected": "Binance: not connected",
+    "bybitNotConnected": "Bybit: not connected",
+    "futuPhase3": "Futu (Phase 3)",
+    "ibkrPhase3": "IBKR (Phase 3)"
+  },
+  "aiSignals": {
+    "title": "AI Signals",
+    "description": "Real-time AI-scored news. Scores ≥ 80 trigger trade signals.",
+    "signalCount": "signals",
+    "refreshRate": "15s refresh",
+    "noSignals": "No AI Signals Yet",
+    "noSignalsHint": "Connect data sources (Telegram / X.com) and AI providers.",
+    "tableHeaders": {
+      "time": "Time",
+      "source": "Source",
+      "content": "Content",
+      "flag": "Flag",
+      "score": "Score",
+      "tsr": "T/S/R"
+    },
+    "drawer": {
+      "title": "AI Analysis",
+      "scoreSummary": "Score Summary",
+      "overall": "Overall",
+      "truth": "Truth",
+      "sentiment": "Sent",
+      "relevance": "Relevance",
+      "aiConsensus": "AI Consensus",
+      "noAnalysis": "No AI analysis yet.",
+      "parseError": "Parse error",
+      "priceChart": "📈 Price Chart (1H)",
+      "sourceInfo": "Source",
+      "pending": "Pending",
+      "unknown": "Unknown",
+      "likelyFake": "⚠️ Likely Fake"
+    },
+    "filters": {
+      "source": "Source",
+      "all": "All",
+      "telegram": "Telegram",
+      "xcom": "X.com",
+      "onchain": "On-Chain",
+      "asset": "Asset",
+      "minScore": "Min Score"
+    },
+    "sourceIcons": {
+      "TELEGRAM": "📡",
+      "X": "🐦",
+      "ONCHAIN": "⛓️"
+    },
+    "fake": "FAKE"
+  },
+  "backtest": {
+    "title": "Backtesting Engine",
+    "description": "Test trading strategies against historical Binance data. Fetching real 1h klines via public API.",
+    "strategyParams": "Strategy Parameters",
+    "symbol": "Symbol",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "initialCapital": "Initial Capital ($)",
+    "fee": "Fee",
+    "slippage": "Slippage",
+    "strategy": "MA Cross Strategy",
+    "fastMA": "Fast MA",
+    "slowMA": "Slow MA",
+    "runBacktest": "Run Backtest",
+    "running": "Running...",
+    "metrics": {
+      "totalReturn": "Total Return",
+      "winRate": "Win Rate",
+      "sharpe": "Sharpe",
+      "maxDD": "Max DD",
+      "profitFactor": "Profit Factor",
+      "trades": "Trades"
+    },
+    "charts": {
+      "equityCurve": "Equity Curve",
+      "drawdown": "Drawdown"
+    },
+    "tableHeaders": {
+      "time": "Time",
+      "side": "Side",
+      "price": "Price",
+      "pnl": "PnL",
+      "reason": "Reason"
+    },
+    "emptyState": "Configure parameters and click \"Run Backtest\" to start.",
+    "emptyHint": "Uses Binance public API — no API key required.",
+    "backtestFailed": "Backtest failed"
+  },
+  "risk": {
+    "title": "Risk Dashboard",
+    "subtitle": "VaR · Drawdown · Concentration · Beta · Correlation",
+    "riskScore": "Risk Score",
+    "var95_1Day": "VaR 95% (1-Day)",
+    "var95Sub": "5% probability loss",
+    "var99_1Day": "VaR 99% (1-Day)",
+    "var99Sub": "1% probability loss",
+    "cvar95": "CVaR 95%",
+    "cvar95Sub": "Expected shortfall",
+    "maxDrawdown": "Max Drawdown",
+    "currentDrawdown": "Current",
+    "concentrationRisk": "Concentration Risk",
+    "concentrationSub": "Top asset weight",
+    "concentrationTitle": "Concentration Risk",
+    "ofPortfolio": "of portfolio",
+    "betaExposure": "Beta Exposure",
+    "correlationMatrix": "Correlation Matrix",
+    "riskAlerts": "Risk Alerts & Suggested Actions",
+    "riskLevels": {
+      "low": "Low Risk",
+      "medium": "Medium Risk",
+      "high": "High Risk"
+    },
+    "concentrationLevels": {
+      "LOW": "LOW",
+      "MEDIUM": "MEDIUM",
+      "HIGH": "HIGH",
+      "CRITICAL": "CRITICAL"
+    },
+    "alertStatus": {
+      "WARNING": "WARNING",
+      "BREACHED": "BREACHED"
+    },
+    "legend": {
+      "negative": "Negative",
+      "low": "Low (0–0.3)",
+      "moderate": "Moderate (0.3–0.5)",
+      "high": "High (0.5–0.7)",
+      "veryHigh": "Very High (0.7+)"
+    },
+    "tableHeaders": {
+      "rule": "Rule",
+      "status": "Status",
+      "message": "Message",
+      "suggestedAction": "Suggested Action"
+    },
+    "actions": {
+      "copy": "Copy",
+      "retry": "Retry",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "auto15s": "Auto 15s",
+      "copyHedge": "Copy hedge suggestion"
+    },
+    "loading": "Loading risk metrics…",
+    "failedToLoad": "Failed to Load Risk Data",
+    "failedToFetch": "Failed to fetch risk data",
+    "noData": "No Risk Data Available",
+    "noDataHint": "Connect an exchange and enable risk monitoring to see metrics."
+  },
+  "portfolio": {
+    "title": "Portfolio",
+    "subtitle": "Asset allocation · Performance analysis · P&L breakdown",
+    "totalPortfolioValue": "Total Portfolio Value",
+    "today": "Today",
+    "realizedPnL": "Realized P&L",
+    "unrealizedPnL": "Unrealized P&L",
+    "assetAllocation": "Asset Allocation",
+    "filtered": "Filtered",
+    "topHoldings": "Top Holdings",
+    "historicalPerformance": "Historical Performance",
+    "portfolioValue": "Portfolio Value",
+    "pnlRanking": "P&L Ranking",
+    "clickToClearFilter": "Click to clear filter",
+    "noData": "No portfolio data yet",
+    "noDataHint": "Connect an exchange or add assets to get started.",
+    "noDataAvailable": "No portfolio data available.",
+    "failedToLoad": "Failed to load portfolio data. Please try again.",
+    "failedToLoadPerformance": "Failed to load performance data",
+    "showingPeriod": "Showing period",
+    "tableHeaders": {
+      "rank": "#",
+      "asset": "Asset",
+      "value": "Value",
+      "allocPct": "Alloc%",
+      "pnl": "P&L",
+      "pnlPct": "P&L%"
+    },
+    "periods": {
+      "30d": "30d",
+      "90d": "90d",
+      "1y": "1y"
+    }
+  },
+  "trades": {
+    "title": "Trade History",
+    "subtitle": "trades · Real-time records with AI context",
+    "tradeCount": "trade",
+    "tradeCount_plural": "trades",
+    "exportCsv": "Export CSV",
+    "exporting": "Exporting…",
+    "loading": "Loading trades…",
+    "failedToLoad": "Failed to Load Trades",
+    "noTradesFound": "No Trades Found",
+    "noTradesHint": "Connect an exchange and start trading to see history.",
+    "noTradesFilterHint": "No trades match your current filters.",
+    "clearFilters": "Clear Filters",
+    "resetFilters": "Reset Filters",
+    "filters": {
+      "dateFrom": "Date From",
+      "dateTo": "Date To",
+      "exchange": "Exchange",
+      "all": "All",
+      "symbol": "Symbol",
+      "side": "Side",
+      "buy": "Buy",
+      "sell": "Sell",
+      "status": "Status",
+      "filled": "Filled",
+      "partial": "Partial",
+      "cancelled": "Cancelled",
+      "rejected": "Rejected"
+    },
+    "tableHeaders": {
+      "time": "Time",
+      "exchange": "Exchange",
+      "symbol": "Symbol",
+      "side": "Side",
+      "qty": "Qty",
+      "price": "Price",
+      "pnl": "P&L",
+      "fee": "Fee",
+      "status": "Status"
+    },
+    "drawer": {
+      "title": "Trade Detail",
+      "orderId": "Order ID",
+      "na": "N/A",
+      "exchange": "Exchange",
+      "unknown": "Unknown",
+      "symbol": "Symbol",
+      "sideType": "Side · Type",
+      "quantity": "Quantity",
+      "price": "Price",
+      "pnl": "P&L",
+      "fee": "Fee",
+      "status": "Status",
+      "riskScore": "Risk Score",
+      "aiDecision": "AI Decision",
+      "noAiReason": "No AI reason recorded",
+      "riskAssessment": "Risk Assessment",
+      "riskLow": "Low risk trade — within all risk parameters. Adequate stop-loss in place.",
+      "riskModerate": "Moderate risk — VaR contribution within limits. Monitor closely.",
+      "riskHigh": "High risk — exceeded one or more risk thresholds. Review position sizing.",
+      "created": "Created"
+    },
+    "status": {
+      "FILLED": "Filled",
+      "PARTIALLY_FILLED": "Partial",
+      "CANCELLED": "Cancelled",
+      "REJECTED": "Rejected"
+    },
+    "toast": {
+      "filtersReset": "Filters reset",
+      "exportSuccess": "Exported trades to CSV",
+      "exportFailed": "Failed to export CSV",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Failed to copy",
+      "refreshing": "Refreshing…"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "User preferences · Notification · API Key Management · Security",
+    "appearance": "Appearance",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "switchToLight": "Switch to Light",
+    "switchToDark": "Switch to Dark",
+    "tabs": {
+      "profile": "Profile",
+      "apiKeys": "API Keys",
+      "notifications": "Notifications",
+      "security": "Security"
+    },
+    "profile": {
+      "name": "Name",
+      "email": "Email",
+      "timezone": "Timezone",
+      "saveChanges": "Save Changes",
+      "saving": "Saving…",
+      "saved": "Profile saved successfully"
+    },
+    "apiKeys": {
+      "connected": "exchange",
+      "connected_plural": "exchanges",
+      "connectedCount": "exchanges connected",
+      "addApiKey": "Add API Key",
+      "noExchanges": "No exchange connections yet",
+      "connectFirst": "Connect Your First Exchange",
+      "tableHeaders": {
+        "exchange": "Exchange",
+        "status": "Status",
+        "lastUsed": "Last Used",
+        "actions": "Actions"
+      },
+      "status": {
+        "connected": "Connected",
+        "error": "Error",
+        "disconnected": "Disconnected"
+      },
+      "testConnection": "Test Connection",
+      "delete": "Delete",
+      "addModal": {
+        "title": "Add API Key",
+        "exchange": "Exchange",
+        "apiKey": "API Key",
+        "apiSecret": "API Secret",
+        "description": "Description (optional)",
+        "cancel": "Cancel",
+        "addKey": "Add Key",
+        "adding": "Adding…",
+        "fillAllFields": "Please fill all required fields",
+        "added": "API key added"
+      },
+      "deleteModal": {
+        "title": "Remove API Key?",
+        "message": "This will disconnect the exchange and delete its API key. This action cannot be undone. Active trades will not be affected.",
+        "cancel": "Cancel",
+        "remove": "Remove"
+      },
+      "toast": {
+        "testSuccess": "Connection test successful",
+        "testFailed": "Connection test failed — check API key permissions",
+        "removed": "connection removed"
+      }
+    },
+    "notifications": {
+      "title": "Notification Channels",
+      "emailNotifications": "Email Notifications",
+      "emailDesc": "Trade confirmations, risk alerts, weekly reports",
+      "telegramAlerts": "Telegram Alerts",
+      "telegramDesc": "Real-time signals, urgent risk breaches",
+      "inAppNotifications": "In-App Notifications",
+      "inAppDesc": "Dashboard alerts, system health updates",
+      "riskThreshold": "Risk Alert Threshold",
+      "thresholdDesc": "Trigger alerts when risk score exceeds:",
+      "saveThreshold": "Save Threshold",
+      "saving": "Saving…",
+      "enabled": "notifications enabled",
+      "disabled": "notifications disabled",
+      "thresholdSaved": "Risk alert threshold set"
+    },
+    "security": {
+      "changePassword": "Change Password",
+      "passwordComingSoon": "Password management is coming soon.",
+      "comingSoon": "Coming Soon",
+      "twoFactorAuth": "Two-Factor Authentication",
+      "twoFactorComingSoon": "Google Authenticator / TOTP support is coming soon.",
+      "connectedWallet": "Connected Wallet",
+      "walletNetwork": "Ethereum Mainnet · Connected via MetaMask",
+      "apiKeyEncryption": "API Key Encryption",
+      "encryptionLabel": "AES-256-GCM",
+      "encryptionDesc": "All API keys are encrypted at rest using AES-256-GCM. Keys are never logged or stored in plaintext.",
+      "walletCopied": "Wallet address copied",
+      "copyFailed": "Failed to copy"
+    }
+  },
+  "scoringRules": {
+    "title": "Scoring Rules",
+    "description": "Design scoring rules — configure weights, thresholds, and action mappings.",
+    "rules": "Rules",
+    "new": "New",
+    "newRule": "New Rule",
+    "ruleEditor": "Rule Editor",
+    "ruleName": "Rule Name",
+    "signalWeights": "Signal Weights",
+    "totalWeight": "Total",
+    "weightExceeds": "Total exceeds 100% — reduce some weights.",
+    "weightMustBe100": "Total must equal 100%.",
+    "weights": {
+      "truth": "Truth Weight",
+      "sentiment": "Sentiment Weight",
+      "relevance": "Relevance Weight",
+      "confidence": "Confidence Weight"
+    },
+    "signalThreshold": "Signal Threshold",
+    "actionOnSignal": "Action on Signal",
+    "actions": {
+      "BUY": "Buy (Market Order)",
+      "SELL": "Sell (Market Order)",
+      "ALERT": "Alert Only",
+      "IGNORE": "Ignore"
+    },
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "createRule": "Create Rule",
+    "versionHistory": "Version History",
+    "current": "Current",
+    "rollback": "Rollback",
+    "noHistory": "No version history available",
+    "confirmRollback": "Confirm Rollback",
+    "rollbackMessage": "Roll back to this configuration? This will create a new version with the previous settings:",
+    "confirm": "Confirm Rollback",
+    "weightAction": "Action",
+    "weightThreshold": "Threshold",
+    "status": {
+      "Active": "Active",
+      "Draft": "Draft"
+    },
+    "selectRule": "Select a rule or create a new one",
+    "selectRuleHint": "Choose from the list on the left to edit its configuration",
+    "noRules": "No scoring rules yet",
+    "toast": {
+      "enabled": "Rule enabled",
+      "disabled": "Rule disabled",
+      "updateFailed": "Failed to update rule",
+      "saved": "Rule saved successfully",
+      "saveFailed": "Failed to save rule",
+      "created": "Rule created successfully",
+      "createFailed": "Failed to create rule",
+      "deleted": "Rule deleted",
+      "deleteFailed": "Failed to delete rule",
+      "weightsWarning": "Weights must sum to 100%",
+      "rollbackSuccess": "Rolled back to configuration",
+      "rollbackFailed": "Rollback failed",
+      "loadFailed": "Failed to load scoring rules"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "pageTitle": "Notifications",
+    "unreadCount": "unread",
+    "subtitle": "In-app notification center",
+    "markAllRead": "Mark all read",
+    "marking": "Marking...",
+    "noNotifications": "No notifications",
+    "caughtUp": "You're all caught up! New notifications will appear here.",
+    "noUnread": "No unread notifications — you're all caught up! 🎉",
+    "noFilterMatch": "No notifications match this filter.",
+    "failedToLoad": "Failed to load notifications.",
+    "actionFailed": "Action failed",
+    "markedAsRead": "Marked as read · Navigating",
+    "navigating": "Navigating",
+    "markedAllRead": "notifications marked as read",
+    "markAllFailed": "Failed to mark all as read",
+    "noUnreadToMark": "No unread notifications",
+    "filters": {
+      "all": "All",
+      "unread": "Unread",
+      "trade": "Trade",
+      "signal": "Signal",
+      "risk": "Risk",
+      "system": "System"
+    },
+    "typeLabels": {
+      "trade": "Trade",
+      "signal": "Signal",
+      "risk": "Risk",
+      "system": "System"
+    },
+    "relativeTime": {
+      "justNow": "just now",
+      "minAgo": "min ago",
+      "hourAgo": "hour ago",
+      "hoursAgo": "hours ago",
+      "dayAgo": "day ago",
+      "daysAgo": "days ago"
+    }
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "subtitle": "Admin panel — restricted access",
+    "userManagement": "User Management",
+    "auditLog": "Audit Log",
+    "systemSettings": "System Settings",
+    "users": {
+      "tableHeaders": {
+        "wallet": "Wallet",
+        "role": "Role",
+        "status": "Status",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "save": "Save",
+      "disable": "Disable",
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      }
+    },
+    "audit": {
+      "tableHeaders": {
+        "time": "Time",
+        "user": "User",
+        "action": "Action",
+        "resource": "Resource",
+        "ip": "IP"
+      },
+      "exportCsv": "Export CSV"
+    },
+    "system": {
+      "aiModelManagement": "AI Model Management",
+      "rateLimiting": "Rate Limiting",
+      "maxRequests": "Max Requests / IP / min",
+      "enableRateLimiting": "Enable Rate Limiting",
+      "modelStatus": "Ready"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "close": "Close",
+    "copy": "Copy",
+    "search": "Search",
+    "reset": "Reset",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "export": "Export",
+    "noData": "No data available",
+    "na": "N/A",
+    "unknown": "Unknown",
+    "all": "All",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "comingSoon": "Coming Soon"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super Admin",
+    "ADMIN": "Admin",
+    "TRADER": "Trader",
+    "ANALYST": "Analyst",
+    "VIEWER": "Viewer"
+  },
+  "error": {
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Try Again",
+    "unauthorized": "You do not have permission to access this page.",
+    "notFound": "Page not found"
+  },
+  "toast": {
+    "copiedToClipboard": "Copied to clipboard",
+    "failedToCopy": "Failed to copy",
+    "refreshing": "Refreshing...",
+    "saved": "Saved successfully",
+    "saveFailed": "Failed to save",
+    "exported": "Exported successfully",
+    "exportFailed": "Failed to export"
+  }
+}

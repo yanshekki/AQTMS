@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { safePost } from '@/shared/api';
 import { z } from 'zod';
 import { useThemeMode } from '@/app/Providers';
@@ -32,6 +33,7 @@ type BacktestResult = z.infer<typeof BacktestResponseSchema>['data'];
 
 export function BacktestPage() {
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const isDark = mode === 'dark';
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -48,7 +50,6 @@ export function BacktestPage() {
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Chart state
   const [chartData, setChartData] = useState<ChartCandle[]>([]);
   const [chartMarkers, setChartMarkers] = useState<ChartMarker[]>([]);
   const [chartTimeframe, setChartTimeframe] = useState<TimeFrame>('1H');
@@ -70,7 +71,6 @@ export function BacktestPage() {
       }, BacktestResponseSchema);
       setResult(response.data);
 
-      // Fetch klines for chart display
       try {
         const binanceBase = 'https://api.binance.com';
         const klineRes = await fetch(`${binanceBase}/api/v3/klines?symbol=${symbol}&interval=1h&limit=200`);
@@ -85,20 +85,17 @@ export function BacktestPage() {
         }));
         setChartData(candles);
 
-        // Convert backtest trades to markers
-        const markers: ChartMarker[] = response.data.trades.map((t) => ({
-          time: Math.floor(new Date(t.timestamp).getTime() / 1000),
-          position: t.side === 'BUY' ? 'belowBar' : 'aboveBar',
-          color: t.side === 'BUY' ? '#22c55e' : '#ef4444',
-          shape: t.side === 'BUY' ? 'arrowUp' : 'arrowDown',
-          text: t.side === 'BUY' ? 'BUY' : 'SELL',
+        const markers: ChartMarker[] = response.data.trades.map((tr) => ({
+          time: Math.floor(new Date(tr.timestamp).getTime() / 1000),
+          position: tr.side === 'BUY' ? 'belowBar' : 'aboveBar',
+          color: tr.side === 'BUY' ? '#22c55e' : '#ef4444',
+          shape: tr.side === 'BUY' ? 'arrowUp' : 'arrowDown',
+          text: tr.side === 'BUY' ? 'BUY' : 'SELL',
           size: 2,
         }));
         setChartMarkers(markers);
-      } catch {
-        // Chart data fetch is non-critical — keep backtest results
-      }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Backtest failed'); }
+      } catch { /* non-critical */ }
+    } catch (err) { setError(err instanceof Error ? err.message : t('backtest.backtestFailed')); }
     finally { setRunning(false); }
   };
 
@@ -106,44 +103,42 @@ export function BacktestPage() {
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
       <Box className="fade-in-up">
         <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, mb: 1, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-          Backtesting Engine
+          {t('backtest.title')}
         </Typography>
         <Typography variant="body2" sx={{ color: mutedText, mb: { xs: 2, md: 4 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-          Test trading strategies against historical Binance data. Fetching real 1h klines via public API.
+          {t('backtest.description')}
         </Typography>
       </Box>
 
       <Grid container spacing={{ xs: 2, md: 3 }}>
-        {/* Left panel — Parameters */}
         <Grid item xs={12} md={4}>
           <Card sx={{ bgcolor: cardBg, backdropFilter: 'blur(12px)', border: 1, borderColor, borderRadius: 3 }}>
             <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-              <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>Strategy Parameters</Typography>
+              <Typography variant="subtitle2" sx={{ color: mutedText, mb: 2, fontWeight: 700 }}>{t('backtest.strategyParams')}</Typography>
               <Stack spacing={2}>
-                <TextField label="Symbol" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} size="small" sx={inputStyles} />
-                <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={inputStyles} />
-                <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={inputStyles} />
-                <TextField label="Initial Capital ($)" type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} size="small" sx={inputStyles} />
-                <Typography variant="caption" sx={{ color: mutedText }}>Fee: {feeRate}%</Typography>
+                <TextField label={t('backtest.symbol')} value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} size="small" sx={inputStyles} />
+                <TextField label={t('backtest.startDate')} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={inputStyles} />
+                <TextField label={t('backtest.endDate')} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={inputStyles} />
+                <TextField label={t('backtest.initialCapital')} type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} size="small" sx={inputStyles} />
+                <Typography variant="caption" sx={{ color: mutedText }}>{t('backtest.fee')}: {feeRate}%</Typography>
                 <Slider value={feeRate} onChange={(_, v) => setFeeRate(v as number)} min={0} max={1} step={0.01} sx={{ color: '#3b82f6' }} />
-                <Typography variant="caption" sx={{ color: mutedText }}>Slippage: {slippage}%</Typography>
+                <Typography variant="caption" sx={{ color: mutedText }}>{t('backtest.slippage')}: {slippage}%</Typography>
                 <Slider value={slippage} onChange={(_, v) => setSlippage(v as number)} min={0} max={1} step={0.01} sx={{ color: '#3b82f6' }} />
                 <Divider sx={{ borderColor }} />
-                <Typography variant="subtitle2" sx={{ color: mutedText, fontWeight: 700 }}>MA Cross Strategy</Typography>
+                <Typography variant="subtitle2" sx={{ color: mutedText, fontWeight: 700 }}>{t('backtest.strategy')}</Typography>
                 <Stack direction="row" spacing={2}>
-                  <TextField label="Fast MA" type="number" value={fastPeriod} onChange={(e) => setFastPeriod(Number(e.target.value))} size="small" sx={inputStyles} />
-                  <TextField label="Slow MA" type="number" value={slowPeriod} onChange={(e) => setSlowPeriod(Number(e.target.value))} size="small" sx={inputStyles} />
+                  <TextField label={t('backtest.fastMA')} type="number" value={fastPeriod} onChange={(e) => setFastPeriod(Number(e.target.value))} size="small" sx={inputStyles} />
+                  <TextField label={t('backtest.slowMA')} type="number" value={slowPeriod} onChange={(e) => setSlowPeriod(Number(e.target.value))} size="small" sx={inputStyles} />
                 </Stack>
                 <Button variant="contained" fullWidth startIcon={running ? <CircularProgress size={16} /> : <PlayArrowIcon />} onClick={runBacktest} disabled={running}
                   sx={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', borderRadius: 3, fontWeight: 700, '&:hover': { background: 'linear-gradient(135deg, #2563eb, #7c3aed)', transform: 'translateY(-1px)', boxShadow: '0 4px 20px rgba(59,130,246,0.3)' } }}>
-                  {running ? 'Running...' : 'Run Backtest'}
+                  {running ? t('backtest.running') : t('backtest.runBacktest')}
                 </Button>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Right panel — Results */}
         <Grid item xs={12} md={8}>
           {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
@@ -151,12 +146,12 @@ export function BacktestPage() {
             <>
               <Grid container spacing={1.5} mb={2}>
                 {[
-                  { label: 'Total Return', value: `${result.totalReturn}%`, color: result.totalReturn >= 0 ? '#22c55e' : '#ef4444' },
-                  { label: 'Win Rate', value: `${result.winRate}%`, color: result.winRate >= 50 ? '#22c55e' : '#f59e0b' },
-                  { label: 'Sharpe', value: result.sharpeRatio.toFixed(2), color: result.sharpeRatio >= 1 ? '#22c55e' : '#f59e0b' },
-                  { label: 'Max DD', value: `${result.maxDrawdown}%`, color: result.maxDrawdown <= 20 ? '#22c55e' : '#ef4444' },
-                  { label: 'Profit Factor', value: result.profitFactor === Infinity ? '∞' : result.profitFactor.toFixed(2), color: '#3b82f6' },
-                  { label: 'Trades', value: result.totalTrades.toString(), color: mutedText },
+                  { label: t('backtest.metrics.totalReturn'), value: `${result.totalReturn}%`, color: result.totalReturn >= 0 ? '#22c55e' : '#ef4444' },
+                  { label: t('backtest.metrics.winRate'), value: `${result.winRate}%`, color: result.winRate >= 50 ? '#22c55e' : '#f59e0b' },
+                  { label: t('backtest.metrics.sharpe'), value: result.sharpeRatio.toFixed(2), color: result.sharpeRatio >= 1 ? '#22c55e' : '#f59e0b' },
+                  { label: t('backtest.metrics.maxDD'), value: `${result.maxDrawdown}%`, color: result.maxDrawdown <= 20 ? '#22c55e' : '#ef4444' },
+                  { label: t('backtest.metrics.profitFactor'), value: result.profitFactor === Infinity ? '∞' : result.profitFactor.toFixed(2), color: '#3b82f6' },
+                  { label: t('backtest.metrics.trades'), value: result.totalTrades.toString(), color: mutedText },
                 ].map((m) => (
                   <Grid item xs={6} sm={4} md={2} key={m.label}>
                     <Card sx={{ bgcolor: cardBgAlt, border: 1, borderColor, borderRadius: 2 }}>
@@ -169,7 +164,6 @@ export function BacktestPage() {
                 ))}
               </Grid>
 
-              {/* TradingView Candlestick Chart */}
               {chartData.length > 0 && (
                 <Card sx={{ bgcolor: cardBgAlt, border: 1, borderColor, mb: 2, borderRadius: 3 }}>
                   <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
@@ -207,13 +201,13 @@ export function BacktestPage() {
 
               <Card sx={{ bgcolor: cardBgAlt, border: 1, borderColor, mb: 2, borderRadius: 3 }}>
                 <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
-                  <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>Equity Curve</Typography>
+                  <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>{t('backtest.charts.equityCurve')}</Typography>
                   <ResponsiveContainer width="100%" height={isMobile ? 150 : 200}>
                     <LineChart data={result.equityCurve}>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1e293b' : '#e2e8f0'} />
                       <XAxis dataKey="time" tick={false} />
                       <YAxis stroke={mutedText} fontSize={11} />
-                      <Tooltip labelFormatter={(t) => new Date(t as number).toLocaleString()} formatter={(v) => [`$${Number(v).toFixed(2)}`]} />
+                      <Tooltip labelFormatter={(ts) => new Date(ts as number).toLocaleString()} formatter={(v) => [`$${Number(v).toFixed(2)}`]} />
                       <Line type="monotone" dataKey="value" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -222,13 +216,13 @@ export function BacktestPage() {
 
               <Card sx={{ bgcolor: cardBgAlt, border: 1, borderColor, mb: 2, borderRadius: 3 }}>
                 <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
-                  <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>Drawdown</Typography>
+                  <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>{t('backtest.charts.drawdown')}</Typography>
                   <ResponsiveContainer width="100%" height={isMobile ? 120 : 150}>
                     <LineChart data={result.drawdownCurve}>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1e293b' : '#e2e8f0'} />
                       <XAxis dataKey="time" tick={false} />
                       <YAxis stroke={mutedText} fontSize={11} domain={[0, 'auto']} reversed />
-                      <Tooltip formatter={(v) => [`${Number(v).toFixed(2)}%`, 'Drawdown']} />
+                      <Tooltip formatter={(v) => [`${Number(v).toFixed(2)}%`, t('backtest.charts.drawdown')]} />
                       <Line type="monotone" dataKey="drawdown" stroke="#ef4444" fill="#ef444420" dot={false} strokeWidth={1.5} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -239,21 +233,21 @@ export function BacktestPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>Time</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>Side</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>Price</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>PnL</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor, display: { xs: 'none', sm: 'table-cell' } }}>Reason</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.time')}</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.side')}</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.price')}</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.pnl')}</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor, display: { xs: 'none', sm: 'table-cell' } }}>{t('backtest.tableHeaders.reason')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {result.trades.slice(-20).reverse().map((t, i) => (
+                    {result.trades.slice(-20).reverse().map((tr, i) => (
                       <TableRow key={i} hover>
-                        <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{new Date(t.timestamp).toLocaleDateString()}</TableCell>
-                        <TableCell sx={{ color: t.side === 'BUY' ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{t.side}</TableCell>
-                        <TableCell sx={{ color: primaryText, fontSize: '0.7rem', borderColor }}>${t.price.toFixed(2)}</TableCell>
-                        <TableCell sx={{ color: (t.pnl ?? 0) >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{t.pnl !== null ? `$${t.pnl.toFixed(2)}` : '—'}</TableCell>
-                        <TableCell sx={{ color: mutedText, fontSize: '0.65rem', borderColor, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>{t.reason}</TableCell>
+                        <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{new Date(tr.timestamp).toLocaleDateString()}</TableCell>
+                        <TableCell sx={{ color: tr.side === 'BUY' ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.side}</TableCell>
+                        <TableCell sx={{ color: primaryText, fontSize: '0.7rem', borderColor }}>${tr.price.toFixed(2)}</TableCell>
+                        <TableCell sx={{ color: (tr.pnl ?? 0) >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.pnl !== null ? `$${tr.pnl.toFixed(2)}` : '—'}</TableCell>
+                        <TableCell sx={{ color: mutedText, fontSize: '0.65rem', borderColor, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>{tr.reason}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -262,8 +256,8 @@ export function BacktestPage() {
             </>
           ) : (
             <Box sx={{ textAlign: 'center', py: { xs: 6, md: 12 }, bgcolor: cardBg, borderRadius: 3, border: 1, borderColor }}>
-              <Typography sx={{ color: mutedText, fontSize: { xs: '0.9rem', md: '1rem' } }}>Configure parameters and click "Run Backtest" to start.</Typography>
-              <Typography variant="caption" sx={{ color: isDark ? '#374151' : '#cbd5e1', display: 'block', mt: 1 }}>Uses Binance public API — no API key required.</Typography>
+              <Typography sx={{ color: mutedText, fontSize: { xs: '0.9rem', md: '1rem' } }}>{t('backtest.emptyState')}</Typography>
+              <Typography variant="caption" sx={{ color: isDark ? '#374151' : '#cbd5e1', display: 'block', mt: 1 }}>{t('backtest.emptyHint')}</Typography>
             </Box>
           )}
         </Grid>
