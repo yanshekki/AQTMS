@@ -39,11 +39,15 @@ export function TradingViewChart({
   const isDark = mode === 'dark';
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !containerRef.current.isConnected) return;
 
-    // Cleanup previous chart
+    // Cleanup previous chart safely
     if (chartRef.current) {
-      chartRef.current.remove();
+      try {
+        chartRef.current.remove();
+      } catch {
+        // Chart already disposed — ignore
+      }
       chartRef.current = null;
     }
 
@@ -150,8 +154,12 @@ export function TradingViewChart({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      markersPluginRef.current?.detach();
-      chart.remove();
+      try {
+        markersPluginRef.current?.detach();
+      } catch { /* already detached */ }
+      try {
+        chart.remove();
+      } catch { /* already disposed */ }
     };
   }, [isDark, height, data, markers, showVolume]);
 
