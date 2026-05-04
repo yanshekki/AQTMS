@@ -437,6 +437,30 @@ aqtms/
 
 ---
 
+## 👤 作者
+
+**Ki (yanshekki)** — 全棧開發者、量化交易員、建造者。
+
+🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki)
+
+### ☕ 支持 / 捐贈
+
+如果 AQTMS 幫到你，請我飲杯咖啡！
+
+| Network | Address |
+|---------|---------|
+| **EVM** (ETH/BSC/Polygon) | `yanshekki.eth` |
+| **NEAR** | `yanshekki.near` |
+| **ADA** (Cardano) | `$yanshekki` |
+
+<p align="center">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://linktr.ee/yanshekki" alt="yanshekki QR" width="200" />
+  <br/>
+  <sub>掃碼支持 → linktr.ee/yanshekki</sub>
+</p>
+
+---
+
 ## 📄 授權
 
 MIT © AQTMS
@@ -453,10 +477,6 @@ MIT © AQTMS
 | **審計者** | 5 分鐘 | 驗證安全性 | `node test-full.cjs` → 70/70 通過 + 查看權限矩陣 |
 
 ---
-
-## 🏢 團隊
-
-AQTMS 由專業量化開發團隊構建。如需商業支持或定制開發，請聯繫我們。
 
 ---
 

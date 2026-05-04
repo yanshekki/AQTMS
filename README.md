@@ -435,6 +435,30 @@ Before submitting a PR, please confirm:
 
 ---
 
+## 👤 Creator
+
+**Ki (yanshekki)** — Full-stack developer, quant trader, builder.
+
+🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki)
+
+### ☕ Support / Donate
+
+If AQTMS helps you, consider buying me a coffee!
+
+| Network | Address |
+|---------|---------|
+| **EVM** (ETH/BSC/Polygon) | `yanshekki.eth` |
+| **NEAR** | `yanshekki.near` |
+| **ADA** (Cardano) | `$yanshekki` |
+
+<p align="center">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://linktr.ee/yanshekki" alt="yanshekki QR" width="200" />
+  <br/>
+  <sub>Scan to support → linktr.ee/yanshekki</sub>
+</p>
+
+---
+
 ## 📄 License
 
 MIT © AQTMS
@@ -451,10 +475,6 @@ MIT © AQTMS
 | **Auditor** | 5 minutes | Verify security | `node test-full.cjs` → 70/70 passed + review permission matrix |
 
 ---
-
-## 🏢 Team
-
-AQTMS is built by a professional quantitative development team. For commercial support or custom development, please contact us.
 
 ---
 
