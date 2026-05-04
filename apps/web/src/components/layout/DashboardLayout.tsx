@@ -5,28 +5,31 @@ import { Box, Typography, Link } from '@mui/material';
 import { useThemeMode } from '@/app/Providers';
 import { DashboardHeader } from './DashboardHeader';
 
-const SIDEBAR_WIDTH = 240;
+const HEADER_HEIGHT = 56;
 
 export function DashboardLayout() {
   const { mode } = useThemeMode();
   const isDark = mode === 'dark';
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: isDark ? '#030712' : '#f8fafc' }}>
+      {/* Header: AppBar + Sidebar */}
       <DashboardHeader />
+
+      {/* Main content area */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          ml: { md: `${SIDEBAR_WIDTH}px` },
-          mt: '56px',
+          width: { xs: '100%', md: `calc(100% - 240px)` },
+          ml: { xs: 0, md: '240px' },
+          mt: `${HEADER_HEIGHT}px`,
           display: 'flex',
           flexDirection: 'column',
-          minHeight: 'calc(100vh - 56px)',
-          bgcolor: isDark ? '#030712' : '#f8fafc',
+          minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
           backgroundImage: isDark
-            ? 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 240, 255, 0.03), transparent), radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.02), transparent)'
-            : 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(37, 99, 235, 0.04), transparent), radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.03), transparent)',
+            ? 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 240, 255, 0.03), transparent)'
+            : 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(37, 99, 235, 0.04), transparent)',
         }}
       >
         <Box sx={{ flex: 1 }}>
@@ -47,12 +50,7 @@ export function DashboardLayout() {
               href="https://ysk.hk/"
               target="_blank"
               rel="noopener"
-              sx={{
-                color: isDark ? '#4b5563' : '#94a3b8',
-                textDecoration: 'none',
-                fontWeight: 600,
-                '&:hover': { color: isDark ? '#00f0ff' : '#2563eb' },
-              }}
+              sx={{ color: isDark ? '#4b5563' : '#94a3b8', textDecoration: 'none', fontWeight: 600, '&:hover': { color: isDark ? '#00f0ff' : '#2563eb' } }}
             >
               YSK Limited
             </Link>

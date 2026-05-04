@@ -209,7 +209,7 @@ export function DashboardHeader() {
     <>
       {/* Top bar */}
       <AppBar
-        position="sticky"
+        position="fixed"
         elevation={0}
         sx={{
           bgcolor: bgColor,
@@ -293,7 +293,7 @@ export function DashboardHeader() {
       </AppBar>
 
       {/* Sidebar */}
-      <Box component="nav" sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ '& .MuiDrawer-docked': { width: 0 } }}>
         {/* Mobile drawer */}
         <Drawer
           variant="temporary"
