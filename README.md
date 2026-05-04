@@ -286,6 +286,48 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 
 ## 🐳 Deployment
 
+### PM2 Process Manager (Recommended)
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start all services (dev mode)
+pnpm pm2:start
+
+# Start production mode (builds frontend first)
+pnpm pm2:start:prod
+
+# Monitor processes
+pnpm pm2:monit
+
+# View logs
+pnpm pm2:logs
+
+# Status overview
+pnpm pm2:status
+
+# Graceful restart (zero downtime)
+pnpm pm2:reload
+
+# Stop all
+pnpm pm2:stop
+
+# Save process list for auto-start on boot
+pnpm pm2:save
+pnpm pm2:startup
+```
+
+#### PM2 Process List
+
+| Process | Port | Mode | Memory Limit |
+|---------|------|------|-------------|
+| `aqtms-backend` | 3001 | fork | 512M |
+| `aqtms-frontend-dev` | 5173 | fork | 256M |
+| `aqtms-frontend` | 5173 | fork | 128M |
+
+> 📁 Full config: `ecosystem.config.cjs`
+
 ### Docker Compose (Dev / Small Production)
 
 ```bash

@@ -288,6 +288,48 @@ apps/web/src/
 
 ## 🐳 部署
 
+### PM2 進程管理器（推薦）
+
+```bash
+# 全局安裝 PM2
+npm install -g pm2
+
+# 啟動所有服務（開發模式）
+pnpm pm2:start
+
+# 啟動生產模式（會先 build frontend）
+pnpm pm2:start:prod
+
+# 監控面板
+pnpm pm2:monit
+
+# 查看日誌
+pnpm pm2:logs
+
+# 狀態總覽
+pnpm pm2:status
+
+# 平滑重啟（零停機）
+pnpm pm2:reload
+
+# 停止全部
+pnpm pm2:stop
+
+# 保存進程列表（開機自啟）
+pnpm pm2:save
+pnpm pm2:startup
+```
+
+#### PM2 進程列表
+
+| Process | Port | Mode | Memory Limit |
+|---------|------|------|-------------|
+| `aqtms-backend` | 3001 | fork | 512M |
+| `aqtms-frontend-dev` | 5173 | fork | 256M |
+| `aqtms-frontend` | 5173 | fork | 128M |
+
+> 📁 完整配置：`ecosystem.config.cjs`
+
 ### Docker Compose（開發/小型生產）
 
 ```bash

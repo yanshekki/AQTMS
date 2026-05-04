@@ -8,11 +8,24 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:start:prod": "pnpm build && pm2 start ecosystem.config.cjs --env production",
+    "pm2:stop": "pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart ecosystem.config.cjs",
+    "pm2:reload": "pm2 reload ecosystem.config.cjs",
+    "pm2:delete": "pm2 delete ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "pm2:monit": "pm2 monit",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "pm2": "^7.0.1",
     "prettier": "^3.5.0",
+    "serve": "^14.2.6",
     "turbo": "^2.4.0",
     "typescript": "^5.4.0"
   }
