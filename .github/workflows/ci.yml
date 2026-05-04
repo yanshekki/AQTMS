@@ -11,7 +11,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── Lint & Type Check ──
+  # ── Type Check ──
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -22,8 +22,8 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter backend tsc --noEmit
-      - run: pnpm --filter web tsc --noEmit
+      - run: cd apps/backend && npx tsc --noEmit
+      - run: cd apps/web && npx tsc --noEmit
 
   # ── Unit Tests ──
   test:
@@ -40,7 +40,7 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter backend test
+      - run: cd apps/backend && npx vitest run
         env:
           REDIS_URL: redis://localhost:6379
 
@@ -56,8 +56,8 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter backend build 2>/dev/null || true
-      - run: pnpm --filter web build 2>/dev/null || true
+      - run: cd apps/backend && npx tsc --outDir dist 2>/dev/null || true
+      - run: cd apps/web && npx vite build 2>/dev/null || true
 
   # ── Docker Build ──
   docker:
