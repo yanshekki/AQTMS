@@ -123,11 +123,15 @@ export class BacktestService {
     const endMs = new Date(endDate).getTime();
     const interval = '1h';
     const limit = 1000;
+    const maxBatches = 50; // Safety limit: max 50 batches
+    const rateLimitDelay = 250; // 250ms between Binance API calls
 
     const allKlines: Kline[] = [];
     let currentStart = startMs;
+    let batchCount = 0;
 
-    while (currentStart < endMs) {
+    while (currentStart < endMs && batchCount < maxBatches) {
+      batchCount++;
       const url = `${this.binanceBase}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${currentStart}&endTime=${endMs}&limit=${limit}`;
 
       try {
@@ -156,11 +160,12 @@ export class BacktestService {
         // Move to next batch
         currentStart = data[data.length - 1]![0] + 1;
 
-        // Rate limit: wait 200ms between requests
-        await new Promise((r) => setTimeout(r, 200));
+        // Rate limit: wait before next request
+        await new Promise((r) => setTimeout(r, rateLimitDelay));
       } catch (error) {
-        logger.warn({ error, currentStart }, 'Failed to fetch klines batch, retrying...');
-        await new Promise((r) => setTimeout(r, 1000));
+        logger.warn({ error, currentStart, batch: batchCount }, 'Failed to fetch klines batch');
+        if (batchCount >= 3) throw new Error('Multiple kline fetch failures — aborting');
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
 

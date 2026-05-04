@@ -1,15 +1,19 @@
 // ── Dashboard Page (Responsive + Theme-aware) ──
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Container, Typography, Grid, Card, CardContent, Chip, Box,
-  Accordion, AccordionSummary, AccordionDetails, Stack,
+  Accordion, AccordionSummary, AccordionDetails, Stack, CircularProgress,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from 'react-i18next';
+import { useAtomValue } from 'jotai';
 import { useThemeMode } from '@/app/Providers';
 import { TradingViewChart, ChartDatafeed } from '@/features/chart';
 import type { ChartCandle, TimeFrame } from '@/features/chart';
+import { portfolioApi } from '@/shared/api/portfolioApi';
+import { useWebSocket } from '@/shared/lib/useWebSocket';
+import { authAtom } from '@/store/auth';
 
 export function DashboardPage() {
   const { mode } = useThemeMode();
@@ -27,6 +31,56 @@ export function DashboardPage() {
   const [chartExpanded, setChartExpanded] = useState(false);
   const feed = useRef(new ChartDatafeed());
 
+  // Real portfolio data
+  const auth = useAtomValue(authAtom);
+  const [portfolioSummary, setPortfolioSummary] = useState<{
+    totalValue: number; todayPnL: number; todayPnLPercent: number;
+    mtdReturn: number; ytdReturn: number;
+    realizedPnL: number; unrealizedPnL: number;
+  } | null>(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+
+  const fetchPortfolio = useCallback(async () => {
+    if (!auth.isAuthenticated) return;
+    setPortfolioLoading(true);
+    try {
+      const res = await portfolioApi.getSummary();
+      setPortfolioSummary(res.data);
+    } catch {
+      // No exchange connected — show defaults
+    } finally {
+      setPortfolioLoading(false);
+    }
+  }, [auth.isAuthenticated]);
+
+  // WebSocket for live risk alerts + order updates
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
+  const { status: wsStatus, subscribe } = useWebSocket({
+    url: wsUrl,
+    token: auth.token,
+    reconnectDelayMs: 3000,
+  });
+
+  const [wsAlerts, setWsAlerts] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchPortfolio();
+    const interval = setInterval(fetchPortfolio, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchPortfolio]);
+
+  useEffect(() => {
+    const unsubRisk = subscribe('risk:alert', (data: unknown) => {
+      const msg = (data as { message?: string })?.message ?? 'Risk alert';
+      setWsAlerts((prev) => [msg, ...prev].slice(0, 5));
+    });
+    const unsubOrder = subscribe('order:update', (data: unknown) => {
+      fetchPortfolio(); // Refresh portfolio on order updates
+      void data;
+    });
+    return () => { unsubRisk(); unsubOrder(); };
+  }, [subscribe, fetchPortfolio]);
+
   useEffect(() => {
     if (!chartExpanded) return;
     feed.current
@@ -42,12 +96,14 @@ export function DashboardPage() {
     return () => clearInterval(interval);
   }, [liveSymbol, liveTimeframe, chartExpanded]);
 
+  const hasPortfolio = portfolioSummary !== null && portfolioSummary.totalValue > 0;
+
   const metricCards = [
-    { label: t('dashboard.totalPortfolioValue'), value: '$0.00', hint: t('dashboard.noExchangeConnected') },
-    { label: t('dashboard.todayPnL'), value: '$0.00', hint: '0.00%' },
+    { label: t('dashboard.totalPortfolioValue'), value: hasPortfolio ? `$${portfolioSummary!.totalValue.toLocaleString()}` : '$0.00', hint: hasPortfolio ? t('dashboard.connected') : t('dashboard.noExchangeConnected') },
+    { label: t('dashboard.todayPnL'), value: hasPortfolio ? `$${portfolioSummary!.todayPnL.toLocaleString()}` : '$0.00', hint: hasPortfolio ? `${portfolioSummary!.todayPnLPercent}%` : '0.00%' },
     { label: t('dashboard.latestAISignal'), value: '—', hint: t('dashboard.noDataSources') },
     { label: t('dashboard.openPositions'), value: '0', hint: t('dashboard.noActiveTrades') },
-    { label: t('dashboard.riskScore'), value: '—', hint: t('dashboard.connectExchangeFirst') },
+    { label: t('dashboard.riskScore'), value: hasPortfolio ? `${portfolioSummary!.unrealizedPnL > 0 ? '🟢' : '🟡'} ${Math.abs(portfolioSummary!.unrealizedPnL)}` : '—', hint: t('dashboard.connectExchangeFirst') },
     { label: t('dashboard.sharpeRatio'), value: '—', hint: t('dashboard.runBacktest') },
   ];
 
@@ -141,6 +197,31 @@ export function DashboardPage() {
               />
             </AccordionDetails>
           </Accordion>
+        </Grid>
+
+        {/* WebSocket status + risk alerts */}
+        <Grid item xs={12}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip
+              label={`WS: ${wsStatus}`}
+              size="small"
+              sx={{
+                bgcolor: wsStatus === 'connected' ? '#22c55e20' : '#f59e0b20',
+                color: wsStatus === 'connected' ? '#22c55e' : '#f59e0b',
+                fontSize: '0.65rem',
+              }}
+            />
+            {portfolioLoading && <CircularProgress size={16} sx={{ color: '#3b82f6' }} />}
+          </Stack>
+          {wsAlerts.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              {wsAlerts.map((alert, i) => (
+                <Typography key={i} variant="caption" sx={{ color: '#ef4444', display: 'block' }}>
+                  ⚠️ {alert}
+                </Typography>
+              ))}
+            </Box>
+          )}
         </Grid>
       </Grid>
     </Container>
