@@ -26,6 +26,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '@/app/Providers';
+import { usePermissions } from '@/shared/lib/usePermissions';
+import { PERMISSIONS } from '@/shared/lib/permissions';
 
 interface ExchangeConnection {
   id: string;
@@ -451,8 +453,11 @@ export function SettingsPage() {
   const { mode, toggle } = useThemeMode();
   const theme = useTheme();
   const { t, i18n } = useTranslation();
+  const { hasPermission } = usePermissions();
   const isDark = mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const canManageApiKeys = hasPermission(PERMISSIONS.EXCHANGE_CONNECT);
 
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -468,7 +473,7 @@ export function SettingsPage() {
 
   const tabs = [
     { label: t('settings.tabs.profile'), icon: <PersonIcon sx={{ fontSize: 20 }} />, component: ProfileTab },
-    { label: t('settings.tabs.apiKeys'), icon: <VpnKeyIcon sx={{ fontSize: 20 }} />, component: ApiKeysTab },
+    ...(canManageApiKeys ? [{ label: t('settings.tabs.apiKeys'), icon: <VpnKeyIcon sx={{ fontSize: 20 }} />, component: ApiKeysTab }] : []),
     { label: t('settings.tabs.notifications'), icon: <NotificationsIcon sx={{ fontSize: 20 }} />, component: NotificationsTab },
     { label: t('settings.tabs.security'), icon: <SecurityIcon sx={{ fontSize: 20 }} />, component: SecurityTab },
   ];

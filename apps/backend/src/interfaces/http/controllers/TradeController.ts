@@ -25,7 +25,10 @@ export class TradeController {
         parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
-      const trade = await this.executeTradeUseCase.execute(parseResult.data);
+      const userId = req.user?.userId;
+      if (!userId) throw new ValidationError('User not authenticated');
+
+      const trade = await this.executeTradeUseCase.execute(parseResult.data, userId);
       const responseDto = TradeResponseDtoSchema.parse(trade);
 
       res.status(201).json({
@@ -46,7 +49,10 @@ export class TradeController {
         parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
-      const trade = await this.cancelTradeUseCase.execute(parseResult.data);
+      const userId = req.user?.userId;
+      if (!userId) throw new ValidationError('User not authenticated');
+
+      const trade = await this.cancelTradeUseCase.execute(parseResult.data, userId);
       const responseDto = TradeResponseDtoSchema.parse(trade);
 
       res.status(200).json({

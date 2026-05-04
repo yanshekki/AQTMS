@@ -22,7 +22,7 @@ export function AppRouter() {
           {/* Viewer+ */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/notifications" element={<ProtectedRoute requiredPermissions={[PERMISSIONS.USER_READ]}><NotificationsPage /></ProtectedRoute>} />
 
           {/* Trader+ */}
           <Route path="/exchanges" element={<ProtectedRoute requiredRoles={[ROLES.TRADER, ROLES.ANALYST, ROLES.ADMIN, ROLES.SUPER_ADMIN]}><ExchangesPage /></ProtectedRoute>} />

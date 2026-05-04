@@ -6,7 +6,7 @@ import type { CancelTradeDto } from '@aqtms/shared-types';
 import { DomainError, InfraError } from '../../shared/errors';
 
 export interface ExchangeAdapterMap {
-  get(exchangeAccountId: string): Promise<BaseTradingAdapter | undefined>;
+  get(exchangeAccountId: string, userId: string): Promise<BaseTradingAdapter | undefined>;
 }
 
 export class CancelTradeUseCase {
@@ -15,8 +15,8 @@ export class CancelTradeUseCase {
     private readonly tradeRepository: ITradeRepository,
   ) {}
 
-  async execute(dto: CancelTradeDto) {
-    const adapter = await this.adapterMap.get(dto.exchangeAccountId);
+  async execute(dto: CancelTradeDto, userId: string) {
+    const adapter = await this.adapterMap.get(dto.exchangeAccountId, userId);
     if (!adapter) {
       throw new DomainError(
         `Exchange account not found: ${dto.exchangeAccountId}`,

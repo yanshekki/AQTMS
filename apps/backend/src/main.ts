@@ -26,9 +26,9 @@ import { TelegramAdapter } from './infrastructure/adapters/datasources/TelegramA
 import { XAdapter } from './infrastructure/adapters/datasources/XAdapter';
 import { aiProviderRegistry } from './infrastructure/ai-providers/AIProviderRegistry';
 import { ScoringEngine } from './application/services/ScoringEngine';
-import { initNewsQueue, enqueueNews, getNewsQueueHealth } from './queues/processors/news.processor';
-import { initAIScoringQueue, getAIQueueHealth } from './queues/processors/ai.processor';
-import { initTradeQueue, getTradeQueueHealth } from './queues/processors/trade.processor';
+import { initNewsQueue, enqueueNews } from './queues/processors/news.processor';
+import { initAIScoringQueue } from './queues/processors/ai.processor';
+import { initTradeQueue } from './queues/processors/trade.processor';
 import { metricsRegistry } from './shared/metrics';
 import { initWebSocket } from './shared/websocket';
 import compression from 'compression';
@@ -48,8 +48,8 @@ const dataSources: BaseDataSourceAdapter[] = [];
 const exchangeAccountRepo = new ExchangeAccountRepository(env.ENCRYPTION_KEY);
 
 const adapterMap: ExchangeAdapterMap = {
-  async get(accountId: string) {
-    const creds = await exchangeAccountRepo.getDecryptedCredentials(accountId);
+  async get(accountId: string, userId: string) {
+    const creds = await exchangeAccountRepo.getDecryptedCredentials(accountId, userId);
     if (!creds) return undefined;
 
     switch (creds.exchange) {
@@ -161,41 +161,25 @@ app.use(metricsMiddleware);
 app.use(rateLimitMiddleware);
 app.use(authMiddleware);
 
-// Health check
+// Health check — minimal, no internal details exposed
 app.get('/health', async (_req, res) => {
-  let redisStatus = 'unknown';
-  let newsQueueHealth = { waiting: 0, active: 0, failed: 0 };
-  let aiQueueHealth = { waiting: 0, active: 0, failed: 0 };
-  let tradeQueueHealth = { waiting: 0, active: 0, failed: 0 };
-
-  try {
-    const { redis } = await import('./shared/redis');
-    redisStatus = (await redis.ping()) === 'PONG' ? 'connected' : 'error';
-  } catch { redisStatus = 'disconnected'; }
-
-  try { newsQueueHealth = await getNewsQueueHealth(); } catch { /* use defaults */ }
-  try { aiQueueHealth = await getAIQueueHealth(); } catch { /* use defaults */ }
-  try { tradeQueueHealth = await getTradeQueueHealth(); } catch { /* use defaults */ }
-
   res.json({
     status: 'ok',
     uptime: process.uptime(),
-    redis: redisStatus,
-    aiProviders: aiProviderRegistry.size,
-    aiHealthy: aiProviderRegistry.getHealthy().length,
-    dataSources: dataSources.length,
-    queues: {
-      news: newsQueueHealth,
-      ai: aiQueueHealth,
-      trade: tradeQueueHealth,
-    },
-    memory: process.memoryUsage(),
     timestamp: new Date().toISOString(),
   });
 });
 
-// Prometheus metrics endpoint
-app.get('/metrics', async (_req, res) => {
+// Prometheus metrics endpoint — authenticated via shared secret
+app.get('/metrics', async (req, res) => {
+  const metricsSecret = process.env.METRICS_SECRET;
+  if (metricsSecret) {
+    const auth = req.headers.authorization;
+    if (!auth || auth !== `Bearer ${metricsSecret}`) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+  }
   res.setHeader('Content-Type', metricsRegistry.contentType);
   res.send(await metricsRegistry.metrics());
 });
@@ -203,12 +187,12 @@ app.get('/metrics', async (_req, res) => {
 // API Routes
 app.use('/auth', authRateLimitMiddleware, createAuthRoutes());
 app.use('/api/v1/trades', strictRateLimitMiddleware, createTradeRoutes(executeTradeUseCase, cancelTradeUseCase));
-app.use('/api/v1/exchanges', createExchangeRoutes(env.ENCRYPTION_KEY));
-app.use('/api/v1/risk', createRiskRoutes());
-app.use('/api/v1/backtest', createBacktestRoutes());
-app.use('/api/v1/portfolio', createPortfolioRoutes());
-app.use('/api/v1/scoring-rules', createScoringRulesRoutes());
-app.use('/api/v1/notifications', createNotificationsRoutes());
+app.use('/api/v1/exchanges', rateLimitMiddleware, createExchangeRoutes(env.ENCRYPTION_KEY));
+app.use('/api/v1/risk', rateLimitMiddleware, createRiskRoutes());
+app.use('/api/v1/backtest', rateLimitMiddleware, createBacktestRoutes());
+app.use('/api/v1/portfolio', rateLimitMiddleware, createPortfolioRoutes());
+app.use('/api/v1/scoring-rules', rateLimitMiddleware, createScoringRulesRoutes());
+app.use('/api/v1/notifications', rateLimitMiddleware, createNotificationsRoutes());
 
 // AI & News endpoints
 app.get('/api/v1/ai/providers', permission(['ai:read']), (_req, res) => {
@@ -294,7 +278,7 @@ app.use(errorMiddleware);
 
 // ── Start ──
 const server = http.createServer(app);
-initWebSocket(server, env.JWT_SECRET);
+initWebSocket(server, env.JWT_SECRET, env.CORS_ORIGIN);
 
 server.listen(env.PORT, () => {
   logger.info(`🚀 AQTMS Backend running on port ${env.PORT} [${env.NODE_ENV}]`);

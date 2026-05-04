@@ -19,7 +19,7 @@ export function initTradeQueue(useCase: ExecuteTradeUseCase): Queue {
   });
 
   tradeQueue.process(3, async (job: { data: TradeExecuteJob }) => {
-    const { symbol, side, quantity, reason, compositeScore, exchangeAccountId, idempotencyKey } = job.data;
+    const { symbol, side, quantity, reason, compositeScore, exchangeAccountId, idempotencyKey, userId } = job.data;
     logger.info({ symbol, side, quantity, reason, score: compositeScore }, 'Executing trade');
 
     if (compositeScore < 80) {
@@ -35,7 +35,7 @@ export function initTradeQueue(useCase: ExecuteTradeUseCase): Queue {
       quantity,
       timeInForce: 'GTC',
       idempotencyKey,
-    });
+    }, userId);
 
     logger.info({ symbol, tradeId: result.id, status: result.status }, 'Trade executed');
     return { success: true, tradeId: result.id, status: result.status };

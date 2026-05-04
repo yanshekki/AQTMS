@@ -13,6 +13,8 @@ import { TradingViewChart, ChartDatafeed } from '@/features/chart';
 import type { ChartCandle, TimeFrame } from '@/features/chart';
 import { portfolioApi } from '@/shared/api/portfolioApi';
 import { useWebSocket } from '@/shared/lib/useWebSocket';
+import { usePermissions } from '@/shared/lib/usePermissions';
+import { PERMISSIONS } from '@/shared/lib/permissions';
 import { authAtom } from '@/store/auth';
 
 export function DashboardPage() {
@@ -33,6 +35,9 @@ export function DashboardPage() {
 
   // Real portfolio data
   const auth = useAtomValue(authAtom);
+  const { hasPermission } = usePermissions();
+  const canViewRisk = hasPermission(PERMISSIONS.RISK_VIEW);
+  const canConnectExchange = hasPermission(PERMISSIONS.EXCHANGE_CONNECT);
   const [portfolioSummary, setPortfolioSummary] = useState<{
     totalValue: number; todayPnL: number; todayPnLPercent: number;
     mtdReturn: number; ytdReturn: number;
@@ -70,16 +75,21 @@ export function DashboardPage() {
   }, [fetchPortfolio]);
 
   useEffect(() => {
-    const unsubRisk = subscribe('risk:alert', (data: unknown) => {
-      const msg = (data as { message?: string })?.message ?? 'Risk alert';
-      setWsAlerts((prev) => [msg, ...prev].slice(0, 5));
-    });
+    const unsubs: (() => void)[] = [];
+    if (canViewRisk) {
+      const unsubRisk = subscribe('risk:alert', (data: unknown) => {
+        const msg = (data as { message?: string })?.message ?? 'Risk alert';
+        setWsAlerts((prev) => [msg, ...prev].slice(0, 5));
+      });
+      unsubs.push(unsubRisk);
+    }
     const unsubOrder = subscribe('order:update', (data: unknown) => {
       fetchPortfolio(); // Refresh portfolio on order updates
       void data;
     });
-    return () => { unsubRisk(); unsubOrder(); };
-  }, [subscribe, fetchPortfolio]);
+    unsubs.push(unsubOrder);
+    return () => { unsubs.forEach((fn) => fn()); };
+  }, [subscribe, fetchPortfolio, canViewRisk]);
 
   useEffect(() => {
     if (!chartExpanded) return;
@@ -97,9 +107,10 @@ export function DashboardPage() {
   }, [liveSymbol, liveTimeframe, chartExpanded]);
 
   const hasPortfolio = portfolioSummary !== null && portfolioSummary.totalValue > 0;
+  const showViewerHint = !hasPortfolio && !canConnectExchange;
 
   const metricCards = [
-    { label: t('dashboard.totalPortfolioValue'), value: hasPortfolio ? `$${portfolioSummary!.totalValue.toLocaleString()}` : '$0.00', hint: hasPortfolio ? t('dashboard.connected') : t('dashboard.noExchangeConnected') },
+    { label: t('dashboard.totalPortfolioValue'), value: hasPortfolio ? `$${portfolioSummary!.totalValue.toLocaleString()}` : '$0.00', hint: hasPortfolio ? t('dashboard.connected') : (showViewerHint ? t('dashboard.viewOnly') : t('dashboard.noExchangeConnected')) },
     { label: t('dashboard.todayPnL'), value: hasPortfolio ? `$${portfolioSummary!.todayPnL.toLocaleString()}` : '$0.00', hint: hasPortfolio ? `${portfolioSummary!.todayPnLPercent}%` : '0.00%' },
     { label: t('dashboard.latestAISignal'), value: '—', hint: t('dashboard.noDataSources') },
     { label: t('dashboard.openPositions'), value: '0', hint: t('dashboard.noActiveTrades') },

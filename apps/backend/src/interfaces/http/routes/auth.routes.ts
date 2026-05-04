@@ -8,8 +8,9 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { validate } from '../middleware/validate.middleware';
-import { UnauthorizedError } from '../../../shared/errors';
+import { UnauthorizedError, ForbiddenError, ValidationError } from '../../../shared/errors';
 import { getEnv } from '../../../shared/config';
+import redis from '../../../shared/redis';
 
 const prisma = new PrismaClient();
 
@@ -24,6 +25,18 @@ const AuthenticateRequestSchema = z.object({
 });
 
 // Default permissions by role — exact match (aligned with frontend RBAC)
+// Default permissions by role — exact match (aligned with frontend RBAC)
+const VALID_PERMISSIONS = new Set([
+  'trade:execute', 'trade:cancel', 'trade:read',
+  'exchange:connect', 'exchange:read',
+  'risk:view', 'risk:manage', 'scoring:manage',
+  'ai:read', 'datasource:read',
+  'audit:read', 'audit:export',
+  'admin:user:manage', 'admin:system',
+  'user:read',
+  'backtest:run',
+]);
+
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   SUPER_ADMIN: [
     'trade:execute', 'trade:cancel', 'trade:read',
@@ -42,12 +55,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'audit:read', 'audit:export',
     'ai:read', 'datasource:read',
     'admin:user:manage', 'admin:system',
-    'backtest:run',
+    'backtest:run', 'scoring:manage',
   ],
   TRADER: [
     'trade:execute', 'trade:cancel', 'trade:read',
     'exchange:connect', 'exchange:read',
     'risk:view', 'datasource:read',
+    'user:read',
   ],
   ANALYST: [
     'trade:read', 'exchange:read',
@@ -55,8 +69,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'audit:read', 'risk:view',
     'scoring:manage',
     'backtest:run',
+    'user:read',
   ],
-  VIEWER: ['trade:read', 'exchange:read'],
+  VIEWER: ['trade:read', 'exchange:read', 'user:read'],
 };
 
 export function createAuthRoutes(): Router {
@@ -138,7 +153,18 @@ export function createAuthRoutes(): Router {
         });
 
         // Generate JWT
-        const permissions: string[] = JSON.parse(user.permissions || '[]') as string[];
+        let permissions: string[] = JSON.parse(user.permissions || '[]') as string[];
+        // Validate permissions against known list — prevent privilege escalation via DB manipulation
+        permissions = permissions.filter((p) => VALID_PERMISSIONS.has(p));
+        if (permissions.length === 0) {
+          // Fallback to role-based defaults if all permissions were invalid
+          const rolePerms = (ROLE_PERMISSIONS as Record<string, string[]>)[user.role];
+          if (rolePerms && rolePerms.length > 0) {
+            permissions = rolePerms;
+          } else {
+            permissions = (ROLE_PERMISSIONS as Record<string, string[]>).VIEWER!;
+          }
+        }
         const env = getEnv();
         const token = jwt.sign(
           {
@@ -213,6 +239,54 @@ export function createAuthRoutes(): Router {
           ...user,
           permissions: JSON.parse(user.permissions || '[]') as string[],
         },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /auth/invalidate — invalidate all tokens for a user (admin use)
+  router.post('/invalidate', async (req, res, next) => {
+    try {
+      // Verify admin permission from JWT
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new UnauthorizedError('Authentication required');
+      }
+      const token = authHeader.split(' ')[1]!;
+      const env = getEnv();
+      const decoded = jwt.verify(token, env.JWT_SECRET) as {
+        userId: string; role: string; permissions: string[];
+      };
+
+      if (!decoded.permissions.includes('admin:user:manage')) {
+        throw new ForbiddenError('Missing admin:user:manage permission');
+      }
+
+      const { userId } = req.body as { userId: string };
+      if (!userId) throw new ValidationError('userId is required');
+
+      // Set invalidation timestamp — all tokens issued before this time are revoked
+      const invalidationTime = Math.floor(Date.now() / 1000);
+      await redis.set(`token:invalid_before:${userId}`, invalidationTime);
+
+      // Log audit
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      await prisma.auditLog.create({
+        data: {
+          userId: decoded.userId,
+          action: 'admin:token:invalidate',
+          resource: 'user',
+          resourceId: userId,
+          ...(req.ip ? { ipAddress: req.ip } : {}),
+        },
+      });
+
+      res.json({
+        success: true,
+        data: { invalidated: true, userId, invalidBefore: invalidationTime },
         timestamp: new Date().toISOString(),
       });
     } catch (err) {

@@ -34,7 +34,7 @@ export class ExchangeController {
       });
 
       // Test connection in background
-      queueConnectionTest(account.id, this.exchangeRepo, exchange, apiKey, apiSecret, testnet);
+      queueConnectionTest(account.id, userId, this.exchangeRepo, exchange, apiKey, apiSecret, testnet);
 
       res.status(201).json({
         success: true,
@@ -67,12 +67,21 @@ export class ExchangeController {
     }
   };
 
-  getBalances = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getBalances = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const id = String(req.params.id ?? '');
+      const userId = req.user?.userId;
+      if (!userId) throw new ValidationError('User not authenticated');
+
+      // Verify ownership before returning data
+      const account = await this.exchangeRepo.findById(id);
+      if (!account) throw new NotFoundError('Exchange account not found');
+      if (account.userId !== userId) throw new ForbiddenError('You can only access your own exchange accounts');
+
       // TODO: Retrieve adapter from registry, fetch real balances
       res.status(200).json({
         success: true,
-        data: { exchange: 'BINANCE', balances: [], updatedAt: new Date().toISOString() },
+        data: { exchange: account.exchange, balances: [], updatedAt: new Date().toISOString() },
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -80,11 +89,20 @@ export class ExchangeController {
     }
   };
 
-  getPositions = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getPositions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const id = String(req.params.id ?? '');
+      const userId = req.user?.userId;
+      if (!userId) throw new ValidationError('User not authenticated');
+
+      // Verify ownership before returning data
+      const account = await this.exchangeRepo.findById(id);
+      if (!account) throw new NotFoundError('Exchange account not found');
+      if (account.userId !== userId) throw new ForbiddenError('You can only access your own exchange accounts');
+
       res.status(200).json({
         success: true,
-        data: { exchange: 'BINANCE', positions: [], updatedAt: new Date().toISOString() },
+        data: { exchange: account.exchange, positions: [], updatedAt: new Date().toISOString() },
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -97,7 +115,11 @@ export class ExchangeController {
       const id = String(req.params.id ?? '');
       if (!id) throw new ValidationError('Exchange ID required');
 
-      const creds = await this.exchangeRepo.getDecryptedCredentials(id);
+      const userId = req.user?.userId;
+      if (!userId) throw new ValidationError('User not authenticated');
+
+      // Ownership check enforced by repository
+      const creds = await this.exchangeRepo.getDecryptedCredentials(id, userId);
       if (!creds) throw new NotFoundError('Exchange account not found');
 
       let success = false;
@@ -110,7 +132,7 @@ export class ExchangeController {
       }
 
       const status = success ? 'CONNECTED' : 'ERROR';
-      await this.exchangeRepo.updateStatus(id, status, success);
+      await this.exchangeRepo.updateStatus(id, userId, status, success);
 
       res.status(200).json({
         success: true,
@@ -145,6 +167,7 @@ export class ExchangeController {
 // ── Background connection test ──
 async function queueConnectionTest(
   id: string,
+  userId: string,
   repo: ExchangeAccountRepository,
   exchange: string,
   apiKey: string,
@@ -152,7 +175,7 @@ async function queueConnectionTest(
   testnet: boolean,
 ): Promise<void> {
   try {
-    await repo.updateStatus(id, 'TESTING');
+    await repo.updateStatus(id, userId, 'TESTING');
     let success = false;
 
     if (exchange === 'BINANCE') {
@@ -164,10 +187,10 @@ async function queueConnectionTest(
     }
 
     const status = success ? 'CONNECTED' : 'ERROR';
-    await repo.updateStatus(id, status, success);
+    await repo.updateStatus(id, userId, status, success);
     logger.info({ exchangeId: id, exchange, success, status }, 'Exchange connection test completed');
   } catch (error) {
     logger.error({ exchangeId: id, error }, 'Exchange connection test failed');
-    await repo.updateStatus(id, 'ERROR', false);
+    await repo.updateStatus(id, userId, 'ERROR', false);
   }
 }

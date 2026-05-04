@@ -32,4 +32,5 @@ export interface TradeExecuteJob {
   compositeScore: number;
   exchangeAccountId: string;
   idempotencyKey: string;
+  userId: string;
 }

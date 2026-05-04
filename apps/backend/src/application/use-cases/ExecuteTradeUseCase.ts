@@ -8,7 +8,7 @@ import type { CreateTradeDto } from '@aqtms/shared-types';
 import { DomainError, InfraError } from '../../shared/errors';
 
 export interface ExchangeAdapterMap {
-  get(exchangeAccountId: string): Promise<BaseTradingAdapter | undefined>;
+  get(exchangeAccountId: string, userId: string): Promise<BaseTradingAdapter | undefined>;
 }
 
 export class ExecuteTradeUseCase {
@@ -17,7 +17,7 @@ export class ExecuteTradeUseCase {
     private readonly tradeRepository: ITradeRepository,
   ) {}
 
-  async execute(dto: CreateTradeDto) {
+  async execute(dto: CreateTradeDto, userId: string) {
     // 1. Check idempotency (prevent duplicate execution)
     const existing = await this.tradeRepository.findByIdempotencyKey(dto.idempotencyKey);
     if (existing) {
@@ -25,7 +25,7 @@ export class ExecuteTradeUseCase {
     }
 
     // 2. Get the correct exchange adapter (resolves account ID → exchange type → adapter)
-    const adapter = await this.adapterMap.get(dto.exchangeAccountId);
+    const adapter = await this.adapterMap.get(dto.exchangeAccountId, userId);
     if (!adapter) {
       throw new DomainError(
         `Exchange account not found: ${dto.exchangeAccountId}`,

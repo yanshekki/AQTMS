@@ -75,6 +75,7 @@ export function initNewsQueue(_engine: ScoringEngine, useCase: ProcessNewsUseCas
             compositeScore: result.score.compositeScore,
             exchangeAccountId: firstAccount.id,
             idempotencyKey: `${newsId}-${Date.now()}`,
+            userId: firstAccount.userId,
           });
           logger.info({ newsId, score: result.score.compositeScore, symbol: result.score.affectedAssets[0] }, 'Trade enqueued from news signal');
         } else {

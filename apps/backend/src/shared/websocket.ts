@@ -8,9 +8,9 @@ import { logger } from './logger';
 
 let io: Server | null = null;
 
-export function initWebSocket(server: HttpServerType, jwtSecret: string): Server {
+export function initWebSocket(server: HttpServerType, jwtSecret: string, corsOrigin: string): Server {
   io = new Server(server, {
-    cors: { origin: '*' },
+    cors: { origin: corsOrigin },
     pingTimeout: 60_000,
     pingInterval: 25_000,
     connectTimeout: 10_000,

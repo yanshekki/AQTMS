@@ -77,7 +77,15 @@ export function createTradeRoutes(
     try {
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
-      const trade = await prisma.trade.findUnique({ where: { id: String(req.params.id) } });
+      const userId = req.user?.userId;
+      if (!userId) {
+        const lang = detectLang(req);
+        res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: t('auth.required', lang) }, timestamp: new Date().toISOString() });
+        return;
+      }
+      const trade = await prisma.trade.findFirst({
+        where: { id: String(req.params.id), userId },
+      });
       if (!trade) {
         const lang = detectLang(req);
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('trade.not_found', lang) }, timestamp: new Date().toISOString() });

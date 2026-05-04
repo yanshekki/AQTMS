@@ -99,8 +99,9 @@ export class ExchangeAccountRepository {
 
   /**
    * Returns decrypted API credentials — use ONLY when initializing adapters.
+   * Requires userId for ownership verification.
    */
-  async getDecryptedCredentials(id: string): Promise<{
+  async getDecryptedCredentials(id: string, userId: string): Promise<{
     apiKey: string;
     apiSecret: string;
     exchange: string;
@@ -108,6 +109,12 @@ export class ExchangeAccountRepository {
   } | null> {
     const account = await prisma.exchangeAccount.findUnique({ where: { id } });
     if (!account) return null;
+
+    // Ownership check — prevent horizontal privilege escalation
+    if (account.userId !== userId) {
+      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user access to exchange credentials');
+      return null;
+    }
 
     try {
       const apiKey = decrypt(account.apiKey, this.encryptionKey);
@@ -125,7 +132,18 @@ export class ExchangeAccountRepository {
     }
   }
 
-  async updateStatus(id: string, status: string, testPassed?: boolean): Promise<void> {
+  async updateStatus(id: string, userId: string, status: string, testPassed?: boolean): Promise<void> {
+    // Ownership check
+    const account = await prisma.exchangeAccount.findUnique({ where: { id } });
+    if (!account) {
+      logger.warn({ exchangeId: id }, 'Attempted to update status of non-existent exchange account');
+      return;
+    }
+    if (account.userId !== userId) {
+      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user exchange status update');
+      return;
+    }
+
     await prisma.exchangeAccount.update({
       where: { id },
       data: {
