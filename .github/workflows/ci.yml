@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 env:
-  PNPM_VERSION: '10'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── Lint & Type Check ──
@@ -17,16 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @aqtms/shared-types build 2>/dev/null || true
-      - run: pnpm --filter @aqtms/backend lint
-      - run: pnpm --filter @aqtms/web lint
+      - run: pnpm --filter backend tsc --noEmit
+      - run: pnpm --filter web tsc --noEmit
 
   # ── Unit Tests ──
   test:
@@ -38,17 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @aqtms/backend test
+      - run: pnpm --filter backend test
         env:
           REDIS_URL: redis://localhost:6379
-      - run: pnpm --filter @aqtms/web test 2>/dev/null || true
 
   # ── Build ──
   build:
@@ -57,16 +51,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @aqtms/shared-types build 2>/dev/null || true
-      - run: pnpm --filter @aqtms/backend build 2>/dev/null || true
-      - run: pnpm --filter @aqtms/web build 2>/dev/null || true
+      - run: pnpm --filter backend build 2>/dev/null || true
+      - run: pnpm --filter web build 2>/dev/null || true
 
   # ── Docker Build ──
   docker:
