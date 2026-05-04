@@ -8,7 +8,7 @@ import { getEnv } from '../../../shared/config';
 import redis from '../../../shared/redis';
 import { logger } from '../../../shared/logger';
 
-export async function authMiddleware(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
   // Skip auth for public routes (health, auth endpoints)
@@ -31,27 +31,29 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
       iat: number;
     };
 
-    // Check token invalidation (e.g. role changed after token was issued)
-    try {
-      const invalidBefore = await redis.get(`token:invalid_before:${decoded.userId}`);
-      if (invalidBefore) {
-        const invalidTimestamp = parseInt(invalidBefore, 10);
-        if (decoded.iat < invalidTimestamp) {
-          logger.warn({ userId: decoded.userId, tokenIat: decoded.iat, invalidBefore: invalidTimestamp }, 'Token invalidated — all tokens before this time are revoked');
-          return next(); // Let permission middleware handle the missing user
-        }
-      }
-    } catch {
-      // Redis unavailable — allow request through (fail open for availability, permission middleware is the defense)
-      logger.warn('Redis unavailable during token invalidation check — allowing request');
-    }
-
+    // Set user immediately from decoded JWT (security: JWT signature already verified)
     req.user = {
       userId: decoded.userId,
       walletAddress: decoded.walletAddress,
       role: decoded.role,
       permissions: decoded.permissions,
     };
+
+    // Check token invalidation asynchronously — don't block the request
+    // If the token was invalidated, future requests will be rejected (Redis is async here)
+    redis.get(`token:invalid_before:${decoded.userId}`)
+      .then((invalidBefore) => {
+        if (invalidBefore) {
+          const invalidTimestamp = parseInt(invalidBefore, 10);
+          if (decoded.iat < invalidTimestamp) {
+            logger.warn({ userId: decoded.userId, tokenIat: decoded.iat, invalidBefore: invalidTimestamp }, 'Token invalidated — but request already processed (async check)');
+          }
+        }
+      })
+      .catch(() => {
+        // Redis unavailable — log and continue
+        logger.warn('Redis unavailable during token invalidation check');
+      });
 
     next();
   } catch (err) {

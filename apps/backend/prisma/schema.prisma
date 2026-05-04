@@ -12,7 +12,7 @@ model User {
   walletAddress     String             @unique
   nonce             String
   role              String             @default("VIEWER")
-  permissions       String             @default("[]")  // JSON array
+  permissions       String             @default("[]") @db.VarChar(2000)  // JSON array
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   exchangeAccounts  ExchangeAccount[]
