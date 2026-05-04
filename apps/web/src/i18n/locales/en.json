@@ -19,7 +19,8 @@
     "admin": "Admin",
     "userManagement": "User Management",
     "auditLog": "Audit Log",
-    "systemSettings": "System Settings"
+    "systemSettings": "System Settings",
+    "scoringRules": "Scoring Rules"
   },
   "auth": {
     "loginTitle": "AQTMS",
@@ -36,7 +37,8 @@
       "walletConnect": "WalletConnect",
       "coinbase": "Coinbase"
     },
-    "noAccount": "No account selected"
+    "noAccount": "No account selected",
+    "logout": "Logout"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -224,6 +226,7 @@
     },
     "actions": {
       "copy": "Copy",
+    "language": "Language",
       "retry": "Retry",
       "refresh": "Refresh",
       "refreshing": "Refreshing…",
@@ -433,6 +436,7 @@
       "changePassword": "Change Password",
       "passwordComingSoon": "Password management is coming soon.",
       "comingSoon": "Coming Soon",
+    "comingSoon": "Coming Soon",
       "twoFactorAuth": "Two-Factor Authentication",
       "twoFactorComingSoon": "Google Authenticator / TOTP support is coming soon.",
       "connectedWallet": "Connected Wallet",
@@ -552,6 +556,7 @@
     "userManagement": "User Management",
     "auditLog": "Audit Log",
     "systemSettings": "System Settings",
+    "scoringRules": "Scoring Rules",
     "users": {
       "tableHeaders": {
         "wallet": "Wallet",
@@ -594,6 +599,7 @@
     "confirm": "Confirm",
     "close": "Close",
     "copy": "Copy",
+    "language": "Language",
     "search": "Search",
     "reset": "Reset",
     "retry": "Retry",
@@ -605,6 +611,7 @@
     "all": "All",
     "enabled": "Enabled",
     "disabled": "Disabled",
+    "comingSoon": "Coming Soon",
     "comingSoon": "Coming Soon"
   },
   "roles": {

@@ -3,8 +3,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   Container, Typography, Box, Stack, Card, CardContent, Tabs, Tab,
-  TextField, Button, Switch, FormControlLabel, Select, MenuItem,
-  FormControl, InputLabel, Avatar, Slider, CircularProgress,
+  TextField, Button, Avatar, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem,
+  Slider, CircularProgress,
   Snackbar, Alert, useMediaQuery, useTheme, Skeleton,
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
@@ -133,9 +133,9 @@ function NotificationsTab({
 }
 
 export function SettingsPage() {
-  const { mode, toggle } = useThemeMode();
+  const { mode } = useThemeMode();
   const theme = useTheme();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { isAuthenticated } = usePermissions();
   const isDark = mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -163,28 +163,6 @@ export function SettingsPage() {
           {t('settings.subtitle')}
         </Typography>
       </Box>
-
-      {/* Appearance */}
-      <Card sx={{ bgcolor: cardBg, border: '1px solid', borderColor, borderRadius: 3, mb: 2 }}>
-        <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: primaryText, fontWeight: 600 }}>{t('settings.appearance')}</Typography>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <FormControlLabel
-              control={<Switch checked={isDark} onChange={toggle} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#3b82f6' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#3b82f6' } }} />}
-              label={<Typography variant="body2" sx={{ color: primaryText }}>{isDark ? t('settings.darkMode') : t('settings.lightMode')}</Typography>}
-            />
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel sx={{ color: mutedText }}>🌐 {t('common.language') || 'Language'}</InputLabel>
-              <Select value={i18n.language} onChange={(e) => i18n.changeLanguage(e.target.value)}
-                label={t('common.language') || 'Language'}
-                sx={{ color: primaryText, '.MuiOutlinedInput-notchedOutline': { borderColor }, borderRadius: 3 }}>
-                <MenuItem value="zh">🇭🇰 繁體中文</MenuItem>
-                <MenuItem value="en">🇬🇧 English</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </CardContent>
-      </Card>
 
       {/* Tabs */}
       <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant={isMobile ? 'fullWidth' : 'standard'}

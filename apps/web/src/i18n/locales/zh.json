@@ -19,7 +19,8 @@
     "admin": "管理",
     "userManagement": "用戶管理",
     "auditLog": "審計日誌",
-    "systemSettings": "系統設定"
+    "systemSettings": "系統設定",
+    "scoringRules": "評分規則"
   },
   "auth": {
     "loginTitle": "AQTMS",
@@ -36,7 +37,8 @@
       "walletConnect": "WalletConnect",
       "coinbase": "Coinbase"
     },
-    "noAccount": "未選擇帳戶"
+    "noAccount": "未選擇帳戶",
+    "logout": "登出"
   },
   "dashboard": {
     "title": "儀表板",
@@ -551,6 +553,7 @@
     "userManagement": "用戶管理",
     "auditLog": "審計日誌",
     "systemSettings": "系統設定",
+    "scoringRules": "評分規則",
     "users": {
       "tableHeaders": {
         "wallet": "錢包",

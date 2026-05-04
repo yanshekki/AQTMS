@@ -123,19 +123,12 @@ export function DashboardHeader() {
 
   const sidebarContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Logo */}
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Box component="img" src="/logo.svg" alt="AQTMS" sx={{ height: 36, width: 36 }} />
-        <Box>
-          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', background: 'linear-gradient(135deg, #00f0ff, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.2 }}>
-            {t('app.name')}
-          </Typography>
-          <Typography variant="caption" sx={{ color: textColor, fontSize: '0.65rem' }}>
-            {t('app.fullName')}
-          </Typography>
-        </Box>
+      <Box sx={{ p: 2, pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: isDark ? '#f3f4f6' : '#0f172a' }}>
+          {t('app.name')}
+        </Typography>
         {isMobile && (
-          <IconButton onClick={() => setMobileOpen(false)} sx={{ ml: 'auto', color: textColor }}>
+          <IconButton onClick={() => setMobileOpen(false)} sx={{ color: textColor }}>
             <ChevronLeftIcon />
           </IconButton>
         )}
