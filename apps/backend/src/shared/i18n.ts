@@ -3,6 +3,7 @@ type Lang = 'en' | 'zh';
 
 const messages: Record<string, Record<Lang, string>> = {
   // ── Auth ──
+  'auth.required': { en: 'Authentication required', zh: '需要身份驗證' },
   'auth.unauthorized': { en: 'Authentication required', zh: '需要身份驗證' },
   'auth.invalid_signature': { en: 'Invalid signature format', zh: '簽名格式無效' },
   'auth.signature_failed': { en: 'Signature verification failed — wrong wallet', zh: '簽名驗證失敗 — 錢包地址不符' },

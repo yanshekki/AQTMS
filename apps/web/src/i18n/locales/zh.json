@@ -52,6 +52,7 @@
     "noActiveTrades": "無活躍交易",
     "connectExchangeFirst": "請先連接交易所",
     "runBacktest": "執行回測",
+    "viewOnly": "僅供查看 — 連接交易所以啟用交易",
     "liveChart": "📈 即時圖表"
   },
   "exchanges": {

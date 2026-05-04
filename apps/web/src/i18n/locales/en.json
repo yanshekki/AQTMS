@@ -52,6 +52,7 @@
     "noActiveTrades": "No active trades",
     "connectExchangeFirst": "Connect exchange first",
     "runBacktest": "Run backtest",
+    "viewOnly": "View only — connect an exchange to enable trading",
     "liveChart": "📈 Live Chart"
   },
   "exchanges": {
