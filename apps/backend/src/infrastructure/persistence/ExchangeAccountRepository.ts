@@ -153,7 +153,17 @@ export class ExchangeAccountRepository {
     });
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, userId: string): Promise<void> {
+    // Ownership check — defense in depth
+    const account = await prisma.exchangeAccount.findUnique({ where: { id } });
+    if (!account) {
+      logger.warn({ exchangeId: id }, 'Attempted to delete non-existent exchange account');
+      return;
+    }
+    if (account.userId !== userId) {
+      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user exchange deletion');
+      return;
+    }
     await prisma.exchangeAccount.delete({ where: { id } });
     logger.info({ exchangeId: id }, 'Exchange account deleted');
   }

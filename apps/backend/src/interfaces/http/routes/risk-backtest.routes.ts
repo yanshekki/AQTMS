@@ -97,10 +97,12 @@ export function createBacktestRoutes(): Router {
     } catch (err) { next(err); }
   });
 
-  // GET /api/v1/backtest/history — list past backtests
-  router.get('/history', permission(['backtest:run']), async (_req, res, next) => {
+  // GET /api/v1/backtest/history — list past backtests (user-scoped)
+  router.get('/history', permission(['backtest:run']), async (req, res, next) => {
     try {
+      const userId = req.user?.userId ?? '';
       const reports = await prisma.backtestReport.findMany({
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         take: 20,
         select: {
@@ -113,10 +115,13 @@ export function createBacktestRoutes(): Router {
     } catch (err) { next(err); }
   });
 
-  // GET /api/v1/backtest/:id — get full report detail
+  // GET /api/v1/backtest/:id — get full report detail (user-scoped)
   router.get('/:id', permission(['backtest:run']), async (req, res, next) => {
     try {
-      const report = await prisma.backtestReport.findUnique({ where: { id: String(req.params.id) } });
+      const userId = req.user?.userId ?? '';
+      const report = await prisma.backtestReport.findFirst({
+        where: { id: String(req.params.id), userId },
+      });
       if (!report) {
         const lang = detectLang(req);
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('backtest.not_found', lang) }, timestamp: new Date().toISOString() });

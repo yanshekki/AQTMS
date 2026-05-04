@@ -63,7 +63,6 @@ export function DashboardPage() {
   const { status: wsStatus, subscribe } = useWebSocket({
     url: wsUrl,
     token: auth.token,
-    reconnectDelayMs: 3000,
   });
 
   const [wsAlerts, setWsAlerts] = useState<string[]>([]);

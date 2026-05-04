@@ -43,5 +43,7 @@ export const scoringRulesApi = {
     safePost('/api/v1/scoring-rules', CreateRuleSchema.parse(data), RuleResponseSchema),
   updateRule: (id: string, data: UpdateRuleInput) =>
     safePut(`/api/v1/scoring-rules/${id}`, UpdateRuleSchema.parse(data), RuleResponseSchema),
+  toggleRule: (id: string, enabled: boolean) =>
+    safePut(`/api/v1/scoring-rules/${id}`, { enabled }, RuleResponseSchema),
   deleteRule: (id: string) => safeDelete(`/api/v1/scoring-rules/${id}`, {}, DeleteResponseSchema),
 };

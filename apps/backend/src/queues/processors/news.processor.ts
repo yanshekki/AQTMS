@@ -16,6 +16,33 @@ const prisma = new PrismaClient();
 const riskEngine = new RiskEngine();
 const sizingCalculator = new PositionSizingCalculator(riskEngine);
 
+// ── Price Feed ──
+// Fetches current price from Binance public API (no auth required).
+// Cached in-memory with 15s TTL to avoid rate limits.
+const priceCache = new Map<string, { price: number; ts: number }>();
+const PRICE_CACHE_TTL = 15_000; // 15 seconds
+
+async function fetchCurrentPrice(symbol: string): Promise<number> {
+  const cached = priceCache.get(symbol);
+  if (cached && Date.now() - cached.ts < PRICE_CACHE_TTL) {
+    return cached.price;
+  }
+
+  try {
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+    const data = (await res.json()) as { price: string };
+    const price = parseFloat(data.price);
+    if (!isNaN(price) && price > 0) {
+      priceCache.set(symbol, { price, ts: Date.now() });
+      return price;
+    }
+  } catch (err) {
+    logger.warn({ err, symbol }, 'Failed to fetch current price from Binance');
+  }
+
+  return 0; // caller must handle zero
+}
+
 let newsQueue: Queue | null = null;
 let processNewsUseCase: ProcessNewsUseCase | null = null;
 
@@ -55,19 +82,32 @@ export function initNewsQueue(_engine: ScoringEngine, useCase: ProcessNewsUseCas
           orderBy: { createdAt: 'asc' },
         });
         if (firstAccount) {
+          const symbol = result.score.affectedAssets[0] ?? 'BTCUSDT';
+
+          // Fetch current price from public exchange API
+          const currentPrice = await fetchCurrentPrice(symbol);
+          if (currentPrice <= 0) {
+            logger.warn({ newsId, symbol }, 'Skipping trade — unable to fetch current price');
+            return;
+          }
+
+          // TODO: Replace with real exchange balance lookup (requires adapter integration)
+          // For MVP, use a conservative default ($10,000). Production MUST use real balance.
+          const accountSize = 10_000;
+
           // Calculate position size using Half Kelly
           const sizing = sizingCalculator.calculate({
             method: 'KELLY_HALF',
-            accountSize: 10000, // FIXME: pull from exchange balance
+            accountSize,
             riskPercent: 2,
             winRate: 0.55,
             avgWin: 200,
             avgLoss: 100,
-            currentPrice: 50000, // FIXME: fetch current price
+            currentPrice,
           });
 
           await enqueueTrade({
-            symbol: result.score.affectedAssets[0] ?? 'BTCUSDT',
+            symbol,
             side: result.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
             action: result.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
             quantity: sizing.suggestedSize > 0 ? sizing.suggestedSize : 0.001,

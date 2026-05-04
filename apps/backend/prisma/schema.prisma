@@ -142,3 +142,36 @@ model BacktestReport {
   @@index([symbol])
   @@index([createdAt])
 }
+
+model ScoringRule {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  status    String   @default("Active") // Active, Draft
+  version   String   @default("v1")
+  weights   String                // JSON: { truth, sentiment, relevance, confidence }
+  threshold Float    @default(80)
+  action    String   @default("ALERT") // BUY, SELL, ALERT, IGNORE
+  enabled   Boolean  @default(true)
+  versions  String   @db.LongText // JSON array of version history
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // trade, signal, risk, system
+  title       String
+  message     String   @db.Text
+  read        Boolean  @default(false)
+  targetRoute String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
+}

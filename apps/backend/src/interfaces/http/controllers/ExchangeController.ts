@@ -156,7 +156,7 @@ export class ExchangeController {
         throw new ForbiddenError('You can only delete your own exchange accounts');
       }
 
-      await this.exchangeRepo.delete(id);
+      await this.exchangeRepo.delete(id, account.userId);
       res.status(200).json({ success: true, data: { deleted: true }, timestamp: new Date().toISOString() });
     } catch (err) {
       next(err);

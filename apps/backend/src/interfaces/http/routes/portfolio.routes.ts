@@ -1,5 +1,6 @@
 // ── Portfolio Routes ──
 // Mock data for MVP; real implementation fetches from exchange adapters.
+// User-scoping enforced even in MVP for correct architecture.
 
 import { Router } from 'express';
 import { permission } from '../middleware/permission.middleware';
@@ -8,7 +9,12 @@ export function createPortfolioRoutes(): Router {
   const router = Router();
 
   // GET /api/v1/portfolio/summary
-  router.get('/summary', permission(['trade:read']), async (_req, res) => {
+  router.get('/summary', permission(['trade:read']), async (req, res) => {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' }, timestamp: new Date().toISOString() });
+      return;
+    }
     res.json({
       success: true,
       data: {
