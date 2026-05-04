@@ -24,9 +24,10 @@ export type UpdateRuleInput = z.infer<typeof UpdateRuleSchema>;
 
 const RuleSchema = z.object({
   id: z.string(), name: z.string(), status: z.string(), version: z.string(),
+  enabled: z.boolean().default(true),
   weights: z.object({ truth: z.number(), sentiment: z.number(), relevance: z.number(), confidence: z.number() }),
   threshold: z.number(), action: z.enum(['BUY', 'SELL', 'ALERT', 'IGNORE']),
-  versions: z.array(z.object({
+  history: z.array(z.object({
     version: z.string(), timestamp: z.string(),
     weights: z.object({ truth: z.number(), sentiment: z.number(), relevance: z.number(), confidence: z.number() }),
     action: z.string(), by: z.string(),

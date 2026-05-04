@@ -60,7 +60,7 @@ export function DashboardPage() {
 
   // WebSocket for live risk alerts + order updates
   const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-  const { status: wsStatus, subscribe } = useWebSocket({
+  const { status: wsStatus, subscribe, joinRoom } = useWebSocket({
     url: wsUrl,
     token: auth.token,
   });
@@ -76,11 +76,12 @@ export function DashboardPage() {
   useEffect(() => {
     const unsubs: (() => void)[] = [];
     if (canViewRisk) {
+      const leaveRoom = joinRoom('risk');
       const unsubRisk = subscribe('risk:alert', (data: unknown) => {
         const msg = (data as { message?: string })?.message ?? 'Risk alert';
         setWsAlerts((prev) => [msg, ...prev].slice(0, 5));
       });
-      unsubs.push(unsubRisk);
+      unsubs.push(leaveRoom, unsubRisk);
     }
     const unsubOrder = subscribe('order:update', (data: unknown) => {
       fetchPortfolio(); // Refresh portfolio on order updates
@@ -88,7 +89,7 @@ export function DashboardPage() {
     });
     unsubs.push(unsubOrder);
     return () => { unsubs.forEach((fn) => fn()); };
-  }, [subscribe, fetchPortfolio, canViewRisk]);
+  }, [subscribe, joinRoom, fetchPortfolio, canViewRisk]);
 
   useEffect(() => {
     if (!chartExpanded) return;

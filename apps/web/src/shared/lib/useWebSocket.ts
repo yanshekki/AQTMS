@@ -110,26 +110,28 @@ export function useWebSocket(options: UseWebSocketOptions) {
       }
       listeners.current.get(topic)!.add(wrappedHandler as (data: unknown) => void);
 
-      // Subscribe on server if connected
-      subscribedTopics.current.add(topic);
-      if (socketRef.current?.connected) {
-        socketRef.current.emit(`subscribe:${topic}`);
-      }
-
       // Return unsubscribe function
       return () => {
         listeners.current.get(topic)?.delete(wrappedHandler as (data: unknown) => void);
         if (listeners.current.get(topic)?.size === 0) {
           listeners.current.delete(topic);
-          subscribedTopics.current.delete(topic);
-        }
-        if (socketRef.current?.connected) {
-          socketRef.current.emit('unsubscribe', topic);
         }
       };
     },
     [],
   );
+
+  // Join a server-side room (e.g. 'risk', 'signals', or 'exchange:binance')
+  const joinRoom = useCallback((room: string) => {
+    subscribedTopics.current.add(room);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit(`subscribe:${room}`);
+    }
+    // Return leave function
+    return () => {
+      subscribedTopics.current.delete(room);
+    };
+  }, []);
 
   const send = useCallback((data: unknown) => {
     if (socketRef.current?.connected) {
@@ -144,5 +146,5 @@ export function useWebSocket(options: UseWebSocketOptions) {
     };
   }, [connect, disconnect]);
 
-  return { status, subscribe, send, disconnect, reconnect: connect };
+  return { status, subscribe, joinRoom, send, disconnect, reconnect: connect };
 }

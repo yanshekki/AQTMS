@@ -52,8 +52,6 @@ const MOCK_RULES: ScoringRule[] = [
   ]},
 ];
 
-function simulateSave<T>(data: T, delay = 900): Promise<T> { return new Promise(resolve => setTimeout(() => resolve(data), delay)); }
-
 const ACTION_COLORS: Record<SignalAction, string> = { BUY: '#22c55e', SELL: '#ef4444', ALERT: '#f59e0b', IGNORE: '#6b7280' };
 
 function getWeightLabels(t: (key: string) => string): { key: keyof WeightConfig; label: string; color: string }[] {
@@ -301,11 +299,13 @@ export function ScoringRulesPage() {
   }, []);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, enabled, status: enabled ? 'Active' as RuleStatus : r.status === 'Active' ? 'Draft' as RuleStatus : r.status } : r));
+    // Optimistic update
+    setRules(prev => prev.map(r => r.id === id ? { ...r, enabled, status: enabled ? 'Active' as RuleStatus : 'Draft' as RuleStatus } : r));
     try {
-      await simulateSave({ success: true }, 300);
+      await scoringRulesApi.toggleRule(id, enabled);
       showToast(enabled ? t('scoringRules.toast.enabled') : t('scoringRules.toast.disabled'), 'success');
     } catch {
+      // Revert on failure
       setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !enabled } : r));
       showToast(t('scoringRules.toast.updateFailed'), 'error');
     }

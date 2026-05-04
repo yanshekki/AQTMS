@@ -29,7 +29,18 @@ export function createNotificationsRoutes(): Router {
         take: 50,
       });
 
-      res.json({ success: true, data: notifications, timestamp: new Date().toISOString() });
+      // Map to frontend-compatible format (time = createdAt)
+      const data = notifications.map((n) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        time: n.createdAt.toISOString(),
+        read: n.read,
+        targetRoute: n.targetRoute,
+      }));
+
+      res.json({ success: true, data, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
   });
 
@@ -56,7 +67,19 @@ export function createNotificationsRoutes(): Router {
         data: { read: true },
       });
 
-      res.json({ success: true, data: updated, timestamp: new Date().toISOString() });
+      res.json({
+        success: true,
+        data: {
+          id: updated.id,
+          type: updated.type,
+          title: updated.title,
+          message: updated.message,
+          time: updated.createdAt.toISOString(),
+          read: updated.read,
+          targetRoute: updated.targetRoute,
+        },
+        timestamp: new Date().toISOString(),
+      });
     } catch (err) { next(err); }
   });
 

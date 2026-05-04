@@ -80,7 +80,7 @@ export function createScoringRulesRoutes(): Router {
       }
 
       const { name, weights, threshold, action } = req.body as z.infer<typeof CreateRuleSchema>;
-      const versionHistory = [{ version: 'v1', timestamp: new Date().toISOString(), weights, action, by: 'user' }];
+      const versionHistory = [{ version: 'v1', timestamp: new Date().toISOString(), weights, threshold, action, changedBy: 'user' }];
 
       const rule = await prisma.scoringRule.create({
         data: {
@@ -144,8 +144,9 @@ export function createScoringRulesRoutes(): Router {
         version: newVersion,
         timestamp: new Date().toISOString(),
         weights: newWeights,
+        threshold: newThreshold,
         action: newAction,
-        by: 'user',
+        changedBy: 'user',
       });
 
       const rule = await prisma.scoringRule.update({
