@@ -166,6 +166,7 @@ app.get('/health', async (_req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
+    poweredBy: 'YSK Limited — https://ysk.hk/',
     timestamp: new Date().toISOString(),
   });
 });
@@ -285,6 +286,7 @@ server.listen(env.PORT, () => {
   logger.info(`   🤖 AI Providers: ${aiProviderRegistry.size} (${aiProviderRegistry.getHealthy().length} healthy)`);
   logger.info(`   📡 Data Sources: ${dataSources.length} active`);
   logger.info(`   📊 Scoring Engine: threshold ${80}, multi-AI pipeline ready`);
+  logger.info(`   🏢 Powered by YSK Limited — https://ysk.hk/`);
 });
 
 // Graceful shutdown

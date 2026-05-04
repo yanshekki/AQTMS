@@ -439,9 +439,9 @@ aqtms/
 
 ## 👤 作者
 
-**Ki (yanshekki)** — 全棧開發者、量化交易員、建造者。
+**Ki (yanshekki)** — 全棧開發者、量化交易員，[YSK Limited](https://ysk.hk/) 創辦人。
 
-🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki)
+🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki) · 🏢 [ysk.hk](https://ysk.hk/)
 
 ### ☕ 支持 / 捐贈
 
@@ -481,3 +481,5 @@ MIT © AQTMS
 ---
 
 **AQTMS — 讓 AI 為你交易。** 🤖📈
+
+<sub>Powered by [YSK Limited](https://ysk.hk/) — 香港遠程開發團隊及企業解決方案</sub>

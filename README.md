@@ -437,9 +437,9 @@ Before submitting a PR, please confirm:
 
 ## 👤 Creator
 
-**Ki (yanshekki)** — Full-stack developer, quant trader, builder.
+**Ki (yanshekki)** — Full-stack developer, quant trader, founder of [YSK Limited](https://ysk.hk/).
 
-🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki)
+🌐 [linktr.ee/yanshekki](https://linktr.ee/yanshekki) · 🏢 [ysk.hk](https://ysk.hk/)
 
 ### ☕ Support / Donate
 
@@ -479,3 +479,5 @@ MIT © AQTMS
 ---
 
 **AQTMS — Let AI trade for you.** 🤖📈
+
+<sub>Powered by [YSK Limited](https://ysk.hk/) — Hong Kong Remote Dev Team & Enterprise Solutions</sub>
