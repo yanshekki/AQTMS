@@ -297,6 +297,142 @@ JWT Token 通過 Wallet 簽名流程取得（參閱 [Auth](#auth)）。
 
 ---
 
+## Scoring Rules
+
+### GET /api/v1/scoring-rules
+獲取用戶的評分規則列表
+
+**Permission:** `scoring:manage`
+**User-Scoped:** ✅ (僅返回當前用戶的規則)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "name": "High Signal Strategy",
+      "status": "Active",
+      "version": "v3",
+      "enabled": true,
+      "weights": { "truth": 35, "sentiment": 15, "relevance": 40, "confidence": 10 },
+      "threshold": 80,
+      "action": "BUY",
+      "history": [{ "version": "v1", "timestamp": "...", "weights": {...}, "threshold": 70, "action": "ALERT", "changedBy": "user" }]
+    }
+  ]
+}
+```
+
+### POST /api/v1/scoring-rules
+建立新評分規則
+
+**Permission:** `scoring:manage`
+
+**Request:**
+```json
+{
+  "name": "My Strategy",
+  "weights": { "truth": 40, "sentiment": 20, "relevance": 30, "confidence": 10 },
+  "threshold": 75,
+  "action": "BUY"
+}
+```
+
+### PUT /api/v1/scoring-rules/:id
+更新評分規則（含版本歷史）
+
+**Permission:** `scoring:manage`
+**User-Scoped:** ✅
+
+**Request (partial):**
+```json
+{
+  "weights": { "truth": 35, "sentiment": 15, "relevance": 40, "confidence": 10 },
+  "threshold": 80,
+  "enabled": false
+}
+```
+
+### DELETE /api/v1/scoring-rules/:id
+刪除評分規則
+
+**Permission:** `scoring:manage`
+**User-Scoped:** ✅
+
+---
+
+## Notifications
+
+### GET /api/v1/notifications
+獲取用戶通知列表（最多 50 筆，最新優先）
+
+**Permission:** `user:read`
+**User-Scoped:** ✅
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "type": "trade",
+      "title": "Order Filled — BTC/USDT",
+      "message": "Buy 0.01 BTC @ $50,200.00",
+      "time": "2026-05-04T12:00:00.000Z",
+      "read": false,
+      "targetRoute": "/trades"
+    }
+  ]
+}
+```
+
+### PUT /api/v1/notifications/:id/read
+標記單個通知為已讀
+
+**Permission:** `user:read`
+**User-Scoped:** ✅
+
+### PUT /api/v1/notifications/read-all
+標記全部通知為已讀
+
+**Permission:** `user:read`
+**User-Scoped:** ✅
+
+---
+
+## Token Management
+
+### POST /auth/invalidate
+撤銷指定用戶的所有 Token（Admin 專用）
+
+**Permission:** `admin:user:manage`
+
+**Request:**
+```json
+{
+  "userId": "target-user-uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "invalidated": true,
+    "userId": "target-user-uuid",
+    "invalidBefore": 1714800000
+  }
+}
+```
+
+> 💡 撤銷後，該用戶必須重新登入以獲取新 Token。舊 Token 的 `iat` 早於 `invalidBefore` 時間戳將被拒絕。
+
+---
+
 ## Audit & Monitoring
 
 ### GET /api/v1/audit/export

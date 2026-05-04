@@ -9,3 +9,4 @@ build/
 coverage/
 *.log
 .DS_Store
+TEST_WALLETS_PRIVATE.md
