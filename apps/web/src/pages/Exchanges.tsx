@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Container, Typography, Grid, Button, Alert, Box, CircularProgress, Stack
+  Container, Typography, Grid, Button, Alert, Box, CircularProgress, Stack, Card, CardContent, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
@@ -68,6 +68,31 @@ export function ExchangesPage() {
           ))}
         </Grid>
       )}
+
+      {/* Coming Soon Exchanges */}
+      <Typography variant="subtitle2" sx={{ color: mutedText, mt: 4, mb: 2, fontWeight: 700 }}>{t('common.comingSoon')}</Typography>
+      <Grid container spacing={{ xs: 1.5, md: 2 }}>
+        {[
+          { exchange: 'FUTU', color: '#FF6B35', desc: 'Futu (富途) — Hong Kong & US stocks' },
+          { exchange: 'IBKR', color: '#E8252D', desc: 'Interactive Brokers — Global equities' },
+        ].map((ex) => (
+          <Grid item xs={12} sm={6} lg={4} key={ex.exchange}>
+            <Card sx={{
+              bgcolor: emptyBg, border: '1px dashed', borderColor: emptyBorder, borderRadius: 3, opacity: 0.6,
+              transition: 'all 0.3s', '&:hover': { opacity: 0.8, borderColor: ex.color },
+            }}>
+              <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: `${ex.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                  <Typography sx={{ color: ex.color, fontWeight: 900, fontSize: '1.2rem' }}>{ex.exchange[0]}</Typography>
+                </Box>
+                <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 0.5 }}>{ex.exchange}</Typography>
+                <Typography variant="caption" sx={{ color: dimText }}>{ex.desc}</Typography>
+                <Chip label={t('common.comingSoon')} size="small" sx={{ mt: 1.5, bgcolor: `${ex.color}15`, color: ex.color, fontWeight: 600 }} />
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
       <ConnectExchangeModal open={modalOpen} onClose={() => setModalOpen(false)} onConnect={handleConnect} isConnecting={isConnecting} connectError={connectError} testConnection={testConnection} />
     </Container>

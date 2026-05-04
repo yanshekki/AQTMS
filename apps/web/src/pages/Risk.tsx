@@ -61,84 +61,12 @@ interface RiskData {
   alerts: RiskAlert[];
 }
 
-const ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'AVAX', 'DOT', 'LINK'];
-function generateMockRiskData(): RiskData {
-  const riskScore = Math.floor(20 + Math.random() * 55);
-  const baseVar = 800 + Math.random() * 3000;
 
-  const concentration: ConcentrationItem[] = [
-    { asset: 'BTC', weight: 35 + Math.random() * 20, riskLevel: 'HIGH' },
-    { asset: 'ETH', weight: 20 + Math.random() * 15, riskLevel: 'MEDIUM' },
-    { asset: 'SOL', weight: 8 + Math.random() * 12, riskLevel: 'MEDIUM' },
-    { asset: 'BNB', weight: 4 + Math.random() * 8, riskLevel: 'LOW' },
-    { asset: 'XRP', weight: 2 + Math.random() * 6, riskLevel: 'LOW' },
-    { asset: 'DOGE', weight: 1 + Math.random() * 5, riskLevel: riskScore > 50 ? 'HIGH' : 'LOW' },
-  ];
 
-  const topWeight = concentration[0]?.weight ?? 0;
-  const concentrationRisk: RiskData['concentrationRisk'] =
-    topWeight > 50 ? 'CRITICAL'
-    : topWeight > 40 ? 'HIGH'
-    : topWeight > 30 ? 'MEDIUM'
-    : 'LOW';
 
-  const betaExposure: BetaExposureItem[] = [
-    { asset: 'ETH', betaVsBTC: 0.85 + Math.random() * 0.3, betaVsETH: 1.0, hedgeSuggestion: 'Reduce ETH exposure by 5% or hedge with ETH put options' },
-    { asset: 'SOL', betaVsBTC: 1.2 + Math.random() * 0.6, betaVsETH: 1.1 + Math.random() * 0.4, hedgeSuggestion: 'Consider SOL/BTC pair trade to reduce beta to 1.0' },
-    { asset: 'BNB', betaVsBTC: 0.7 + Math.random() * 0.5, betaVsETH: 0.8 + Math.random() * 0.3 },
-    { asset: 'DOGE', betaVsBTC: 1.5 + Math.random() * 1.0, betaVsETH: 1.3 + Math.random() * 0.7, hedgeSuggestion: 'High beta — reduce DOGE position by 50%' },
-    { asset: 'AVAX', betaVsBTC: 1.1 + Math.random() * 0.5, betaVsETH: 0.9 + Math.random() * 0.4 },
-  ];
 
-  const correlationPairs: CorrelationPair[] = [];
-  for (let i = 0; i < ASSETS.length; i++) {
-    for (let j = i + 1; j < ASSETS.length; j++) {
-      const baseCorr = 0.3 + Math.random() * 0.65;
-      correlationPairs.push({ pair: `${ASSETS[i]}-${ASSETS[j]}`, value: Math.round(baseCorr * 100) / 100 });
-    }
-  }
 
-  const alerts: RiskAlert[] = [
-    {
-      rule: 'Concentration Limit',
-      status: (concentration[0]?.weight ?? 0) > 40 ? 'BREACHED' : 'WARNING',
-      message: `BTC weight at ${(concentration[0]?.weight ?? 0).toFixed(1)}%${(concentration[0]?.weight ?? 0) > 40 ? ' — exceeds 40% limit' : ' — approaching 40% limit'}`,
-      action: `Reduce BTC to 30% allocation: sell 0.15 BTC @ market`,
-    },
-    {
-      rule: 'Max Drawdown Guard',
-      status: riskScore > 55 ? 'BREACHED' : 'WARNING',
-      message: `Current drawdown ${(3 + Math.random() * 12).toFixed(1)}% — ${riskScore > 55 ? 'exceeded threshold' : 'approaching threshold'}`,
-      action: `Hedge with BTCUSD perpetual short 0.5x notional @ Binance`,
-    },
-    {
-      rule: 'VaR Limit',
-      status: baseVar > 3000 ? 'BREACHED' : 'WARNING',
-      message: `VaR 95% at $${Math.round(baseVar).toLocaleString()} — ${baseVar > 3000 ? 'exceeds $3,000 limit' : 'close to $3,000 limit'}`,
-      action: `Reduce portfolio leverage from 2x to 1.5x across all positions`,
-    },
-    {
-      rule: 'Correlation Cluster',
-      status: 'WARNING',
-      message: 'L1 assets showing 0.85+ correlation cluster — diversification benefit reduced',
-      action: `Add uncorrelated asset: allocate 5% to RWA tokens (e.g. ONDO)`,
-    },
-  ];
 
-  return {
-    riskScore,
-    var95: Math.round(baseVar),
-    var99: Math.round(baseVar * 1.45),
-    cvar95: Math.round(baseVar * 1.28),
-    maxDrawdown: Math.round((15 + Math.random() * 20) * 10) / 10,
-    currentDrawdown: Math.round((3 + Math.random() * 12) * 10) / 10,
-    concentrationRisk,
-    concentration,
-    betaExposure,
-    correlationMatrix: correlationPairs,
-    alerts,
-  };
-}
 
 // Sub-components use local useTranslation
 function RiskScoreCard({
@@ -455,10 +383,8 @@ export function RiskPage() {
       ]);
       setData(response.data as RiskData);
     } catch (err: unknown) {
-      const mock = generateMockRiskData();
-      setData(mock);
-      const msg = err instanceof Error ? err.message : t('risk.failedToFetch');
-      setError(msg);
+      // Backend unavailable — show empty state, not fake data
+      setError(t('risk.failedToFetch'));
     } finally {
       setLoading(false);
       setRefreshing(false);

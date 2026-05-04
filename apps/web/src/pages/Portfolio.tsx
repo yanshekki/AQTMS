@@ -60,37 +60,6 @@ interface PerformancePoint {
 
 type Period = '30d' | '90d' | '1y';
 
-const MOCK_SUMMARY: PortfolioSummary = {
-  totalValue: 128_450.75, todayPnL: 2_340.50, todayPnLPercent: 1.86,
-  mtdReturn: 12.5, ytdReturn: 45.2, realizedPnL: 4_250, unrealizedPnL: 1_890,
-};
-
-const MOCK_HOLDINGS: Holding[] = [
-  { asset: 'BTC', value: 38_500, allocation: 30.0, pnl: 5_200, pnlPercent: 15.6, color: '#f59e0b' },
-  { asset: 'ETH', value: 25_700, allocation: 20.0, pnl: -1_200, pnlPercent: -4.5, color: '#3b82f6' },
-  { asset: 'USDT', value: 22_000, allocation: 17.1, pnl: 0, pnlPercent: 0, color: '#22c55e' },
-  { asset: 'SOL', value: 15_300, allocation: 11.9, pnl: 3_800, pnlPercent: 33.1, color: '#8b5cf6' },
-  { asset: 'BNB', value: 10_200, allocation: 7.9, pnl: 560, pnlPercent: 5.8, color: '#f97316' },
-  { asset: 'MATIC', value: 6_450, allocation: 5.0, pnl: -890, pnlPercent: -12.1, color: '#ec4899' },
-  { asset: 'LINK', value: 5_800, allocation: 4.5, pnl: 420, pnlPercent: 7.8, color: '#06b6d4' },
-  { asset: 'AVAX', value: 4_500, allocation: 3.5, pnl: -310, pnlPercent: -6.4, color: '#ef4444' },
-];
-
-function generatePerformanceData(period: Period): PerformancePoint[] {
-  const now = new Date();
-  const points = period === '30d' ? 30 : period === '90d' ? 90 : 365;
-  const data: PerformancePoint[] = [];
-  let value = 100_000;
-  for (let i = points; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const change = (Math.random() - 0.48) * 2_500;
-    value = Math.max(80_000, Math.min(150_000, value + change));
-    data.push({ date: d.toISOString().slice(0, 10), value: Math.round(value * 100) / 100 });
-  }
-  return data;
-}
-
 interface AssetAllocationPieProps {
   holdings: Holding[];
   isDark: boolean;
@@ -290,33 +259,34 @@ export function PortfolioPage() {
     setLoading(true); setError(null);
     try {
       const [summaryRes, holdingsRes, perfRes] = await Promise.all([
-        portfolioApi.getSummary().catch(() => ({ success: true as const, data: MOCK_SUMMARY, timestamp: '' })),
-        portfolioApi.getHoldings().catch(() => ({ success: true as const, data: MOCK_HOLDINGS, timestamp: '' })),
-        portfolioApi.getPerformance(period).catch(() => ({ success: true as const, data: generatePerformanceData(period), timestamp: '' })),
+        portfolioApi.getSummary(),
+        portfolioApi.getHoldings(),
+        portfolioApi.getPerformance(period),
       ]);
       setSummary(summaryRes.data);
       setHoldings(holdingsRes.data);
       setPerformanceData(perfRes.data);
     } catch {
-      setError(t('portfolio.failedToLoad'));
-      showToast(t('portfolio.failedToLoad'), 'error');
+      // No exchange connected — show empty state
+      setSummary(null);
+      setHoldings([]);
+      setPerformanceData([]);
     } finally {
       setLoading(false);
     }
-  }, [period, showToast, t]);
+  }, [period]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handlePeriodChange = useCallback(async (p: Period) => {
     setPeriod(p); setChartLoading(true);
     try {
-      const perfRes = await portfolioApi.getPerformance(p).catch(() => ({
-        success: true as const, data: generatePerformanceData(p), timestamp: '',
-      }));
+      const perfRes = await portfolioApi.getPerformance(p);
       setPerformanceData(perfRes.data);
       showToast(`${t('portfolio.showingPeriod')} ${p}`, 'info');
     } catch {
-      showToast(t('portfolio.failedToLoadPerformance'), 'error');
+      // No data for this period
+      setPerformanceData([]);
     } finally { setChartLoading(false); }
   }, [showToast, t]);
 
