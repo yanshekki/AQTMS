@@ -35,31 +35,31 @@ import compression from 'compression';
 import type { ExchangeAdapterMap } from './application/use-cases';
 import { BinanceAdapter } from './infrastructure/adapters/exchanges/BinanceAdapter';
 import { BybitAdapter } from './infrastructure/adapters/exchanges/BybitAdapter';
-import type { BaseTradingAdapter } from './infrastructure/adapters/exchanges/BaseTradingAdapter';
 import type { BaseDataSourceAdapter } from './infrastructure/adapters/datasources/BaseDataSourceAdapter';
 import { ExchangeAccountRepository } from './infrastructure/persistence/ExchangeAccountRepository';
 
 // ── Load & validate env ──
 const env = loadEnv();
 
-// ── Adapter Registry ──
-const adapterRegistry = new Map<string, BaseTradingAdapter>();
+// ── Adapter Registry — lazy, credentials resolved per-account from DB ──
+// Adapters created on-demand with real decrypted API keys, never hardcoded.
 const dataSources: BaseDataSourceAdapter[] = [];
-
-// Register placeholder exchange adapters by exchange type (real credentials resolved per-account from DB)
-const binanceAdapter = new BinanceAdapter({ apiKey: 'placeholder', apiSecret: 'placeholder', testnet: false });
-const bybitAdapter = new BybitAdapter({ apiKey: 'placeholder', apiSecret: 'placeholder', testnet: false });
-adapterRegistry.set('BINANCE', binanceAdapter);
-adapterRegistry.set('BYBIT', bybitAdapter);
 
 const exchangeAccountRepo = new ExchangeAccountRepository(env.ENCRYPTION_KEY);
 
-// Adapter map: resolves account UUID → exchange type → adapter instance
 const adapterMap: ExchangeAdapterMap = {
   async get(accountId: string) {
-    const account = await exchangeAccountRepo.findById(accountId);
-    if (!account) return undefined;
-    return adapterRegistry.get(account.exchange);
+    const creds = await exchangeAccountRepo.getDecryptedCredentials(accountId);
+    if (!creds) return undefined;
+
+    switch (creds.exchange) {
+      case 'BINANCE':
+        return new BinanceAdapter({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet });
+      case 'BYBIT':
+        return new BybitAdapter({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet });
+      default:
+        return undefined;
+    }
   },
 };
 

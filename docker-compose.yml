@@ -65,7 +65,6 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./apps/backend/prisma/migrations:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']

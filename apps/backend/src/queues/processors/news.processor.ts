@@ -9,8 +9,12 @@ import type { ScoringEngine } from '../../application/services/ScoringEngine';
 import type { ProcessNewsUseCase } from '../../application/use-cases/ProcessNewsUseCase';
 import { enqueueTrade } from './trade.processor';
 import { PrismaClient } from '@prisma/client';
+import { PositionSizingCalculator } from '../../application/services/PositionSizingCalculator';
+import { RiskEngine } from '../../application/services/RiskEngine';
 
 const prisma = new PrismaClient();
+const riskEngine = new RiskEngine();
+const sizingCalculator = new PositionSizingCalculator(riskEngine);
 
 let newsQueue: Queue | null = null;
 let processNewsUseCase: ProcessNewsUseCase | null = null;
@@ -51,12 +55,23 @@ export function initNewsQueue(_engine: ScoringEngine, useCase: ProcessNewsUseCas
           orderBy: { createdAt: 'asc' },
         });
         if (firstAccount) {
+          // Calculate position size using Half Kelly
+          const sizing = sizingCalculator.calculate({
+            method: 'KELLY_HALF',
+            accountSize: 10000, // FIXME: pull from exchange balance
+            riskPercent: 2,
+            winRate: 0.55,
+            avgWin: 200,
+            avgLoss: 100,
+            currentPrice: 50000, // FIXME: fetch current price
+          });
+
           await enqueueTrade({
             symbol: result.score.affectedAssets[0] ?? 'BTCUSDT',
             side: result.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
             action: result.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
-            quantity: 0.001,
-            reason: `AI Signal ${result.score.compositeScore}/100: ${result.score.verdict}`,
+            quantity: sizing.suggestedSize > 0 ? sizing.suggestedSize : 0.001,
+            reason: `AI Signal ${result.score.compositeScore}/100: ${result.score.verdict} (${sizing.method})`,
             compositeScore: result.score.compositeScore,
             exchangeAccountId: firstAccount.id,
             idempotencyKey: `${newsId}-${Date.now()}`,
