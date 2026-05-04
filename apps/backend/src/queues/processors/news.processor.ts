@@ -8,11 +8,11 @@ import { QUEUE_NAMES, type NewsProcessJob } from '../jobs';
 import type { ScoringEngine } from '../../application/services/ScoringEngine';
 import type { ProcessNewsUseCase } from '../../application/use-cases/ProcessNewsUseCase';
 import { enqueueTrade } from './trade.processor';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import { PositionSizingCalculator } from '../../application/services/PositionSizingCalculator';
 import { RiskEngine } from '../../application/services/RiskEngine';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 const riskEngine = new RiskEngine();
 const sizingCalculator = new PositionSizingCalculator(riskEngine);
 

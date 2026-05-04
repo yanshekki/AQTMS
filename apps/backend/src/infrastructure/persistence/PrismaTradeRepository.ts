@@ -1,10 +1,11 @@
 // ── Prisma Trade Repository ──
 // Implements ITradeRepository from domain layer using Prisma.
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import type { Trade, ITradeRepository, TradeStatus } from '../../domain/entities/Trade';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 export class PrismaTradeRepository implements ITradeRepository {
   async save(trade: Trade, userId?: string): Promise<Trade> {

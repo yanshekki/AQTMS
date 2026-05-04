@@ -3,13 +3,13 @@
 // User-scoped: each user manages their own rules.
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../shared/prisma';
 import { permission } from '../middleware/permission.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { z } from 'zod';
 import { detectLang, t } from '../../../shared/i18n';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(100),

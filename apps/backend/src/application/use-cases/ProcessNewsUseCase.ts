@@ -1,12 +1,12 @@
 // ── Process News Use-Case ──
 // Orchestrates: receive news → AI processing → scoring → persist → trigger strategy
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import type { NewsItem } from '../../infrastructure/adapters/datasources/BaseDataSourceAdapter';
 import { ScoringEngine, type CompositeScore } from '../services/ScoringEngine';
 import { logger } from '../../shared/logger';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 export class ProcessNewsUseCase {
   private processingCount = 0;

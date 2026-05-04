@@ -5,14 +5,14 @@ import { Router } from 'express';
 import { ethers } from 'ethers';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../shared/prisma';
 import { randomBytes } from 'node:crypto';
 import { validate } from '../middleware/validate.middleware';
 import { UnauthorizedError, ForbiddenError, ValidationError } from '../../../shared/errors';
 import { getEnv } from '../../../shared/config';
 import redis from '../../../shared/redis';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 // DTOs
 const ChallengeRequestSchema = z.object({
@@ -272,8 +272,8 @@ export function createAuthRoutes(): Router {
       await redis.set(`token:invalid_before:${userId}`, invalidationTime);
 
       // Log audit
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
+      // using shared prisma singleton; const __unused = await import('@prisma/client');
+      // using shared prisma singleton
       await prisma.auditLog.create({
         data: {
           userId: decoded.userId,

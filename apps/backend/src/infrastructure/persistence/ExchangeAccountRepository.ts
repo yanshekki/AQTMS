@@ -1,11 +1,11 @@
 // ── Exchange Account Repository ──
 // Handles CRUD for exchange API keys with AES-256-GCM encryption at rest.
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import { encrypt, decrypt } from '../../shared/crypto';
 import { logger } from '../../shared/logger';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 export interface CreateExchangeAccountDto {
   userId: string;

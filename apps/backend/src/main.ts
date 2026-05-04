@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { loadEnv } from './shared/config';
 import { logger } from './shared/logger';
+import { prisma } from './shared/prisma';
 import { errorMiddleware, authMiddleware } from './interfaces/http/middleware';
 import { permission } from './interfaces/http/middleware/permission.middleware';
 import { metricsMiddleware } from './interfaces/http/middleware/metrics.middleware';
@@ -208,8 +209,7 @@ app.get('/api/v1/ai/providers', permission(['ai:read']), (_req, res) => {
 
 app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+    // using shared prisma singleton
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const minScore = parseFloat(req.query.minScore as string) || 0;
     const source = req.query.source as string | undefined;
@@ -235,8 +235,7 @@ app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) =
 // News detail endpoint
 app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+    // using shared prisma singleton
     const news = await prisma.newsEvent.findUnique({
       where: { id: String(req.params.id) },
     });
@@ -256,8 +255,7 @@ app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
 // Audit log export (CSV)
 app.get('/api/v1/audit/export', permission(['audit:export']), async (_req, res, next) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+    // using shared prisma singleton
     const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: 1000,

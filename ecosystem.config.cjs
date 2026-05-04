@@ -4,6 +4,15 @@
 //   pm2 start ecosystem.config.cjs --env production  # Production mode
 //   pm2 logs aqtms-backend                       # Backend logs
 //   pm2 monit                                     # Dashboard
+//
+// ⚠️ Multi-Core / Cluster Mode Notes:
+//   - Socket.io requires @socket.io/redis-adapter for multi-instance
+//   - Bee-Queue workers start inside backend main.ts; for cluster mode,
+//     extract workers to separate PM2 processes (see templates below)
+//   - Prisma uses shared singleton (shared/prisma.ts); cap pool via
+//     DATABASE_URL="mysql://...?connection_limit=5" per instance
+//   - Rate limiting (Redis) and JWT (stateless) are cluster-safe
+//   - Default: instances=1 (single backend, no Socket.io issues)
 
 module.exports = {
   apps: [
@@ -91,7 +100,8 @@ module.exports = {
     },
 
     // ── Queue Workers (optional, for dedicated worker processes) ──
-    // Uncomment to run workers as separate PM2 processes:
+    // IMPORTANT: When scaling backend to instances > 1, extract workers
+    // to separate PM2 processes to avoid duplicate queue processors.
     //
     // {
     //   name: 'aqtms-worker-news',
@@ -112,6 +122,16 @@ module.exports = {
     //   exec_mode: 'fork',
     //   env: { NODE_ENV: 'production' },
     //   max_memory_restart: '1G',
+    // },
+    // {
+    //   name: 'aqtms-worker-trade',
+    //   cwd: './apps/backend',
+    //   script: 'node_modules/.bin/tsx',
+    //   args: 'src/queues/workers/trade.worker.ts',
+    //   instances: 2,
+    //   exec_mode: 'fork',
+    //   env: { NODE_ENV: 'production' },
+    //   max_memory_restart: '512M',
     // },
   ],
 

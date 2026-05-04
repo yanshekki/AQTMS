@@ -2,11 +2,11 @@
 // PostgreSQL-backed notification center with user scoping.
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../shared/prisma';
 import { permission } from '../middleware/permission.middleware';
 import { detectLang, t } from '../../../shared/i18n';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 
 export function createNotificationsRoutes(): Router {
   const router = Router();

@@ -4,12 +4,12 @@ import { Router } from 'express';
 import { RiskEngine } from '../../../application/services/RiskEngine';
 import { PositionSizingCalculator } from '../../../application/services/PositionSizingCalculator';
 import { BacktestService } from '../../../application/services/BacktestService';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../shared/prisma';
 import { logger } from '../../../shared/logger';
 import { permission } from '../middleware/permission.middleware';
 import { detectLang, t } from '../../../shared/i18n';
 
-const prisma = new PrismaClient();
+// using shared prisma singleton
 const riskEngine = new RiskEngine();
 const sizingCalculator = new PositionSizingCalculator(riskEngine);
 const backtestService = new BacktestService();

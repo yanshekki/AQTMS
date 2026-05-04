@@ -1,5 +1,10 @@
 // ── WebSocket Gateway (Socket.io) ──
 // Real-time push for: price updates, AI signals, order state changes, risk alerts.
+//
+// ⚠️ Multi-Instance Note：當 PM2 instances > 1 時，必須啟用 Redis adapter：
+//   pnpm add @socket.io/redis-adapter
+//   io.adapter(createAdapter(pubClient, subClient));
+//   詳見 https://socket.io/docs/v4/redis-adapter/
 
 import type { Server as HttpServerType } from 'node:http';
 import { Server, Socket } from 'socket.io';

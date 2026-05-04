@@ -7,6 +7,7 @@ import { TradeController } from '../controllers/TradeController';
 import { permission } from '../middleware/permission.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { CreateTradeDtoSchema, CancelTradeDtoSchema } from '../dto';
+import { prisma } from '../../../shared/prisma';
 import type { ExecuteTradeUseCase } from '../../../application/use-cases/ExecuteTradeUseCase';
 import type { CancelTradeUseCase } from '../../../application/use-cases/CancelTradeUseCase';
 import { detectLang, t } from '../../../shared/i18n';
@@ -37,8 +38,6 @@ export function createTradeRoutes(
   // GET /api/v1/trades — list trades with filters
   router.get('/', permission(['trade:read']), async (req, res, next) => {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
       const symbol = req.query.symbol as string | undefined;
@@ -75,8 +74,8 @@ export function createTradeRoutes(
   // GET /api/v1/trades/:id — trade detail
   router.get('/:id', permission(['trade:read']), async (req, res, next) => {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
+      // using shared prisma singleton; const __u = await import('@prisma/client');
+      // shared singleton already imported
       const userId = req.user?.userId;
       if (!userId) {
         const lang = detectLang(req);
