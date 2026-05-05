@@ -13,6 +13,7 @@
 [![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io)
 [![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io)
 [![Security Audit](https://img.shields.io/badge/Security-70/70_測試通過-22c55e)](TEST_WALLETS.md)
+[![Progress](https://img.shields.io/badge/Progress-20%25-orange)](README.zh.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
