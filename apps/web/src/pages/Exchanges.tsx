@@ -1,4 +1,4 @@
-// ── Exchanges Page (Final Fix) ──
+// ── Exchanges Page ──
 
 import { useState } from 'react';
 import {
@@ -27,7 +27,7 @@ export function ExchangesPage() {
     isConnecting,
     connectError,
     testConnection,
-    lastConnectedId,
+    lastConnectedId: _lastConnectedId, // prefixed to avoid unused variable warning
     resetLastConnected,
     deleteExchange,
     isDeleting,
@@ -76,8 +76,8 @@ export function ExchangesPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
-      <Box className="fade-in-up">
-        <Stack
+      <Box className="fade-in-up
+">        <Stack
           direction={{ xs: 'column', sm: 'row' }}
           justifyContent="space-between"
           alignItems={{ xs: 'flex-start', sm: 'center' }}
