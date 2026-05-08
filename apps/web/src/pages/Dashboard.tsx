@@ -1,9 +1,9 @@
-// ── Dashboard Page (With Recent AI Signals) ──
+// ── Dashboard Page (Improved Error Handling) ──
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Container, Typography, Grid, Card, CardContent, Chip, Box,
-  Accordion, AccordionSummary, AccordionDetails, Stack, CircularProgress, Button,
+  Accordion, AccordionSummary, AccordionDetails, Stack, CircularProgress, Button, Alert
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from 'react-i18next';
@@ -50,15 +50,19 @@ export function DashboardPage() {
     realizedPnL: number; unrealizedPnL: number;
   } | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
 
   const fetchPortfolio = useCallback(async () => {
     if (!auth.isAuthenticated) return;
     setPortfolioLoading(true);
+    setPortfolioError(null);
+
     try {
       const res = await portfolioApi.getSummary();
       setPortfolioSummary(res.data);
-    } catch {
-      // No exchange connected
+    } catch (err: any) {
+      const message = err?.message || '無法載入投資組合數據';
+      setPortfolioError(message.includes('network') ? '網絡錯誤，無法載入投資組合' : message);
     } finally {
       setPortfolioLoading(false);
     }
@@ -73,11 +77,11 @@ export function DashboardPage() {
 
   const [wsAlerts, setWsAlerts] = useState<string[]>([]);
 
-  // Recent AI Signals
-  const { data: recentSignalsData, isLoading: signalsLoading } = useQuery({
+  // Recent AI Signals with error handling
+  const { data: recentSignalsData, isLoading: signalsLoading, error: signalsError } = useQuery({
     queryKey: ['dashboard-recent-signals'],
     queryFn: () => signalsApi.getRecentSignals({ limit: 5 }),
-    refetchInterval: 30000, // refresh every 30s
+    refetchInterval: 30000,
     enabled: auth.isAuthenticated,
   });
 
@@ -145,6 +149,13 @@ export function DashboardPage() {
         </Typography>
       </Box>
 
+      {/* Portfolio Error */}
+      {portfolioError && (
+        <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+          {portfolioError}
+        </Alert>
+      )}
+
       <Grid container spacing={{ xs: 1.5, md: 3 }} className="stagger-children">
         {metricCards.map((card, i) => (
           <Grid item xs={6} sm={6} md={4} key={i}>
@@ -192,6 +203,13 @@ export function DashboardPage() {
                   {t('common.viewAll') || 'View All'}
                 </Button>
               </Stack>
+
+              {/* Signals Error */}
+              {signalsError && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  無法載入最近 AI 訊號
+                </Alert>
+              )}
 
               {signalsLoading ? (
                 <Box display="flex" justifyContent="center" py={3}><CircularProgress size={24} /></Box>
