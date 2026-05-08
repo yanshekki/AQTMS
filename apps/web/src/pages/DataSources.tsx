@@ -1,4 +1,4 @@
-// ── Data Sources Page ──
+// ── Data Sources Page (Final Polish) ──
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -199,7 +199,6 @@ export function DataSourcesPage() {
     setTestResult(null);
 
     try {
-      // Simulate test (in real app this should call backend test endpoint)
       await new Promise(resolve => setTimeout(resolve, 900));
 
       if (source.status === 'ERROR') {
@@ -371,6 +370,7 @@ export function DataSourcesPage() {
           {filteredSources.map((source) => {
             const isNew = source.id === newlyAddedId;
             const isPending = source.status === 'PENDING';
+            const isError = source.status === 'ERROR';
 
             return (
               <Card
@@ -381,6 +381,7 @@ export function DataSourcesPage() {
                 sx={{
                   transition: 'all 0.3s ease',
                   cursor: 'pointer',
+                  borderLeft: isError ? '4px solid #ef4444' : '4px solid transparent',
                   ...(isNew && {
                     bgcolor: 'rgba(59, 130, 246, 0.08)',
                     borderColor: '#3b82f6',
@@ -541,7 +542,6 @@ export function DataSourcesPage() {
                 </Card>
               </Box>
 
-              {/* Test Connection Button */}
               <Button
                 variant="outlined"
                 onClick={() => handleTestExistingSource(selectedSource)}
