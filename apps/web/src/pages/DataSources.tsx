@@ -1,4 +1,4 @@
-// ── Data Sources Page (with refresh + better validation) ──
+// ── Data Sources Page ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -8,11 +8,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useTranslation } from 'react-i18next';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
 
 export function DataSourcesPage() {
-  const { t } = useTranslation();
   const [dataSources, setDataSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,7 +228,7 @@ export function DataSourcesPage() {
                         <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
                         <Chip label={source.type} size="small" color="primary" variant="outlined" />
                         <Chip label={source.status} size="small" color={getStatusColor(source.status) as any} />
-                        {isNew && <Chip label="新加入" size="small" color="primary" />}
+                        {isNew && <Chip label="新加入" size="small" color="primary" />} 
                       </Stack>
 
                       <Typography variant="caption" color="text.secondary">
