@@ -1,4 +1,4 @@
-// ── Exchanges Page (Complete with Card Actions) ──
+// ── Exchanges Page (Improved Error Handling) ──
 
 import { useState } from 'react';
 import {
@@ -43,7 +43,7 @@ export function ExchangesPage() {
     try {
       await connect(data);
     } catch (e) {
-      // handled in hook
+      // Error is already handled in the hook with friendly message
     }
   };
 
@@ -70,7 +70,6 @@ export function ExchangesPage() {
   const handleTest = async (id: string) => {
     try {
       await testConnection(id);
-      // Optionally refresh the list after test
     } catch (e) {
       console.error('Test connection failed', e);
     }
@@ -132,7 +131,25 @@ export function ExchangesPage() {
         </Typography>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{t('exchanges.failedToLoad')}: {error}</Alert>}
+      {/* Error Display */}
+      {error && (
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3, borderRadius: 2 }}
+          onClose={() => { /* Can add refresh logic here */ }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {connectError && (
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3, borderRadius: 2 }}
+        >
+          {connectError}
+        </Alert>
+      )}
 
       {isLoading ? (
         <Box display="flex" justifyContent="center" py={8}>
@@ -169,7 +186,7 @@ export function ExchangesPage() {
                 onDelete={handleDelete}
                 onTest={handleTest}
                 isDeleting={isDeleting}
-                isTesting={false} // Can be enhanced later with per-card testing state
+                isTesting={false}
               />
             </Grid>
           ))}
