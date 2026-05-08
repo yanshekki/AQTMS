@@ -4,6 +4,7 @@ import { ExecutionModule } from './execution/execution.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
 import { ExchangeModule } from './exchange/exchange.module';
 import { PaperTradingModule } from './paper-trading/paper-trading.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -11,7 +12,8 @@ import { PaperTradingModule } from './paper-trading/paper-trading.module';
     ExecutionModule,
     ReconciliationModule,
     ExchangeModule,
-    PaperTradingModule, // Phase 2.5
+    PaperTradingModule,
+    PortfolioModule, // Phase 3
   ],
   controllers: [],
   providers: [],
