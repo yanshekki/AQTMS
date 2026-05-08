@@ -1,9 +1,9 @@
-// ── Place Order Modal (Improved UX & Error Handling) ──
+// ── Place Order Modal (Further Improved) ──
 
 import { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, MenuItem, Stack, Typography, Alert, CircularProgress
+  Button, TextField, MenuItem, Stack, Alert, CircularProgress
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { tradeApi, type CreateTradeInput } from '../api/tradeApi';
@@ -44,16 +44,15 @@ export function PlaceOrderModal({
 
   const handleChange = (field: keyof CreateTradeInput, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (error) setError(null);
   };
 
   const validateForm = (): string | null => {
     if (!form.exchangeAccountId) return '請選擇交易所帳戶';
-    if (!form.symbol || form.symbol.length < 3) return '請輸入正確的交易對（例如 BTCUSDT）';
+    if (!form.symbol || form.symbol.length < 4) return '請輸入正確的交易對（例如 BTCUSDT）';
     if (!form.quantity || form.quantity <= 0) return '數量必須大於 0';
     if (form.type === 'LIMIT' && (!form.price || form.price <= 0)) {
-      return '限價單必須輸入價格';
+      return '限價單必須輸入有效的價格';
     }
     return null;
   };
@@ -71,39 +70,38 @@ export function PlaceOrderModal({
 
     try {
       const result = await tradeApi.placeOrder(form);
-      
-      setSuccessMessage(`訂單已成功提交！訂單ID: ${result.exchangeOrderId}`);
-      
-      // Auto close after success
+      setSuccessMessage(`訂單提交成功！交易所訂單號: ${result.exchangeOrderId}`);
+
       setTimeout(() => {
         onSuccess?.();
         handleClose();
-      }, 1500);
-
+      }, 1600);
     } catch (err: any) {
-      // Try to show user-friendly error
-      let errorMsg = '下單失敗，請稍後再試';
-      
-      if (err.message) {
-        if (err.message.includes('Insufficient balance')) {
-          errorMsg = '餘額不足，請檢查帳戶餘額';
-        } else if (err.message.includes('Invalid quantity')) {
-          errorMsg = '數量無效，請輸入正確數量';
-        } else if (err.message.includes('Price too high') || err.message.includes('Price too low')) {
-          errorMsg = '價格超出允許範圍';
-        } else {
-          errorMsg = err.message;
-        }
+      const rawMessage = err?.message || '';
+      let friendlyMessage = '下單失敗，請稍後再試';
+
+      // Map common backend errors to user-friendly messages
+      if (rawMessage.includes('Insufficient balance') || rawMessage.includes('balance')) {
+        friendlyMessage = '帳戶餘額不足，請先充值或減少下單數量';
+      } else if (rawMessage.includes('Invalid quantity') || rawMessage.includes('quantity')) {
+        friendlyMessage = '下單數量無效，請輸入正確數量';
+      } else if (rawMessage.includes('Price too high') || rawMessage.includes('Price too low')) {
+        friendlyMessage = '價格超出交易所允許範圍';
+      } else if (rawMessage.includes('Invalid symbol') || rawMessage.includes('symbol')) {
+        friendlyMessage = '交易對不存在或不支援';
+      } else if (rawMessage.includes('API key') || rawMessage.includes('permission')) {
+        friendlyMessage = '交易所 API 權限不足或 Key 錯誤';
+      } else if (rawMessage) {
+        friendlyMessage = rawMessage;
       }
-      
-      setError(errorMsg);
+
+      setError(friendlyMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
-    // Reset form when closing
     setForm({
       exchangeAccountId: exchangeAccounts[0]?.id || '',
       symbol: defaultSymbol,
@@ -121,20 +119,11 @@ export function PlaceOrderModal({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>下單</DialogTitle>
+      <DialogTitle>手動下單</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
-          {error && (
-            <Alert severity="error" onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
-
-          {successMessage && (
-            <Alert severity="success">
-              {successMessage}
-            </Alert>
-          )}
+          {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+          {successMessage && <Alert severity="success">{successMessage}</Alert>}
 
           <TextField
             select
@@ -153,7 +142,7 @@ export function PlaceOrderModal({
 
           <TextField
             label="交易對 (Symbol)"
-            placeholder="例如：BTCUSDT"
+            placeholder="例如：BTCUSDT 或 ETHUSDT"
             value={form.symbol}
             onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
             fullWidth
@@ -181,13 +170,13 @@ export function PlaceOrderModal({
               sx={{ flex: 1 }}
               disabled={loading}
             >
-              <MenuItem value="MARKET">市價單 (Market)</MenuItem>
-              <MenuItem value="LIMIT">限價單 (Limit)</MenuItem>
+              <MenuItem value="MARKET">市價單</MenuItem>
+              <MenuItem value="LIMIT">限價單</MenuItem>
             </TextField>
           </Stack>
 
           <TextField
-            label="數量 (Quantity)"
+            label="數量"
             type="number"
             value={form.quantity || ''}
             onChange={(e) => handleChange('quantity', parseFloat(e.target.value) || 0)}
@@ -198,7 +187,7 @@ export function PlaceOrderModal({
 
           {form.type === 'LIMIT' && (
             <TextField
-              label="價格 (Price)"
+              label="價格"
               type="number"
               value={form.price || ''}
               onChange={(e) => handleChange('price', parseFloat(e.target.value) || undefined)}
@@ -207,10 +196,6 @@ export function PlaceOrderModal({
               inputProps={{ step: 'any' }}
             />
           )}
-
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            注意：目前為測試階段，建議使用小額數量下單。
-          </Typography>
         </Stack>
       </DialogContent>
 
@@ -222,9 +207,9 @@ export function PlaceOrderModal({
           variant="contained"
           onClick={handleSubmit}
           disabled={loading || !!successMessage}
-          startIcon={loading ? <CircularProgress size={16} /> : null}
+          startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
         >
-          {loading ? '下單中...' : '確認下單'}
+          {loading ? '提交中...' : '確認下單'}
         </Button>
       </DialogActions>
     </Dialog>
