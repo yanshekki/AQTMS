@@ -1,6 +1,6 @@
-// ── Bybit Trading Adapter (Real Implementation) ──
-// Implements Bybit Unified Trading API v5 with HMAC SHA256 signing.
-// Docs: https://bybit-exchange.github.io/docs/v5/guide
+// ── Bybit Trading Adapter ──
+// Strictly follows Bybit Unified Trading API v5 documentation
+// Official Docs: https://bybit-exchange.github.io/docs/v5/intro
 
 import crypto from 'node:crypto';
 import { BaseTradingAdapter, type OrderRequest, type Balance, type Position, type CancelOrderRequest } from './BaseTradingAdapter';
@@ -17,8 +17,6 @@ export interface BybitAdapterConfig {
 const BYBIT_BASE = 'https://api.bybit.com';
 const BYBIT_TESTNET = 'https://api-testnet.bybit.com';
 const RECV_WINDOW = '5000';
-
-// ── Bybit v5 Response Types ──
 
 interface BybitApiResponse<T = unknown> {
   retCode: number;
@@ -54,13 +52,11 @@ interface BybitBalanceResult {
   }>;
 }
 
-// ── Order Type Mapping ──
-
 function mapOrderType(type: OrderRequest['type']): string {
   const mapping: Record<string, string> = {
     MARKET: 'Market',
     LIMIT: 'Limit',
-    STOP_LOSS: 'Market', // Bybit spot uses conditional orders separately
+    STOP_LOSS: 'Market',
     STOP_LOSS_LIMIT: 'Limit',
     TAKE_PROFIT: 'Market',
     TAKE_PROFIT_LIMIT: 'Limit',
@@ -94,7 +90,6 @@ export class BybitAdapter extends BaseTradingAdapter {
   private readonly apiSecret: string;
   private readonly baseUrl: string;
 
-  // Circuit breaker
   private _failureCount = 0;
   private _lastFailureTime = 0;
   private _circuitOpen = false;
@@ -106,14 +101,9 @@ export class BybitAdapter extends BaseTradingAdapter {
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
     this.baseUrl = config.testnet ? BYBIT_TESTNET : BYBIT_BASE;
-    // Touch fields to suppress TS6133 in skeleton phase
-    void this._failureThreshold;
-    void this._failureCount;
   }
 
-  // ══════════════════════════════════════════════════
-  // Order Operations
-  // ══════════════════════════════════════════════════
+  // ── Order Operations ──
 
   async createOrder(request: OrderRequest): Promise<Trade> {
     this.checkCircuitBreaker();
@@ -125,58 +115,29 @@ export class BybitAdapter extends BaseTradingAdapter {
       orderType: mapOrderType(request.type),
       qty: request.quantity.toString(),
       orderLinkId: request.idempotencyKey,
+      recvWindow: RECV_WINDOW,
     };
 
-    // Price: required for LIMIT orders
     if (request.price && request.type !== 'MARKET') {
       params.price = request.price.toString();
     }
-
-    // Time in force: only applicable to LIMIT orders
     if (request.type === 'LIMIT') {
       params.timeInForce = mapTimeInForce(request.timeInForce);
     }
-
-    // Trigger price for stop/take-profit orders
-    // Note: Bybit spot uses TradingView trigger for conditional orders
-    // For MVP, we place regular orders; conditional logic handled by separate endpoint
     if (request.stopPrice) {
       params.triggerPrice = request.stopPrice.toString();
       params.triggerBy = 'LastPrice';
     }
 
     try {
-      const response = await this.signedRequest<BybitOrderResult>(
-        'POST',
-        '/v5/order/create',
-        params,
-      );
-
+      const response = await this.signedRequest<BybitOrderResult>('POST', '/v5/order/create', params);
       const order = response.result;
       this.recordSuccess();
 
-      return {
-        id: order.orderLinkId || crypto.randomUUID(),
-        exchangeOrderId: order.orderId,
-        exchangeAccountId: '',
-        symbol: order.symbol,
-        side: order.side === 'Buy' ? 'BUY' : 'SELL',
-        type: request.type,
-        quantity: parseFloat(order.qty),
-        price: order.price ? parseFloat(order.price) : null,
-        stopPrice: request.stopPrice ?? null,
-        timeInForce: request.timeInForce ?? 'GTC',
-        status: ORDER_STATUS_MAP[order.orderStatus] ?? 'PENDING',
-        filledQuantity: parseFloat(order.cumExecQty),
-        idempotencyKey: request.idempotencyKey,
-        createdAt: new Date(parseInt(order.createdTime)),
-        updatedAt: new Date(parseInt(order.updatedTime)),
-      };
+      return this.mapOrderToTrade(order, request.type);
     } catch (error) {
       this.recordFailure();
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: msg, symbol: request.symbol }, 'Bybit createOrder failed');
-      throw new InfraError(`Bybit order failed: ${msg}`, 'BYBIT_ORDER_FAILED');
+      throw this.handleBybitError(error, 'createOrder');
     }
   }
 
@@ -187,39 +148,18 @@ export class BybitAdapter extends BaseTradingAdapter {
       category: 'spot',
       symbol: request.symbol,
       orderId: request.exchangeOrderId,
+      recvWindow: RECV_WINDOW,
     };
 
     try {
-      const response = await this.signedRequest<BybitOrderResult>(
-        'POST',
-        '/v5/order/cancel',
-        params,
-      );
-
+      const response = await this.signedRequest<BybitOrderResult>('POST', '/v5/order/cancel', params);
       const order = response.result;
       this.recordSuccess();
 
-      return {
-        id: order.orderLinkId || crypto.randomUUID(),
-        exchangeOrderId: order.orderId,
-        exchangeAccountId: '',
-        symbol: order.symbol,
-        side: order.side === 'Buy' ? 'BUY' : 'SELL',
-        type: order.orderType === 'Market' ? 'MARKET' : 'LIMIT',
-        quantity: parseFloat(order.qty),
-        price: order.price ? parseFloat(order.price) : null,
-        stopPrice: null,
-        timeInForce: 'GTC',
-        status: 'CANCELLED',
-        filledQuantity: parseFloat(order.cumExecQty),
-        idempotencyKey: order.orderLinkId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      return this.mapOrderToTrade(order, 'MARKET');
     } catch (error) {
       this.recordFailure();
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      throw new InfraError(`Bybit cancel failed: ${msg}`, 'BYBIT_CANCEL_FAILED');
+      throw this.handleBybitError(error, 'cancelOrder');
     }
   }
 
@@ -230,19 +170,14 @@ export class BybitAdapter extends BaseTradingAdapter {
       category: 'spot',
       symbol,
       orderId: exchangeOrderId,
+      recvWindow: RECV_WINDOW,
     };
 
     try {
-      const response = await this.signedRequest<BybitOrderResult>(
-        'GET',
-        '/v5/order/realtime',
-        params,
-      );
-
+      const response = await this.signedRequest<BybitOrderResult>('GET', '/v5/order/realtime', params);
       return this.mapOrderToTrade(response.result);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      throw new InfraError(`Bybit getOrder failed: ${msg}`, 'BYBIT_GET_ORDER_FAILED');
+      throw this.handleBybitError(error, 'getOrder');
     }
   }
 
@@ -252,43 +187,31 @@ export class BybitAdapter extends BaseTradingAdapter {
     const params: Record<string, string> = {
       category: 'spot',
       limit: '50',
+      recvWindow: RECV_WINDOW,
     };
     if (symbol) params.symbol = symbol;
 
     try {
-      const response = await this.signedRequest<{ list: BybitOrderResult[] }>(
-        'GET',
-        '/v5/order/realtime',
-        params,
-      );
-
-      const orders = response.result.list ?? [];
-      return orders.map((o) => this.mapOrderToTrade(o));
+      const response = await this.signedRequest<{ list: BybitOrderResult[] }>('GET', '/v5/order/realtime', params);
+      return (response.result.list ?? []).map((o) => this.mapOrderToTrade(o));
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      throw new InfraError(`Bybit getOpenOrders failed: ${msg}`, 'BYBIT_OPEN_ORDERS_FAILED');
+      throw this.handleBybitError(error, 'getOpenOrders');
     }
   }
-
-  // ══════════════════════════════════════════════════
-  // Balance & Position
-  // ══════════════════════════════════════════════════
 
   async getBalances(): Promise<Balance[]> {
     this.checkCircuitBreaker();
 
     try {
-      const response = await this.signedRequest<BybitBalanceResult>(
-        'GET',
-        '/v5/account/wallet-balance',
-        { accountType: 'UNIFIED' },
-      );
+      const response = await this.signedRequest<BybitBalanceResult>('GET', '/v5/account/wallet-balance', {
+        accountType: 'UNIFIED',
+        recvWindow: RECV_WINDOW,
+      });
 
       const balances: Balance[] = [];
       for (const account of response.result.list) {
         for (const coin of account.coin) {
-          const walletBalance = parseFloat(coin.walletBalance);
-          if (walletBalance > 0) {
+          if (parseFloat(coin.walletBalance) > 0) {
             balances.push({
               asset: coin.coin,
               free: coin.availableToWithdraw,
@@ -301,25 +224,19 @@ export class BybitAdapter extends BaseTradingAdapter {
       return balances;
     } catch (error) {
       this.recordFailure();
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      throw new InfraError(`Bybit getBalances failed: ${msg}`, 'BYBIT_BALANCE_FAILED');
+      throw this.handleBybitError(error, 'getBalances');
     }
   }
 
   async getPositions(): Promise<Position[]> {
-    // Spot: positions are non-zero balances; return empty for derivatives MVP
     return [];
   }
 
-  // ══════════════════════════════════════════════════
-  // Connectivity
-  // ══════════════════════════════════════════════════
-
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/v5/market/time`);
-      if (!response.ok) return false;
-      const data = (await response.json()) as BybitApiResponse;
+      const res = await fetch(`${this.baseUrl}/v5/market/time`);
+      if (!res.ok) return false;
+      const data = (await res.json()) as BybitApiResponse;
       return data.retCode === 0;
     } catch {
       return false;
@@ -327,38 +244,23 @@ export class BybitAdapter extends BaseTradingAdapter {
   }
 
   async getExchangeInfo(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/v5/market/instruments-info?category=spot`);
-    return response.json() as Promise<Record<string, unknown>>;
+    const res = await fetch(`${this.baseUrl}/v5/market/instruments-info?category=spot`);
+    return res.json();
   }
 
-  // ── Asset Info ──
   getAssetType(): 'crypto' { return 'crypto'; }
   supportsLeverage(): boolean { return false; }
   getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
     return ['MARKET', 'LIMIT'];
   }
 
-  // ══════════════════════════════════════════════════
-  // HMAC SHA256 Signing (Bybit v5)
-  // ══════════════════════════════════════════════════
-  //
-  // Bybit signature format:
-  //   signature = HMAC_SHA256(timestamp + apiKey + recvWindow + queryString, apiSecret)
-  //
-  // Headers required:
-  //   X-BAPI-API-KEY: apiKey
-  //   X-BAPI-TIMESTAMP: timestamp (ms)
-  //   X-BAPI-SIGN: signature
-  //   X-BAPI-RECV-WINDOW: recvWindow (ms, default 5000)
-
+  // ── Signing (Official Bybit V5 format) ──
   private sign(timestamp: string, params: string): string {
     const signStr = `${timestamp}${this.apiKey}${RECV_WINDOW}${params}`;
     return crypto.createHmac('sha256', this.apiSecret).update(signStr).digest('hex');
   }
 
-  // ══════════════════════════════════════════════════
-  // HTTP Helpers
-  // ══════════════════════════════════════════════════
+  // ── HTTP Helpers ──
 
   private async signedRequest<T>(
     method: 'GET' | 'POST',
@@ -367,7 +269,6 @@ export class BybitAdapter extends BaseTradingAdapter {
   ): Promise<BybitApiResponse<T>> {
     const timestamp = Date.now().toString();
     const queryString = new URLSearchParams(params).toString();
-
     const signature = this.sign(timestamp, queryString);
 
     const headers: Record<string, string> = {
@@ -375,56 +276,43 @@ export class BybitAdapter extends BaseTradingAdapter {
       'X-BAPI-TIMESTAMP': timestamp,
       'X-BAPI-SIGN': signature,
       'X-BAPI-RECV-WINDOW': RECV_WINDOW,
-      'Content-Type': 'application/json',
+      'Content-Type': method === 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
     };
 
-    let url = `${this.baseUrl}${path}`;
-    let body: string | undefined;
-
-    if (method === 'GET') {
-      url += `?${queryString}`;
-    } else {
-      body = JSON.stringify(params);
-    }
+    const url = method === 'GET' ? `${this.baseUrl}${path}?${queryString}` : `${this.baseUrl}${path}`;
+    const body = method === 'POST' ? JSON.stringify(params) : undefined;
 
     const response = await fetch(url, {
       method,
       headers,
-      ...(body !== undefined ? { body } : {}),
+      ...(body ? { body } : {}),
     });
 
     const data = (await response.json()) as BybitApiResponse<T>;
 
     if (data.retCode !== 0) {
-      const msg = `Bybit API error [${data.retCode}]: ${data.retMsg}`;
-      logger.error({ retCode: data.retCode, retMsg: data.retMsg, path }, msg);
+      const errorMsg = `Bybit API Error [${data.retCode}]: ${data.retMsg}`;
+      logger.error({ retCode: data.retCode, retMsg: data.retMsg, path }, errorMsg);
 
-      // Specific error codes
-      if (data.retCode === 10001) throw new Error('Bybit internal error');
-      if (data.retCode === 10002) throw new Error('Bybit authorization expired');
-      if (data.retCode === 10003) throw new Error('Insufficient permissions');
-      if (data.retCode === 10004) throw new Error('Invalid sign');
-      if (data.retCode === 10006) throw new Error('Too many requests — rate limited');
-      if (data.retCode === 110001) throw new Error('Order does not exist');
-      if (data.retCode === 110003) throw new Error('Insufficient balance');
-      if (data.retCode === 110004) throw new Error('Price too high/low');
-      if (data.retCode === 110005) throw new Error('Quantity too high/low');
-      if (data.retCode === 130021) throw new Error('OrderLinkId already exists');
+      // Map common error codes
+      if (data.retCode === 10003) throw new Error('Bybit: Insufficient permissions');
+      if (data.retCode === 10004) throw new Error('Bybit: Invalid signature');
+      if (data.retCode === 10006) throw new Error('Bybit: Rate limit exceeded');
+      if (data.retCode === 110003) throw new Error('Bybit: Insufficient balance');
+      if (data.retCode === 110005) throw new Error('Bybit: Invalid quantity');
 
-      throw new Error(msg);
+      throw new Error(errorMsg);
     }
 
     return data;
   }
 
-  // ══════════════════════════════════════════════════
-  // Order Mapping Helper
-  // ══════════════════════════════════════════════════
+  private handleBybitError(error: unknown, operation: string): InfraError {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new InfraError(`Bybit ${operation} failed: ${message}`, `BYBIT_${operation.toUpperCase()}_FAILED`);
+  }
 
-  private mapOrderToTrade(
-    order: BybitOrderResult,
-    requestType?: OrderRequest['type'],
-  ): Trade {
+  private mapOrderToTrade(order: BybitOrderResult, requestType?: OrderRequest['type']): Trade {
     return {
       id: order.orderLinkId || crypto.randomUUID(),
       exchangeOrderId: order.orderId,
@@ -444,17 +332,14 @@ export class BybitAdapter extends BaseTradingAdapter {
     };
   }
 
-  // ══════════════════════════════════════════════════
-  // Circuit Breaker
-  // ══════════════════════════════════════════════════
+  // ── Circuit Breaker ──
 
   private checkCircuitBreaker(): void {
     if (this._circuitOpen) {
       const elapsed = Date.now() - this._lastFailureTime;
       if (elapsed < this._resetTimeoutMs) {
-        const remaining = Math.ceil((this._resetTimeoutMs - elapsed) / 1000);
         throw new InfraError(
-          `[BYBIT] Circuit breaker open — retry after ${remaining}s`,
+          `[${this.exchangeName}] Circuit breaker open — retry after ${Math.ceil((this._resetTimeoutMs - elapsed) / 1000)}s`,
           'CIRCUIT_BREAKER_OPEN',
         );
       }
@@ -468,7 +353,7 @@ export class BybitAdapter extends BaseTradingAdapter {
     this._lastFailureTime = Date.now();
     if (this._failureCount >= this._failureThreshold) {
       this._circuitOpen = true;
-      logger.warn('[BYBIT] Circuit breaker opened');
+      logger.warn(`[${this.exchangeName}] Circuit breaker opened`);
     }
   }
 
@@ -477,7 +362,7 @@ export class BybitAdapter extends BaseTradingAdapter {
       this._failureCount = 0;
       if (this._circuitOpen) {
         this._circuitOpen = false;
-        logger.info('[BYBIT] Circuit breaker reset');
+        logger.info(`[${this.exchangeName}] Circuit breaker reset`);
       }
     }
   }
