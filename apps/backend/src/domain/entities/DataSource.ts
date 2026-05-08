@@ -11,8 +11,8 @@ export interface DataSourceProps {
   name: string;
   config: Record<string, unknown>;
   status: DataSourceStatus;
-  lastError?: string;
-  lastFetchedAt?: Date;
+  lastError?: string | null;
+  lastFetchedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,8 +26,8 @@ export class DataSource {
   get name(): string { return this.props.name; }
   get config(): Record<string, unknown> { return this.props.config; }
   get status(): DataSourceStatus { return this.props.status; }
-  get lastError(): string | undefined { return this.props.lastError; }
-  get lastFetchedAt(): Date | undefined { return this.props.lastFetchedAt; }
+  get lastError(): string | undefined { return this.props.lastError ?? undefined; }
+  get lastFetchedAt(): Date | undefined { return this.props.lastFetchedAt ?? undefined; }
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
 
