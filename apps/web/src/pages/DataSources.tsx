@@ -1,4 +1,4 @@
-// ── Data Sources Page (Improved) ──
+// ── Data Sources Page (Modal Version) ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -15,7 +15,6 @@ export function DataSourcesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showConnectForm, setShowConnectForm] = useState(false);
 
   const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
 
@@ -23,6 +22,8 @@ export function DataSourcesPage() {
   const [deletingSource, setDeletingSource] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Modal states
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
   const [formName, setFormName] = useState('');
   const [formToken, setFormToken] = useState('');
@@ -80,6 +81,20 @@ export function DataSourcesPage() {
     setDeletingSource(null);
   };
 
+  const openConnectModal = () => {
+    setConnectModalOpen(true);
+    setError(null);
+  };
+
+  const closeConnectModal = () => {
+    setConnectModalOpen(false);
+    // Reset form when closing
+    setFormName('');
+    setFormToken('');
+    setFormChannels('');
+    setError(null);
+  };
+
   const handleConnect = async () => {
     const trimmedName = formName.trim();
     const trimmedToken = formToken.trim();
@@ -114,12 +129,7 @@ export function DataSourcesPage() {
       setSuccessMessage(`「${trimmedName}」連接成功！`);
       setNewlyAddedId(newSource.id);
 
-      // Reset form
-      setFormName('');
-      setFormToken('');
-      setFormChannels('');
-      setShowConnectForm(false);
-
+      closeConnectModal();
       await fetchDataSources(false);
     } catch (err: any) {
       const message = err.message || '';
@@ -161,76 +171,12 @@ export function DataSourcesPage() {
           </IconButton>
         </Stack>
 
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowConnectForm(!showConnectForm)}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={openConnectModal}>
           連接新數據來源
         </Button>
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-
-      {/* Connect Form */}
-      {showConnectForm && (
-        <Card sx={{ mb: 3, p: 3 }} variant="outlined">
-          <Typography variant="h6" mb={2}>連接新數據來源</Typography>
-          <Stack spacing={2}>
-            <TextField
-              select
-              label="類型"
-              value={formType}
-              onChange={(e) => setFormType(e.target.value as any)}
-              fullWidth
-              disabled={connecting}
-            >
-              <MenuItem value="TELEGRAM">Telegram</MenuItem>
-              <MenuItem value="X">X (Twitter)</MenuItem>
-            </TextField>
-
-            <TextField
-              label="自訂名稱"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="例如：我的 Telegram 頻道"
-              fullWidth
-              disabled={connecting}
-            />
-
-            <TextField
-              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
-              value={formToken}
-              onChange={(e) => setFormToken(e.target.value)}
-              type="password"
-              fullWidth
-              disabled={connecting}
-            />
-
-            {formType === 'TELEGRAM' && (
-              <TextField
-                label="Channel Username(s)（可用逗號分隔）"
-                value={formChannels}
-                onChange={(e) => setFormChannels(e.target.value)}
-                placeholder="@channel1, @channel2"
-                fullWidth
-                disabled={connecting}
-                helperText="例如：@cointelegraph, @whale_alert"
-              />
-            )}
-
-            <Stack direction="row" spacing={2} mt={1}>
-              <Button variant="outlined" onClick={() => setShowConnectForm(false)} disabled={connecting}>
-                取消
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleConnect}
-                disabled={connecting || !formName.trim() || !formToken.trim()}
-                startIcon={connecting ? <CircularProgress size={18} color="inherit" /> : null}
-              >
-                {connecting ? '連接中...' : '連接'}
-              </Button>
-            </Stack>
-          </Stack>
-        </Card>
-      )}
 
       {/* Data Sources List */}
       {loading ? (
@@ -273,8 +219,8 @@ export function DataSourcesPage() {
                       </Stack>
 
                       <Typography variant="caption" color="text.secondary">
-                        連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt
-)}                      </Typography>
+                        連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt)}
+                      </Typography>
 
                       {(channelCount > 0 || usernameCount > 0) && (
                         <Typography variant="caption" color="text.secondary">
@@ -296,6 +242,71 @@ export function DataSourcesPage() {
           })}
         </Stack>
       )}
+
+      {/* Connect DataSource Modal */}
+      <Dialog open={connectModalOpen} onClose={closeConnectModal} maxWidth="sm" fullWidth>
+        <DialogTitle>連接新數據來源</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+
+            <TextField
+              select
+              label="類型"
+              value={formType}
+              onChange={(e) => setFormType(e.target.value as any)}
+              fullWidth
+              disabled={connecting}
+            >
+              <MenuItem value="TELEGRAM">Telegram</MenuItem>
+              <MenuItem value="X">X (Twitter)</MenuItem>
+            </TextField>
+
+            <TextField
+              label="自訂名稱"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="例如：我的 Telegram 頻道"
+              fullWidth
+              disabled={connecting}
+            />
+
+            <TextField
+              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
+              value={formToken}
+              onChange={(e) => setFormToken(e.target.value)}
+              type="password"
+              fullWidth
+              disabled={connecting}
+            />
+
+            {formType === 'TELEGRAM' && (
+              <TextField
+                label="Channel Username(s)（可用逗號分隔）"
+                value={formChannels}
+                onChange={(e) => setFormChannels(e.target.value)}
+                placeholder="@channel1, @channel2"
+                fullWidth
+                disabled={connecting}
+                helperText="例如：@cointelegraph, @whale_alert"
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeConnectModal} disabled={connecting}>
+            取消
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleConnect}
+            disabled={connecting || !formName.trim() || !formToken.trim()}
+            startIcon={connecting ? <CircularProgress size={18} color="inherit" /> : null}
+          >
+            {connecting ? '連接中...' : '連接'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={cancelDelete} maxWidth="xs" fullWidth>
