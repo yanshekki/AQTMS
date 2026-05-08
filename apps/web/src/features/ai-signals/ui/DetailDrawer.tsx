@@ -1,7 +1,7 @@
-// ── Detail Drawer (With Manual Order Placement) ──
+// ── Detail Drawer (Improved Error Handling) ──
 
 import { useState, useEffect, useRef } from 'react';
-import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, CircularProgress, Card, CardContent, Button } from '@mui/material';
+import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, CircularProgress, Card, CardContent, Button, Alert } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import { signalsApi } from '../api/signalsApi';
@@ -42,16 +42,36 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
   useEffect(() => {
     if (!signalId) {
       setDetail(null);
+      setError(null);
       return;
     }
+
     setLoading(true);
     setError(null);
+
     signalsApi
       .getSignalDetail(signalId)
-      .then((res) => setDetail(res.data))
-      .catch((err) => setError(err instanceof Error ? err.message : t('common.error')))
+      .then((res) => {
+        setDetail(res.data);
+      })
+      .catch((err) => {
+        const friendlyError = getFriendlyErrorMessage(err);
+        setError(friendlyError);
+      })
       .finally(() => setLoading(false));
-  }, [signalId, t]);
+  }, [signalId]);
+
+  // Helper for friendly errors
+  const getFriendlyErrorMessage = (err: any): string => {
+    const message = err?.message || '';
+    if (message.includes('network') || message.includes('fetch')) {
+      return '無法載入訊號詳情，請檢查網絡';
+    }
+    if (message.includes('not found') || message.includes('404')) {
+      return '找不到該訊號，可能已被刪除';
+    }
+    return message || '載入訊號詳情時發生錯誤';
+  };
 
   useEffect(() => {
     if (!detail) return;
@@ -60,7 +80,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
     feed.current.fetchKlines(detectedSymbol, '1h', 100).then(setSignalChartData).catch(console.error);
   }, [detail]);
 
-  // Extract suggested action for default order side
+  // Extract suggested action
   let topSuggestedAction: string | null = null;
   let topUrgency: string | null = null;
   let defaultSide: 'BUY' | 'SELL' = 'BUY';
@@ -77,7 +97,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
       }
     }
 
-    // Try to extract symbol from content
     const symbolMatch = detail?.content.match(/\b([A-Z]{2,10}USDT?)\b/);
     if (symbolMatch) {
       defaultSymbol = symbolMatch[1];
@@ -105,7 +124,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
         PaperProps={{ sx: { width: { xs: '100%', sm: 520 }, bgcolor: isDark ? '#111827' : '#ffffff', borderLeft: 1, borderColor } }}
       >
         <Box sx={{ p: { xs: 2, sm: 3 } }}>
-          {/* Header */}
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h6" sx={{ color: primaryText, fontWeight: 700 }}>
               {t('aiSignals.drawer.title')}
@@ -117,12 +135,19 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
           <Divider sx={{ borderColor, mb: 2 }} />
 
+          {/* Loading */}
           {loading && <Box display="flex" justifyContent="center" py={4}><CircularProgress sx={{ color: '#3b82f6' }} /></Box>}
-          {error && <Typography sx={{ color: '#ef4444' }}>{error}</Typography>}
 
-          {detail && (
+          {/* Error */}
+          {error && !loading && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          {/* Content */}
+          {detail && !error && (
             <>
-              {/* Content + Action Button */}
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
                 <Typography variant="body1" sx={{ color: isDark ? '#d1d5db' : '#334155', lineHeight: 1.7, fontSize: '0.95rem', flex: 1, pr: 2 }}>
                   {detail.content}
@@ -144,7 +169,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
                 )}
               </Stack>
 
-              {/* Meta */}
               <Typography variant="caption" sx={{ color: dimText }}>
                 {detail.source} · {detail.channelName ?? 'Unknown'} · {detail.processedAt ? new Date(detail.processedAt).toLocaleString() : 'Pending'}
               </Typography>
@@ -302,7 +326,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
         defaultSymbol={defaultSymbol}
         defaultSide={defaultSide}
         onSuccess={() => {
-          // Optionally refresh something or show notification
+          // Can add refresh logic here if needed
         }}
       />
     </>
