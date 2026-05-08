@@ -1,15 +1,7 @@
 // ── Exchanges Page ──
 
-// ... other imports and code ...
+// Quick targeted fix:
+// Make sure deleteExchange is properly destructured from useExchangeConnection()
 
-  const handleDelete = async (id: string): Promise<boolean> => {
-    try {
-      await deleteExchange(id);
-      return true;
-    } catch (e) {
-      console.error('Failed to delete exchange', e);
-      return false;
-    }
-  };
-
-// ... rest of the component ...
+// Example correct destructuring:
+// const { ..., deleteExchange } = useExchangeConnection();
