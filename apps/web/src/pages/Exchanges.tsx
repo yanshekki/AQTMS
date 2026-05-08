@@ -1,4 +1,4 @@
-// ── Exchanges Page (Final Improved Exchange Connect Flow) ──
+// ── Exchanges Page (Complete with Card Actions) ──
 
 import { useState } from 'react';
 import {
@@ -29,6 +29,8 @@ export function ExchangesPage() {
     testConnection,
     lastConnectedId,
     resetLastConnected,
+    deleteExchange,
+    isDeleting,
   } = useExchangeConnection();
 
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
@@ -40,9 +42,8 @@ export function ExchangesPage() {
   const handleConnect = async (data: ConnectExchangeForm) => {
     try {
       await connect(data);
-      // lastConnectedId will be automatically set by the hook on success
     } catch (e) {
-      // Error handled in hook + mutation
+      // handled in hook
     }
   };
 
@@ -56,6 +57,23 @@ export function ExchangesPage() {
       setModalOpen(false);
       resetLastConnected();
     }, 600);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteExchange(id);
+    } catch (e) {
+      console.error('Failed to delete exchange', e);
+    }
+  };
+
+  const handleTest = async (id: string) => {
+    try {
+      await testConnection(id);
+      // Optionally refresh the list after test
+    } catch (e) {
+      console.error('Test connection failed', e);
+    }
   };
 
   return (
@@ -114,11 +132,7 @@ export function ExchangesPage() {
         </Typography>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-          {t('exchanges.failedToLoad')}: {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{t('exchanges.failedToLoad')}: {error}</Alert>}
 
       {isLoading ? (
         <Box display="flex" justifyContent="center" py={8}>
@@ -136,36 +150,13 @@ export function ExchangesPage() {
             px: 2,
           }}
         >
-          <Typography
-            variant="h6"
-            sx={{
-              color: dimText,
-              mb: 1,
-              fontSize: { xs: '1rem', md: '1.25rem' },
-            }}
-          >
+          <Typography variant="h6" sx={{ color: dimText, mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
             {t('exchanges.noExchangeConnected')}
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: mutedText,
-              mb: 3,
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-            }}
-          >
+          <Typography variant="body2" sx={{ color: mutedText, mb: 3, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
             {t('exchanges.emptyHint')}
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setModalOpen(true)}
-            sx={{
-              borderColor: isDark ? '#374151' : '#cbd5e1',
-              color: mutedText,
-              borderRadius: 3,
-            }}
-          >
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setModalOpen(true)} sx={{ borderColor: isDark ? '#374151' : '#cbd5e1', color: mutedText, borderRadius: 3 }}>
             {t('exchanges.connectFirstExchange')}
           </Button>
         </Box>
@@ -173,17 +164,20 @@ export function ExchangesPage() {
         <Grid container spacing={{ xs: 1.5, md: 2 }} className="stagger-children">
           {exchanges.map((account) => (
             <Grid item xs={12} sm={6} lg={4} key={account.id}>
-              <ExchangeCard account={account} />
+              <ExchangeCard
+                account={account}
+                onDelete={handleDelete}
+                onTest={handleTest}
+                isDeleting={isDeleting}
+                isTesting={false} // Can be enhanced later with per-card testing state
+              />
             </Grid>
           ))}
         </Grid>
       )}
 
       {/* Coming Soon */}
-      <Typography
-        variant="subtitle2"
-        sx={{ color: mutedText, mt: 4, mb: 2, fontWeight: 700 }}
-      >
+      <Typography variant="subtitle2" sx={{ color: mutedText, mt: 4, mb: 2, fontWeight: 700 }}>
         {t('common.comingSoon')}
       </Typography>
 
@@ -193,51 +187,14 @@ export function ExchangesPage() {
           { exchange: 'IBKR', color: '#E8252D', desc: 'Interactive Brokers — Global equities' },
         ].map((ex) => (
           <Grid item xs={12} sm={6} lg={4} key={ex.exchange}>
-            <Card
-              sx={{
-                bgcolor: emptyBg,
-                border: '1px dashed',
-                borderColor: emptyBorder,
-                borderRadius: 3,
-                opacity: 0.6,
-                transition: 'all 0.3s',
-                '&:hover': { opacity: 0.8, borderColor: ex.color },
-              }}
-            >
+            <Card sx={{ bgcolor: emptyBg, border: '1px dashed', borderColor: emptyBorder, borderRadius: 3, opacity: 0.6, transition: 'all 0.3s', '&:hover': { opacity: 0.8, borderColor: ex.color } }}>
               <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '50%',
-                    bgcolor: `${ex.color}15`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: 2,
-                  }}
-                >
-                  <Typography sx={{ color: ex.color, fontWeight: 900, fontSize: '1.2rem' }}>
-                    {ex.exchange[0]}
-                  </Typography>
+                <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: `${ex.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                  <Typography sx={{ color: ex.color, fontWeight: 900, fontSize: '1.2rem' }}>{ex.exchange[0]}</Typography>
                 </Box>
-                <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 0.5 }}>
-                  {ex.exchange}
-                </Typography>
-                <Typography variant="caption" sx={{ color: dimText }}>
-                  {ex.desc}
-                </Typography>
-                <Chip
-                  label={t('common.comingSoon')}
-                  size="small"
-                  sx={{
-                    mt: 1.5,
-                    bgcolor: `${ex.color}15`,
-                    color: ex.color,
-                    fontWeight: 600,
-                  }}
-                />
+                <Typography variant="subtitle1" sx={{ color: primaryText, fontWeight: 700, mb: 0.5 }}>{ex.exchange}</Typography>
+                <Typography variant="caption" sx={{ color: dimText }}>{ex.desc}</Typography>
+                <Chip label={t('common.comingSoon')} size="small" sx={{ mt: 1.5, bgcolor: `${ex.color}15`, color: ex.color, fontWeight: 600 }} />
               </CardContent>
             </Card>
           </Grid>
