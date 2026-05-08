@@ -1,6 +1,6 @@
-// ── X (Twitter) Connection Service (Improved Error Messages) ──
+// ── X (Twitter) Connection Service ──
 
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export class XConnectionService {
   async validateBearerToken(bearerToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
@@ -11,10 +11,11 @@ export class XConnectionService {
       });
 
       return { valid: response.status === 200 };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const title = error.response?.data?.title || '';
-      const detail = error.response?.data?.detail || '';
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ title?: string; detail?: string }>;
+      const status = axiosError.response?.status;
+      const title = axiosError.response?.data?.title || '';
+      const detail = axiosError.response?.data?.detail || '';
 
       if (status === 401) {
         return {
@@ -24,17 +25,9 @@ export class XConnectionService {
         };
       }
 
-      if (title.includes('Unauthorized') || detail.includes('Invalid')) {
-        return {
-          valid: false,
-          error: 'X Bearer Token 不正確，請檢查是否輸入錯誤',
-          errorCode: 'INVALID_X_TOKEN',
-        };
-      }
-
       return {
         valid: false,
-        error: detail || '無法驗證 X Bearer Token',
+        error: detail || title || '無法驗證 X Bearer Token',
         errorCode: 'X_VALIDATION_FAILED',
       };
     }
@@ -52,8 +45,9 @@ export class XConnectionService {
       );
 
       return { accessible: response.status === 200 };
-    } catch (error: any) {
-      const status = error.response?.status;
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ title?: string } >;
+      const status = axiosError.response?.status;
 
       if (status === 404) {
         return {
