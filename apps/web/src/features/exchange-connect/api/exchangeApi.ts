@@ -1,7 +1,7 @@
 // ── Exchange API ──
 
 import { z } from 'zod';
-import { safeGet, safePost, safeDelete } from '@/shared/api';
+import { safeGet, safePost, safeDelete, safePatch } from '@/shared/api';
 import { ConnectExchangeSchema, ExchangeAccountResponseSchema } from '../lib/schemas';
 import type { ExchangeAccount } from '../lib/schemas';
 
@@ -14,6 +14,18 @@ const ExchangeBalanceResponseSchema = z.object({
     updatedAt: z.string(),
   }),
   timestamp: z.string(),
+});
+
+const ExchangeAccountSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  exchange: z.string(),
+  name: z.string().optional(),
+  status: z.string(),
+  testPassed: z.boolean(),
+  testnet: z.boolean(),
+  isPaperTrading: z.boolean().optional(),
+  createdAt: z.string(),
 });
 
 export const exchangeApi = {
@@ -39,7 +51,7 @@ export const exchangeApi = {
         success: z.literal(true),
         data: z.object({ connected: z.boolean(), status: z.string() }),
         timestamp: z.string(),
-      })
+      }),
     );
     return result.data.connected;
   },
@@ -50,5 +62,19 @@ export const exchangeApi = {
 
   async deleteExchange(exchangeId: string): Promise<void> {
     await safeDelete(`/api/v1/exchanges/${exchangeId}`);
+  },
+
+  // 新增：更新交易所帳戶設定（例如開啟/關閉 Paper Trading）
+  async updateSettings(accountId: string, data: { isPaperTrading?: boolean }) {
+    const response = await safePatch(
+      `/api/v1/exchanges/${accountId}/settings`,
+      data,
+      z.object({
+        success: z.literal(true),
+        data: ExchangeAccountSchema,
+        timestamp: z.string(),
+      }),
+    );
+    return response.data;
   },
 };

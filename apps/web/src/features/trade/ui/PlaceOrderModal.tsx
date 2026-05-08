@@ -1,4 +1,4 @@
-// ── Place Order Modal ──
+// ── Place Order Modal (with Stop Loss / Take Profit) ──
 
 import { useState } from 'react';
 import {
@@ -33,6 +33,8 @@ export function PlaceOrderModal({
     quantity: 0,
     price: undefined,
     timeInForce: 'GTC',
+    stopLoss: undefined,
+    takeProfit: undefined,
   });
 
   const [loading, setLoading] = useState(false);
@@ -106,6 +108,8 @@ export function PlaceOrderModal({
       quantity: 0,
       price: undefined,
       timeInForce: 'GTC',
+      stopLoss: undefined,
+      takeProfit: undefined,
     });
     setError(null);
     setSuccessMessage(null);
@@ -115,7 +119,7 @@ export function PlaceOrderModal({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>手動下單</DialogTitle>
+      <DialogTitle>手動下單（支援止損止盈）</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -192,6 +196,30 @@ export function PlaceOrderModal({
               inputProps={{ step: 'any' }}
             />
           )}
+
+          {/* Stop Loss & Take Profit */}
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Stop Loss（止損價）"
+              type="number"
+              value={form.stopLoss || ''}
+              onChange={(e) => handleChange('stopLoss', parseFloat(e.target.value) || undefined)}
+              fullWidth
+              disabled={loading}
+              inputProps={{ step: 'any' }}
+              helperText="可選，設定止損價格"
+            />
+            <TextField
+              label="Take Profit（止盈價）"
+              type="number"
+              value={form.takeProfit || ''}
+              onChange={(e) => handleChange('takeProfit', parseFloat(e.target.value) || undefined)}
+              fullWidth
+              disabled={loading}
+              inputProps={{ step: 'any' }}
+              helperText="可選，設定止盈價格"
+            />
+          </Stack>
         </Stack>
       </DialogContent>
 
