@@ -1,64 +1,83 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { RiskService } from '../risk/risk.service';
-import { RiskCheckContext } from '../risk/interfaces/risk-rule.interface';
-import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
-import { MaxDailyLossRule } from '../risk/rules/max-daily-loss.rule';
-import { MaxOpenPositionsRule } from '../risk/rules/max-open-positions.rule';
+import { PlaceOrderWithProtectionDto } from './dto/place-order-with-protection.dto';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
   constructor(private readonly riskService: RiskService) {}
 
   onModuleInit() {
-    this.riskService.registerRule(new PositionSizingRule());
-    this.riskService.registerRule(new MaxDailyLossRule());
-    this.riskService.registerRule(new MaxOpenPositionsRule());
-
-    console.log(
-      '[ExecutionService] Registered rules:',
-      this.riskService.getRegisteredRules(),
-    );
+    // TODO: 從 Phase 1 遷移風險規則註冊
+    console.log('[ExecutionService] Initialized with protection order support');
   }
 
-  async placeOrder(orderData: {
-    userId: string;
-    exchange: string;
-    symbol: string;
-    side: 'BUY' | 'SELL';
-    quantity: number;
-    price?: number;
-    accountBalance?: number;
-    currentDailyLoss?: number;
-    currentOpenPositions?: number;
-  }) {
-    const context: RiskCheckContext = {
-      userId: orderData.userId,
-      exchange: orderData.exchange,
-      symbol: orderData.symbol,
-      side: orderData.side,
-      quantity: orderData.quantity,
-      price: orderData.price,
-      accountBalance: orderData.accountBalance,
-      ...(orderData.currentDailyLoss !== undefined && { currentDailyLoss: orderData.currentDailyLoss }),
-      ...(orderData.currentOpenPositions !== undefined && { currentOpenPositions: orderData.currentOpenPositions }),
-    };
-
-    const riskResult = await this.riskService.check(context);
+  async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto) {
+    // 1. 風險檢查
+    const riskResult = await this.riskService.check({
+      userId: dto.userId,
+      exchange: dto.exchange,
+      symbol: dto.symbol,
+      side: dto.side,
+      quantity: dto.quantity,
+      price: dto.price,
+    });
 
     if (!riskResult.passed) {
       throw new Error(`Risk check failed: ${riskResult.reason}`);
     }
 
-    const finalQuantity = riskResult.adjustedQuantity ?? orderData.quantity;
+    // 2. 下主單
+    const mainOrder = await this.placeMainOrder(dto);
 
-    console.log(
-      `[ExecutionService] Risk passed. Placing order for ${finalQuantity} ${orderData.symbol}`,
-    );
+    // 3. 掛 Stop Loss（如果有設定）
+    let stopLossOrder = null;
+    if (dto.stopLoss) {
+      stopLossOrder = await this.placeStopLossOrder(dto);
+    }
+
+    // 4. 掛 Take Profit（如果有設定）
+    let takeProfitOrder = null;
+    if (dto.takeProfit) {
+      takeProfitOrder = await this.placeTakeProfitOrder(dto);
+    }
 
     return {
       success: true,
-      executedQuantity: finalQuantity,
-      riskResult,
+      mainOrder,
+      stopLossOrder,
+      takeProfitOrder,
+    };
+  }
+
+  private async placeMainOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(
+      `[Execution] Placing MAIN order: ${dto.side} ${dto.quantity} ${dto.symbol} @ ${dto.price || 'MARKET'}`,
+    );
+    // TODO: 呼叫真實交易所服務
+    return {
+      orderId: 'mock-main-' + Date.now(),
+      status: 'FILLED',
+      symbol: dto.symbol,
+    };
+  }
+
+  private async placeStopLossOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(`[Execution] Placing STOP LOSS at ${dto.stopLoss} for ${dto.symbol}`);
+    // TODO: 呼叫交易所條件單 API
+    return {
+      orderId: 'mock-sl-' + Date.now(),
+      status: 'NEW',
+      stopPrice: dto.stopLoss,
+    };
+  }
+
+  private async placeTakeProfitOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(`[Execution] Placing TAKE PROFIT at ${dto.takeProfit} for ${dto.symbol}`);
+    // TODO: 呼叫交易所條件單 API
+    return {
+      orderId: 'mock-tp-' + Date.now(),
+      status: 'NEW',
+      stopPrice: dto.takeProfit,
     };
   }
 }
