@@ -1,12 +1,13 @@
-// ── Data Sources Page (with highlight on new source) ──
+// ── Data Sources Page (with refresh + better validation) ──
 
 import { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useTranslation } from 'react-i18next';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
 
@@ -18,10 +19,8 @@ export function DataSourcesPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
 
-  // Highlight newly added source
   const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
 
-  // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingSource, setDeletingSource] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -32,15 +31,15 @@ export function DataSourcesPage() {
   const [formChannels, setFormChannels] = useState('');
   const [connecting, setConnecting] = useState(false);
 
-  const fetchDataSources = async () => {
+  const fetchDataSources = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const sources = await dataSourceApi.getDataSources();
       setDataSources(sources);
     } catch (err: any) {
       setError(err.message || 'Failed to load data sources');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -48,12 +47,9 @@ export function DataSourcesPage() {
     fetchDataSources();
   }, []);
 
-  // Auto remove highlight after 4 seconds
   useEffect(() => {
     if (newlyAddedId) {
-      const timer = setTimeout(() => {
-        setNewlyAddedId(null);
-      }, 4000);
+      const timer = setTimeout(() => setNewlyAddedId(null), 4000);
       return () => clearTimeout(timer);
     }
   }, [newlyAddedId]);
@@ -73,7 +69,7 @@ export function DataSourcesPage() {
       setSuccessMessage(`「${deletingSource.name}」已刪除`);
       setDeleteDialogOpen(false);
       setDeletingSource(null);
-      await fetchDataSources();
+      await fetchDataSources(false);
     } catch (err: any) {
       setError(err.message || '刪除失敗');
     } finally {
@@ -87,7 +83,11 @@ export function DataSourcesPage() {
   };
 
   const handleConnect = async () => {
-    if (!formName || !formToken) {
+    const trimmedName = formName.trim();
+    const trimmedToken = formToken.trim();
+    const trimmedChannels = formChannels.trim();
+
+    if (!trimmedName || !trimmedToken) {
       setError('請填寫名稱和 Token');
       return;
     }
@@ -96,24 +96,28 @@ export function DataSourcesPage() {
     setError(null);
 
     try {
-      const config: any = { token: formToken };
+      const config: any = { token: trimmedToken };
 
-      if (formType === 'TELEGRAM' && formChannels.trim()) {
-        const channels = formChannels.split(',').map((c) => c.trim()).filter(Boolean);
+      if (formType === 'TELEGRAM' && trimmedChannels) {
+        const channels = trimmedChannels.split(',').map((c) => c.trim()).filter(Boolean);
         config.channels = channels;
       }
 
-      const newSource = await dataSourceApi.connectDataSource({ type: formType, name: formName, config });
+      const newSource = await dataSourceApi.connectDataSource({
+        type: formType,
+        name: trimmedName,
+        config,
+      });
 
-      setSuccessMessage(`「${formName}」連接成功！`);
-      setNewlyAddedId(newSource.id); // Highlight the new source
+      setSuccessMessage(`「${trimmedName}」連接成功！`);
+      setNewlyAddedId(newSource.id);
 
       setFormName('');
       setFormToken('');
       setFormChannels('');
       setShowConnectForm(false);
 
-      await fetchDataSources();
+      await fetchDataSources(false);
     } catch (err: any) {
       setError(err.message || '連接失敗，請檢查 Token 是否正確');
     } finally {
@@ -138,9 +142,15 @@ export function DataSourcesPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight={700}>
-          數據來源設定
-        </Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography variant="h5" fontWeight={700}>
+            數據來源設定
+          </Typography>
+          <IconButton onClick={() => fetchDataSources()} disabled={loading} size="small">
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowConnectForm(!showConnectForm)}>
           連接新數據來源
         </Button>
@@ -175,7 +185,7 @@ export function DataSourcesPage() {
 
             <Stack direction="row" spacing={2} mt={1}>
               <Button variant="outlined" onClick={() => setShowConnectForm(false)} disabled={connecting}>取消</Button>
-              <Button variant="contained" onClick={handleConnect} disabled={connecting || !formName || !formToken}>
+              <Button variant="contained" onClick={handleConnect} disabled={connecting || !formName.trim() || !formToken.trim()}>
                 {connecting ? '連接中...' : '連接'}
               </Button>
             </Stack>
@@ -185,7 +195,9 @@ export function DataSourcesPage() {
 
       {/* Data Sources List */}
       {loading ? (
-        <Typography>載入中...</Typography>
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress size={28} />
+        </Box>
       ) : dataSources.length === 0 ? (
         <Card sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="text.secondary">尚未連接任何數據來源</Typography>
