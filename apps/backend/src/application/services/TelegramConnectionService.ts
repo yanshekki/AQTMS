@@ -2,13 +2,13 @@
 
 interface TelegramGetMeResponse {
   ok: boolean;
-  result?: { id: number; is_bot: boolean; first_name: string; username?: string };
+  result?: any;
   description?: string;
 }
 
 interface TelegramGetChatResponse {
   ok: boolean;
-  result?: { id: number; title?: string; username?: string };
+  result?: any;
   description?: string;
 }
 
@@ -16,7 +16,7 @@ export class TelegramConnectionService {
   async validateBotToken(botToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
     try {
       const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-      const data: TelegramGetMeResponse = await response.json();
+      const data = (await response.json()) as TelegramGetMeResponse;
 
       if (data.ok) {
         return { valid: true };
@@ -41,7 +41,7 @@ export class TelegramConnectionService {
       const chatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`;
 
       const response = await fetch(`https://api.telegram.org/bot${botToken}/getChat?chat_id=${chatId}`);
-      const data: TelegramGetChatResponse = await response.json();
+      const data = (await response.json()) as TelegramGetChatResponse;
 
       if (data.ok) {
         return { accessible: true };
