@@ -1,4 +1,4 @@
-// ── Exchange Connection Hook (Improved) ──
+// ── Exchange Connection Hook (Improved Error Handling) ──
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,7 +34,6 @@ export function useExchangeConnection() {
     },
   });
 
-  // NEW: Delete exchange mutation
   const deleteMutation = useMutation({
     mutationFn: exchangeApi.deleteExchange,
     onSuccess: () => {
@@ -50,12 +49,12 @@ export function useExchangeConnection() {
     try {
       const result = await connectMutation.mutateAsync(data);
       return result;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      // Convert technical error to user-friendly message
+      throw new Error(getFriendlyErrorMessage(err));
     }
   };
 
-  // NEW: delete function
   const deleteExchange = async (exchangeId: string) => {
     await deleteMutation.mutateAsync(exchangeId);
   };
@@ -67,20 +66,45 @@ export function useExchangeConnection() {
   return {
     exchanges: exchanges ?? [],
     isLoading,
-    error: error instanceof Error ? error.message : null,
+    error: error instanceof Error ? getFriendlyErrorMessage(error) : null,
 
     lastConnectedId,
     resetLastConnected,
 
     connect,
     isConnecting: connectMutation.isPending,
-    connectError: connectMutation.error instanceof Error ? connectMutation.error.message : null,
+    connectError: connectMutation.error instanceof Error 
+      ? getFriendlyErrorMessage(connectMutation.error) 
+      : null,
 
-    // NEW
     deleteExchange,
     isDeleting: deleteMutation.isPending,
 
     testConnection: testMutation.mutateAsync,
     isTesting: testMutation.isPending,
   };
+}
+
+// Helper function to convert technical errors to user-friendly messages
+function getFriendlyErrorMessage(error: any): string {
+  const message = error?.message || '';
+
+  if (message.includes('invalid') || message.includes('API key')) {
+    return 'API Key 或 Secret 不正確，請檢查後再試';
+  }
+  if (message.includes('permission') || message.includes('Unauthorized')) {
+    return 'API Key 權限不足，請確保已開啟交易權限';
+  }
+  if (message.includes('network') || message.includes('fetch')) {
+    return '網絡連接失敗，請檢查網絡或稍後再試';
+  }
+  if (message.includes('already exists') || message.includes('duplicate')) {
+    return '該交易所帳戶已經連接過了';
+  }
+  if (message.includes('testnet')) {
+    return 'Testnet 連接失敗，請確認使用正確的 Testnet API Key';
+  }
+
+  // Default fallback
+  return message || '發生未知錯誤，請稍後再試';
 }
