@@ -8,6 +8,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SourceIcon from '@mui/icons-material/Source';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
 
 export function DataSourcesPage() {
@@ -160,7 +161,6 @@ export function DataSourcesPage() {
     return new Date(dateStr).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  // Helper to render channels/usernames nicely
   const renderTargets = (source: any) => {
     if (source.type === 'TELEGRAM' && source.config?.channels?.length > 0) {
       const channels = source.config.channels;
@@ -218,9 +218,32 @@ export function DataSourcesPage() {
           <CircularProgress size={28} />
         </Box>
       ) : dataSources.length === 0 ? (
-        <Card sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">尚未連接任何數據來源</Typography>
-          <Typography variant="body2" color="text.secondary" mt={1}>連接 Telegram 或 X 來開始接收訊號</Typography>
+        <Card
+          sx={{
+            p: { xs: 4, md: 6 },
+            textAlign: 'center',
+            border: '1px dashed',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Box sx={{ mb: 2 }}>
+            <SourceIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+          </Box>
+          <Typography variant="h6" gutterBottom>
+            尚未連接任何數據來源
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 420, mx: 'auto' }}>
+            連接 Telegram 或 X 作為數據來源，系統就會自動接收並處理相關訊號，
+            幫助你更快掌握市場動態。
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openConnectModal}
+          >
+            立即連接數據來源
+          </Button>
         </Card>
       ) : (
         <Stack spacing={2}>
@@ -254,7 +277,6 @@ export function DataSourcesPage() {
                         連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt)}
                       </Typography>
 
-                      {/* Show actual channels/usernames */}
                       {renderTargets(source)}
 
                       {source.lastError && (
