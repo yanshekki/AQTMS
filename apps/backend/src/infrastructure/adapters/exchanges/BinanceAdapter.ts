@@ -142,6 +142,25 @@ export class BinanceAdapter extends BaseTradingAdapter {
     }
   }
 
+  async getOpenOrders(symbol?: string): Promise<Trade[]> {
+    this.checkCircuitBreaker();
+
+    const params: Record<string, string> = {
+      timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
+    };
+    if (symbol) params.symbol = symbol;
+    params.signature = this.sign(params);
+
+    try {
+      const response = await this.privateGet('/api/v3/openOrders', params);
+      const orders = response as BinanceOrderResponse[];
+      return orders.map((o) => this.mapOrderToTrade(o, { type: 'MARKET' } as any));
+    } catch (error) {
+      throw this.handleBinanceError(error, 'getOpenOrders');
+    }
+  }
+
   async getBalances(): Promise<Balance[]> {
     this.checkCircuitBreaker();
 
