@@ -1,10 +1,10 @@
 // ── Trade API Client ──
-// For manual order placement (Phase A MVP)
+// Updated for Phase 2.1 - Stop Loss / Take Profit support
 
 import { z } from 'zod';
 import { safePost } from '@/shared/api';
 
-// Schema for creating a trade (manual order)
+// Schema for creating a trade (manual order with protection)
 export const CreateTradeSchema = z.object({
   exchangeAccountId: z.string().min(1, 'Exchange account is required'),
   symbol: z.string().min(1, 'Symbol is required').toUpperCase(),
@@ -13,6 +13,8 @@ export const CreateTradeSchema = z.object({
   quantity: z.number().positive('Quantity must be positive'),
   price: z.number().positive().optional(),
   timeInForce: z.enum(['GTC', 'IOC', 'FOK']).optional(),
+  stopLoss: z.number().positive().optional(),
+  takeProfit: z.number().positive().optional(),
 });
 
 export type CreateTradeInput = z.infer<typeof CreateTradeSchema>;
@@ -36,8 +38,8 @@ interface TradeResponse {
 export const tradeApi = {
   async placeOrder(data: CreateTradeInput): Promise<TradeResponse['data']> {
     const parsed = CreateTradeSchema.parse(data);
-    
-    const response = await safePost('/api/v1/trades', parsed, 
+
+    const response = await safePost('/api/v1/trades', parsed,
       z.object({
         success: z.literal(true),
         data: z.object({
@@ -59,7 +61,7 @@ export const tradeApi = {
   },
 
   async cancelOrder(tradeId: string) {
-    return safePost(`/api/v1/trades/${tradeId}/cancel`, {}, 
+    return safePost(`/api/v1/trades/${tradeId}/cancel`, {},
       z.object({ success: z.literal(true), data: z.any(), timestamp: z.string() })
     );
   },
