@@ -1,4 +1,4 @@
-// ── Connect DataSource UseCase (with X support) ──
+// ── Connect DataSource UseCase ──
 
 import { DataSource, type DataSourceType } from '../../../domain/entities/DataSource';
 import type { DataSourceRepository } from '../../../domain/repositories/DataSourceRepository';
@@ -39,7 +39,6 @@ export class ConnectDataSourceUseCase {
         );
       }
 
-      // Validation based on type
       if (command.type === 'TELEGRAM') {
         await this.validateTelegram(command.config);
       }
@@ -59,7 +58,6 @@ export class ConnectDataSourceUseCase {
 
       const saved = await this.dataSourceRepository.save(dataSource);
 
-      // Start polling based on type
       if (saved.type === 'TELEGRAM') {
         this.startTelegramPolling(saved);
       }
@@ -140,7 +138,7 @@ export class ConnectDataSourceUseCase {
             source: 'TELEGRAM',
             sourceId: newsItem.sourceId,
             content: newsItem.content,
-            channelName: newsItem.channelName,
+            ...(newsItem.channelName && { channelName: newsItem.channelName }),
             retryCount: 0,
           });
         } catch (err) {
@@ -178,7 +176,7 @@ export class ConnectDataSourceUseCase {
             source: 'X',
             sourceId: newsItem.sourceId,
             content: newsItem.content,
-            authorName: newsItem.authorName,
+            ...(newsItem.authorName && { authorName: newsItem.authorName }),
             retryCount: 0,
           });
         } catch (err) {
