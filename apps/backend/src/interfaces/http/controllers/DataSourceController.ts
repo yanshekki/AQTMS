@@ -1,4 +1,4 @@
-// ── DataSource Controller ──
+// ── DataSource Controller (Final Fixed) ──
 
 import type { Request, Response, NextFunction } from 'express';
 import { ConnectDataSourceUseCase } from '../../../application/use-cases/data-source/ConnectDataSourceUseCase';
@@ -23,11 +23,8 @@ export class DataSourceController {
       const { type: rawType, name, config } = req.body;
 
       const allowedTypes: DataSourceType[] = ['TELEGRAM', 'X', 'RSS', 'ONCHAIN'];
-      if (!allowedTypes.includes(rawType)) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_TYPE', message: 'Invalid data source type' },
-        });
+      if (!allowedTypes.includes(rawType as any)) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_TYPE' } });
       }
       const type = rawType as DataSourceType;
 
@@ -38,11 +35,7 @@ export class DataSourceController {
         config: config ?? {},
       });
 
-      res.status(201).json({
-        success: true,
-        data: dataSource.toPrimitives(),
-        timestamp: new Date().toISOString(),
-      });
+      res.status(201).json({ success: true, data: dataSource.toPrimitives(), timestamp: new Date().toISOString() });
     } catch (error) {
       next(error);
     }
@@ -56,12 +49,7 @@ export class DataSourceController {
       }
 
       const dataSources = await this.listDataSourcesUseCase.execute(userId);
-
-      res.json({
-        success: true,
-        data: dataSources.map((ds) => ds.toPrimitives()),
-        timestamp: new Date().toISOString(),
-      });
+      res.json({ success: true, data: dataSources.map((ds) => ds.toPrimitives()), timestamp: new Date().toISOString() });
     } catch (error) {
       next(error);
     }
@@ -78,12 +66,7 @@ export class DataSourceController {
       }
 
       await this.deleteDataSourceUseCase.execute(id, userId);
-
-      res.json({
-        success: true,
-        data: { message: 'Data source deleted successfully' },
-        timestamp: new Date().toISOString(),
-      });
+      res.json({ success: true, data: { message: 'Data source deleted successfully' }, timestamp: new Date().toISOString() });
     } catch (error) {
       next(error);
     }
