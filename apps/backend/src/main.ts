@@ -20,6 +20,7 @@ import { createRiskRoutes, createBacktestRoutes } from './interfaces/http/routes
 import { createPortfolioRoutes } from './interfaces/http/routes/portfolio.routes';
 import { createScoringRulesRoutes } from './interfaces/http/routes/scoring-rules.routes';
 import { createNotificationsRoutes } from './interfaces/http/routes/notifications.routes';
+import { createDataSourceRoutes } from './interfaces/http/routes/data-source.routes';
 import { ExecuteTradeUseCase, CancelTradeUseCase } from './application/use-cases';
 import { ProcessNewsUseCase } from './application/use-cases/ProcessNewsUseCase';
 import { PrismaTradeRepository } from './infrastructure/persistence/PrismaTradeRepository';
@@ -38,6 +39,9 @@ import { BinanceAdapter } from './infrastructure/adapters/exchanges/BinanceAdapt
 import { BybitAdapter } from './infrastructure/adapters/exchanges/BybitAdapter';
 import type { BaseDataSourceAdapter } from './infrastructure/adapters/datasources/BaseDataSourceAdapter';
 import { ExchangeAccountRepository } from './infrastructure/persistence/ExchangeAccountRepository';
+
+// ── Prisma Repositories for DataSource ──
+import { PrismaDataSourceRepository } from './infrastructure/repositories/PrismaDataSourceRepository';
 
 // ── Load & validate env ──
 const env = loadEnv();
@@ -65,16 +69,33 @@ const adapterMap: ExchangeAdapterMap = {
 
 // ── Repositories ──
 const tradeRepository = new PrismaTradeRepository();
+const dataSourceRepository = new PrismaDataSourceRepository(prisma);
 
 // ── Use-cases ──
 const executeTradeUseCase = new ExecuteTradeUseCase(adapterMap, tradeRepository);
 const cancelTradeUseCase = new CancelTradeUseCase(adapterMap, tradeRepository);
 
+// ── DataSource UseCases ──
+import { ConnectDataSourceUseCase } from './application/use-cases/data-source/ConnectDataSourceUseCase';
+import { ListDataSourcesUseCase } from './application/use-cases/data-source/ListDataSourcesUseCase';
+import { DeleteDataSourceUseCase } from './application/use-cases/data-source/DeleteDataSourceUseCase';
+
+const connectDataSourceUseCase = new ConnectDataSourceUseCase(dataSourceRepository);
+const listDataSourcesUseCase = new ListDataSourcesUseCase(dataSourceRepository);
+const deleteDataSourceUseCase = new DeleteDataSourceUseCase(dataSourceRepository);
+
+// ── DataSource Controller ──
+import { DataSourceController } from './interfaces/http/controllers/DataSourceController';
+const dataSourceController = new DataSourceController(
+  connectDataSourceUseCase,
+  listDataSourcesUseCase,
+  deleteDataSourceUseCase
+);
+
 // ── AI Providers Initialization (MVP) ──
 const registerAIProviders = () => {
   let registeredCount = 0;
 
-  // Grok (xAI) - Best for truth verification
   if (process.env.GROK_API_KEY) {
     aiProviderRegistry.register('grok-1', 'GROK', 'Grok-2', {
       apiKey: process.env.GROK_API_KEY,
@@ -86,7 +107,6 @@ const registerAIProviders = () => {
     registeredCount++;
   }
 
-  // DeepSeek - Best for trading decision
   if (process.env.DEEPSEEK_API_KEY) {
     aiProviderRegistry.register('deepseek-1', 'DEEPSEEK', 'DeepSeek Chat', {
       apiKey: process.env.DEEPSEEK_API_KEY,
@@ -98,7 +118,6 @@ const registerAIProviders = () => {
     registeredCount++;
   }
 
-  // Gemini - Best for sentiment + relevance scoring
   if (process.env.GEMINI_API_KEY) {
     aiProviderRegistry.register('gemini-1', 'GEMINI', 'Gemini Flash', {
       apiKey: process.env.GEMINI_API_KEY,
@@ -110,7 +129,6 @@ const registerAIProviders = () => {
     registeredCount++;
   }
 
-  // OpenAI as fallback
   if (process.env.OPENAI_API_KEY) {
     aiProviderRegistry.register('openai-1', 'OPENAI', 'GPT-4o-mini', {
       apiKey: process.env.OPENAI_API_KEY,
@@ -122,7 +140,6 @@ const registerAIProviders = () => {
     registeredCount++;
   }
 
-  // Ollama local model
   if (process.env.OLLAMA_ENABLED === 'true' && process.env.OLLAMA_BASE_URL) {
     aiProviderRegistry.register('ollama-1', 'OLLAMA', process.env.OLLAMA_MODEL || 'Llama 3.1', {
       apiKey: 'local',
@@ -239,6 +256,7 @@ app.use('/api/v1/backtest', rateLimitMiddleware, createBacktestRoutes());
 app.use('/api/v1/portfolio', rateLimitMiddleware, createPortfolioRoutes());
 app.use('/api/v1/scoring-rules', rateLimitMiddleware, createScoringRulesRoutes());
 app.use('/api/v1/notifications', rateLimitMiddleware, createNotificationsRoutes());
+app.use('/api/v1/data-sources', rateLimitMiddleware, createDataSourceRoutes(dataSourceController));
 
 // AI Providers status endpoint
 app.get('/api/v1/ai/providers', permission(['ai:read']), (_req, res) => {
@@ -269,8 +287,7 @@ app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) =
       take: limit,
       select: {
         id: true, source: true, channelName: true, content: true,
-        truthScore: true, sentimentScore: true, relevanceScore: true,
-        compositeScore: true, isFake: true, processedAt: true,
+        truthScore: true, sentimentScore: true, relevanceScore: true, compositeScore: true, isFake: true, processedAt: true,
       },
     });
     res.json({ success: true, data: news, timestamp: new Date().toISOString() });
@@ -280,7 +297,7 @@ app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) =
 app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
   try {
     const news = await prisma.newsEvent.findUnique({
-      where: { id: String(req.params.id) },
+      where: { id: String(req.params.id) }, 
     });
     if (!news) {
       const lang = detectLang(req);
