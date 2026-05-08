@@ -1,8 +1,8 @@
-// ── Data Sources Page (with multi-channel support) ──
+// ── Data Sources Page (with better notifications) ──
 
 import { useState, useEffect } from 'react';
 import {
-  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem
+  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -14,13 +14,14 @@ export function DataSourcesPage() {
   const [dataSources, setDataSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
 
   // Connect form state
   const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
   const [formName, setFormName] = useState('');
   const [formToken, setFormToken] = useState('');
-  const [formChannels, setFormChannels] = useState(''); // comma separated
+  const [formChannels, setFormChannels] = useState('');
   const [connecting, setConnecting] = useState(false);
 
   const fetchDataSources = async () => {
@@ -44,15 +45,16 @@ export function DataSourcesPage() {
 
     try {
       await dataSourceApi.deleteDataSource(id);
+      setSuccessMessage('數據來源已刪除');
       await fetchDataSources();
     } catch (err: any) {
-      alert(err.message || '刪除失敗');
+      setError(err.message || '刪除失敗');
     }
   };
 
   const handleConnect = async () => {
     if (!formName || !formToken) {
-      alert('請填寫名稱和 Token');
+      setError('請填寫名稱和 Token');
       return;
     }
 
@@ -65,12 +67,11 @@ export function DataSourcesPage() {
       };
 
       if (formType === 'TELEGRAM' && formChannels.trim()) {
-        // Support multiple channels separated by comma
         const channels = formChannels
           .split(',')
           .map((c) => c.trim())
           .filter(Boolean);
-        config.channels = channels; // array format
+        config.channels = channels;
       }
 
       await dataSourceApi.connectDataSource({
@@ -78,6 +79,8 @@ export function DataSourcesPage() {
         name: formName,
         config,
       });
+
+      setSuccessMessage('數據來源連接成功！');
 
       // Reset form
       setFormName('');
@@ -87,7 +90,7 @@ export function DataSourcesPage() {
 
       await fetchDataSources();
     } catch (err: any) {
-      setError(err.message || '連接失敗');
+      setError(err.message || '連接失敗，請檢查 Token 是否正確');
     } finally {
       setConnecting(false);
     }
@@ -237,6 +240,15 @@ export function DataSourcesPage() {
           ))}
         </Stack>
       )}
+
+      {/* Success Notification */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={4000}
+        onClose={() => setSuccessMessage(null)}
+        message={successMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Container>
   );
 }
