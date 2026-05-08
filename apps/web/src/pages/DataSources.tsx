@@ -1,4 +1,4 @@
-// ── Data Sources Page (Modal Version) ──
+// ── Data Sources Page ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -65,12 +65,20 @@ export function DataSourcesPage() {
 
     try {
       await dataSourceApi.deleteDataSource(deletingSource.id);
-      setSuccessMessage(`「${deletingSource.name}」已刪除`);
+
+      // Optimistic UI update
+      setDataSources(prev => prev.filter(s => s.id !== deletingSource.id));
+
+      setSuccessMessage(`已成功刪除「${deletingSource.name}」`);
       setDeleteDialogOpen(false);
       setDeletingSource(null);
-      await fetchDataSources(false);
+
+      // Refresh in background to sync with server
+      setTimeout(() => fetchDataSources(false), 500);
     } catch (err: any) {
-      setError(err.message || '刪除失敗');
+      setError(err.message || '刪除失敗，請稍後再試');
+      // If delete failed, refresh to restore correct state
+      await fetchDataSources(false);
     } finally {
       setIsDeleting(false);
     }
@@ -88,7 +96,6 @@ export function DataSourcesPage() {
 
   const closeConnectModal = () => {
     setConnectModalOpen(false);
-    // Reset form when closing
     setFormName('');
     setFormToken('');
     setFormChannels('');
