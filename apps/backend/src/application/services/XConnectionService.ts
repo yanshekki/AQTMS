@@ -1,4 +1,12 @@
-// ── X (Twitter) Connection Service (using native fetch) ──
+// ── X (Twitter) Connection Service ──
+
+interface XUserMeResponse {
+  data?: { id: string; name: string; username: string };
+}
+
+interface XUserByUsernameResponse {
+  data?: { id: string; name: string; username: string };
+}
 
 export class XConnectionService {
   async validateBearerToken(bearerToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
