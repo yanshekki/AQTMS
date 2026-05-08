@@ -11,8 +11,8 @@ export interface DataSourceProps {
   name: string;
   config: Record<string, unknown>;
   status: DataSourceStatus;
-  lastError?: string | null;
-  lastFetchedAt?: Date | null;
+  lastError?: string | null | undefined;
+  lastFetchedAt?: Date | null | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
