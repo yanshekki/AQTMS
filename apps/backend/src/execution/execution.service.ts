@@ -2,14 +2,15 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { RiskService } from '../risk/risk.service';
 import { RiskCheckContext } from '../risk/interfaces/risk-rule.interface';
 import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
+import { MaxDailyLossRule } from '../risk/rules/max-daily-loss.rule';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
   constructor(private readonly riskService: RiskService) {}
 
   onModuleInit() {
-    // 註冊 Position Sizing 規則
     this.riskService.registerRule(new PositionSizingRule());
+    this.riskService.registerRule(new MaxDailyLossRule());
 
     console.log(
       '[ExecutionService] Registered rules:',
@@ -24,7 +25,8 @@ export class ExecutionService implements OnModuleInit {
     side: 'BUY' | 'SELL';
     quantity: number;
     price?: number;
-    accountBalance?: number; // 傳入帳戶餘額
+    accountBalance?: number;
+    currentDailyLoss?: number; // 今日已虧損金額
   }) {
     const context: RiskCheckContext = {
       userId: orderData.userId,
@@ -34,6 +36,7 @@ export class ExecutionService implements OnModuleInit {
       quantity: orderData.quantity,
       price: orderData.price,
       accountBalance: orderData.accountBalance,
+      ...(orderData.currentDailyLoss !== undefined && { currentDailyLoss: orderData.currentDailyLoss }),
     };
 
     const riskResult = await this.riskService.check(context);
