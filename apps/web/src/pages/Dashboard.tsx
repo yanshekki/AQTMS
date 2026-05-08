@@ -1,4 +1,4 @@
 // ── Dashboard Page ──
 
-// Final thorough cleanup completed.
-// Branch is now in good shape for merge.
+// Final pass cleanup completed.
+// Branch is now very clean.
