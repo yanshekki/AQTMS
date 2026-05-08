@@ -1,10 +1,11 @@
-// ── Exchange API Client ──
+// ── Exchange API ──
 
 import { z } from 'zod';
 import { safeGet, safePost, safeDelete } from '@/shared/api';
 import { ConnectExchangeSchema, ExchangeAccountResponseSchema } from '../lib/schemas';
 import type { ExchangeAccount } from '../lib/schemas';
 
+// Schemas
 const ExchangeBalanceResponseSchema = z.object({
   success: z.literal(true),
   data: z.object({
