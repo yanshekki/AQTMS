@@ -4,7 +4,6 @@ import type { Request, Response, NextFunction } from 'express';
 import { ConnectDataSourceUseCase } from '../../../application/use-cases/data-source/ConnectDataSourceUseCase';
 import { ListDataSourcesUseCase } from '../../../application/use-cases/data-source/ListDataSourcesUseCase';
 import { DeleteDataSourceUseCase } from '../../../application/use-cases/data-source/DeleteDataSourceUseCase';
-import { detectLang, t } from '../../../shared/i18n';
 
 export class DataSourceController {
   constructor(
