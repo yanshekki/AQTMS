@@ -1,4 +1,4 @@
-// ── Exchanges Page (Improved Flow) ──
+// ── Exchanges Page (Fixed) ──
 
 import { useState } from 'react';
 import {
@@ -42,7 +42,6 @@ export function ExchangesPage() {
   const handleConnect = async (data: ConnectExchangeForm) => {
     try {
       await connect(data);
-      // Auto close modal after successful connection
       setTimeout(() => {
         setModalOpen(false);
         resetLastConnected();
@@ -131,13 +130,8 @@ export function ExchangesPage() {
         </Typography>
       </Box>
 
-      {/* Error Display */}
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 3, borderRadius: 2 }}
-          onClose={() => { /* refresh logic */ }}
-        >
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => {}}>
           {error}
         </Alert>
       )}
@@ -195,7 +189,6 @@ export function ExchangesPage() {
         </Grid>
       )}
 
-      {/* Coming Soon */}
       <Typography variant="subtitle2" sx={{ color: mutedText, mt: 4, mb: 2, fontWeight: 700 }}>
         {t('common.comingSoon')}
       </Typography>
@@ -227,8 +220,6 @@ export function ExchangesPage() {
         isConnecting={isConnecting}
         connectError={connectError}
         testConnection={testConnection}
-        newlyConnectedId={lastConnectedId}
-        onTestSuccess={() => {}}
       />
     </Container>
   );
