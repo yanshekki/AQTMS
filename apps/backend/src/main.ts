@@ -43,7 +43,6 @@ import { ExchangeAccountRepository } from './infrastructure/persistence/Exchange
 const env = loadEnv();
 
 // ── Adapter Registry — lazy, credentials resolved per-account from DB ──
-// Adapters created on-demand with real decrypted API keys, never hardcoded.
 const dataSources: BaseDataSourceAdapter[] = [];
 
 const exchangeAccountRepo = new ExchangeAccountRepository(env.ENCRYPTION_KEY);
@@ -71,44 +70,89 @@ const tradeRepository = new PrismaTradeRepository();
 const executeTradeUseCase = new ExecuteTradeUseCase(adapterMap, tradeRepository);
 const cancelTradeUseCase = new CancelTradeUseCase(adapterMap, tradeRepository);
 
-// ── AI Providers ──
-if (process.env.OPENAI_API_KEY) {
-  aiProviderRegistry.register('openai-1', 'OPENAI', 'GPT-4o', { apiKey: process.env.OPENAI_API_KEY });
-  logger.info('🤖 OpenAI provider registered');
-}
-if (process.env.DEEPSEEK_API_KEY) {
-  aiProviderRegistry.register('deepseek-1', 'DEEPSEEK', 'DeepSeek Chat', { apiKey: process.env.DEEPSEEK_API_KEY });
-  logger.info('🤖 DeepSeek provider registered');
-}
-if (process.env.GROK_API_KEY) {
-  aiProviderRegistry.register('grok-1', 'GROK', 'Grok-2', { apiKey: process.env.GROK_API_KEY });
-  logger.info('🤖 Grok provider registered');
-}
-if (process.env.GEMINI_API_KEY) {
-  aiProviderRegistry.register('gemini-1', 'GEMINI', 'Gemini Flash', { apiKey: process.env.GEMINI_API_KEY });
-  logger.info('🤖 Gemini provider registered');
-}
-if (process.env.OLLAMA_ENABLED === 'true') {
-  aiProviderRegistry.register('ollama-1', 'OLLAMA', 'Llama 3.2 Local', {
-    apiKey: 'local',
-    baseURL: process.env.OLLAMA_URL ?? 'http://localhost:11434',
-  });
-  logger.info('🤖 Ollama (local) provider registered');
-}
+// ── AI Providers Initialization (MVP) ──
+const registerAIProviders = () => {
+  let registeredCount = 0;
+
+  // Grok (xAI) - Best for truth verification
+  if (process.env.GROK_API_KEY) {
+    aiProviderRegistry.register('grok-1', 'GROK', 'Grok-2', {
+      apiKey: process.env.GROK_API_KEY,
+      model: process.env.GROK_MODEL || 'grok-2',
+      temperature: 0.3,
+      maxTokens: 2000,
+    });
+    logger.info('🤖 Grok provider registered (for verifyTruth)');
+    registeredCount++;
+  }
+
+  // DeepSeek - Best for trading decision
+  if (process.env.DEEPSEEK_API_KEY) {
+    aiProviderRegistry.register('deepseek-1', 'DEEPSEEK', 'DeepSeek Chat', {
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      temperature: 0.2,
+      maxTokens: 1500,
+    });
+    logger.info('🤖 DeepSeek provider registered (for makeDecision)');
+    registeredCount++;
+  }
+
+  // Gemini - Best for sentiment + relevance scoring
+  if (process.env.GEMINI_API_KEY) {
+    aiProviderRegistry.register('gemini-1', 'GEMINI', 'Gemini Flash', {
+      apiKey: process.env.GEMINI_API_KEY,
+      model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+      temperature: 0.4,
+      maxTokens: 2000,
+    });
+    logger.info('🤖 Gemini provider registered (for scoreNews)');
+    registeredCount++;
+  }
+
+  // OpenAI as fallback
+  if (process.env.OPENAI_API_KEY) {
+    aiProviderRegistry.register('openai-1', 'OPENAI', 'GPT-4o-mini', {
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      temperature: 0.3,
+      maxTokens: 2000,
+    });
+    logger.info('🤖 OpenAI provider registered (fallback)');
+    registeredCount++;
+  }
+
+  // Ollama local model
+  if (process.env.OLLAMA_ENABLED === 'true' && process.env.OLLAMA_BASE_URL) {
+    aiProviderRegistry.register('ollama-1', 'OLLAMA', process.env.OLLAMA_MODEL || 'Llama 3.1', {
+      apiKey: 'local',
+      baseURL: process.env.OLLAMA_BASE_URL,
+      model: process.env.OLLAMA_MODEL || 'llama3.1',
+      temperature: 0.3,
+    });
+    logger.info('🤖 Ollama local provider registered');
+    registeredCount++;
+  }
+
+  return registeredCount;
+};
+
+const registeredAI = registerAIProviders();
 
 // ── Scoring Engine ──
-const scoringEngine = new ScoringEngine(aiProviderRegistry, 80);
+const compositeThreshold = Number(process.env.AI_COMPOSITE_THRESHOLD) || 80;
+const scoringEngine = new ScoringEngine(aiProviderRegistry, compositeThreshold);
 
-// ── News Processing ──
+// ── News Processing UseCase ──
 const processNewsUseCase = new ProcessNewsUseCase(scoringEngine);
 
 // ── Queue Initialization ──
 initNewsQueue(scoringEngine, processNewsUseCase);
 initAIScoringQueue(aiProviderRegistry);
 initTradeQueue(executeTradeUseCase);
-logger.info('📬 Bee-Queue workers started (news:5, ai:10, trade:3)');
+logger.info(`📬 Bee-Queue workers started (news → AI scoring → trade execution)`);
 
-// ── Data Sources ──
+// ── Data Sources (Telegram + X.com) ──
 if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNELS) {
   const telegram = new TelegramAdapter({
     botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -162,7 +206,7 @@ app.use(metricsMiddleware);
 app.use(rateLimitMiddleware);
 app.use(authMiddleware);
 
-// Health check — minimal, no internal details exposed
+// Health check
 app.get('/health', async (_req, res) => {
   res.json({
     status: 'ok',
@@ -172,7 +216,7 @@ app.get('/health', async (_req, res) => {
   });
 });
 
-// Prometheus metrics endpoint — authenticated via shared secret
+// Prometheus metrics
 app.get('/metrics', async (req, res) => {
   const metricsSecret = process.env.METRICS_SECRET;
   if (metricsSecret) {
@@ -196,20 +240,21 @@ app.use('/api/v1/portfolio', rateLimitMiddleware, createPortfolioRoutes());
 app.use('/api/v1/scoring-rules', rateLimitMiddleware, createScoringRulesRoutes());
 app.use('/api/v1/notifications', rateLimitMiddleware, createNotificationsRoutes());
 
-// AI & News endpoints
+// AI Providers status endpoint
 app.get('/api/v1/ai/providers', permission(['ai:read']), (_req, res) => {
   const providers = aiProviderRegistry.getAll().map((p) => ({
     id: p.id,
     type: p.type,
     name: p.name,
+    model: p.config.model,
     isHealthy: p.isHealthy,
   }));
   res.json({ success: true, data: providers, timestamp: new Date().toISOString() });
 });
 
+// Recent processed news
 app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) => {
   try {
-    // using shared prisma singleton
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const minScore = parseFloat(req.query.minScore as string) || 0;
     const source = req.query.source as string | undefined;
@@ -232,10 +277,8 @@ app.get('/api/v1/news/recent', permission(['ai:read']), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
-// News detail endpoint
 app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
   try {
-    // using shared prisma singleton
     const news = await prisma.newsEvent.findUnique({
       where: { id: String(req.params.id) },
     });
@@ -244,18 +287,13 @@ app.get('/api/v1/news/:id', permission(['ai:read']), async (req, res, next) => {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('news.not_found', lang) }, timestamp: new Date().toISOString() });
       return;
     }
-    res.json({
-      success: true,
-      data: { ...news, source: news.source, channelName: news.channelName },
-      timestamp: new Date().toISOString(),
-    });
+    res.json({ success: true, data: { ...news, source: news.source, channelName: news.channelName }, timestamp: new Date().toISOString() });
   } catch (err) { next(err); }
 });
 
-// Audit log export (CSV)
+// Audit log export
 app.get('/api/v1/audit/export', permission(['audit:export']), async (_req, res, next) => {
   try {
-    // using shared prisma singleton
     const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: 1000,
@@ -275,15 +313,15 @@ app.get('/api/v1/audit/export', permission(['audit:export']), async (_req, res, 
 // Global error middleware
 app.use(errorMiddleware);
 
-// ── Start ──
+// ── Start Server ──
 const server = http.createServer(app);
 initWebSocket(server, env.JWT_SECRET, env.CORS_ORIGIN);
 
 server.listen(env.PORT, () => {
   logger.info(`🚀 AQTMS Backend running on port ${env.PORT} [${env.NODE_ENV}]`);
-  logger.info(`   🤖 AI Providers: ${aiProviderRegistry.size} (${aiProviderRegistry.getHealthy().length} healthy)`);
+  logger.info(`   🤖 AI Providers: ${registeredAI} registered (${aiProviderRegistry.getHealthy().length} healthy)`);
   logger.info(`   📡 Data Sources: ${dataSources.length} active`);
-  logger.info(`   📊 Scoring Engine: threshold ${80}, multi-AI pipeline ready`);
+  logger.info(`   📊 Scoring Engine: threshold = ${compositeThreshold}`);
   logger.info(`   🏢 Powered by YSK Limited — https://ysk.hk/`);
 });
 
