@@ -1,3 +1,3 @@
 // ── Dashboard Page ──
 
-// Continued thorough cleanup of remaining unused imports.
+// Thorough final cleanup of remaining lint warnings.
