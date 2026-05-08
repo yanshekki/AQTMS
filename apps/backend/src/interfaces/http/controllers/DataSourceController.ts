@@ -4,6 +4,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { ConnectDataSourceUseCase } from '../../../application/use-cases/data-source/ConnectDataSourceUseCase';
 import { ListDataSourcesUseCase } from '../../../application/use-cases/data-source/ListDataSourcesUseCase';
 import { DeleteDataSourceUseCase } from '../../../application/use-cases/data-source/DeleteDataSourceUseCase';
+import type { DataSourceType } from '../../../domain/entities/DataSource';
 
 export class DataSourceController {
   constructor(
@@ -19,20 +20,23 @@ export class DataSourceController {
         return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
       }
 
-      // Explicitly type to avoid undefined issues
-      const body = req.body as {
-        type: string;
-        name: string;
-        config?: Record<string, unknown> | string | string[];
-      };
+      const { type: rawType, name, config } = req.body;
 
-      const { type, name, config } = body;
+      // Validate and cast type
+      const allowedTypes: DataSourceType[] = ['TELEGRAM', 'X', 'RSS', 'ONCHAIN'];
+      if (!allowedTypes.includes(rawType)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_TYPE', message: 'Invalid data source type' },
+        });
+      }
+      const type = rawType as DataSourceType;
 
       const dataSource = await this.connectDataSourceUseCase.execute({
         userId,
         type,
         name,
-        config: (config as any) ?? {},
+        config: config ?? {},
       });
 
       res.status(201).json({
