@@ -1,4 +1,4 @@
-// ── Exchanges Page (Fixed) ──
+// ── Exchanges Page (Final Fix) ──
 
 import { useState } from 'react';
 import {
