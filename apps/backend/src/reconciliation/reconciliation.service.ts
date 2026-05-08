@@ -1,8 +1,5 @@
-import { Injectable } from '@nestjs/common';
-
-// 之後可以從 exchange module 注入
-// import { BinanceService } from '../exchange/binance.service';
-// import { BybitService } from '../exchange/bybit.service';
+import { Injectable, Inject, Optional } from '@nestjs/common';
+import { ExchangePositionProvider } from '../exchange/interfaces/exchange-position.provider';
 
 export interface PositionDifference {
   symbol: string;
@@ -22,25 +19,24 @@ export interface ReconciliationResult {
 
 @Injectable()
 export class ReconciliationService {
-  // TODO: 注入真實的交易所服務
-  // constructor(
-  //   private readonly binanceService: BinanceService,
-  //   private readonly bybitService: BybitService,
-  // ) {}
+  constructor(
+    @Optional() @Inject('EXCHANGE_POSITION_PROVIDER')
+    private readonly positionProvider?: ExchangePositionProvider,
+  ) {}
 
-  /**
-   * 對指定用戶進行倉位對帳
-   */
-  async reconcilePositions(userId: string, exchange?: string): Promise<ReconciliationResult> {
+  async reconcilePositions(userId: string): Promise<ReconciliationResult> {
     console.log(`[Reconciliation] Starting reconciliation for user: ${userId}`);
 
-    // TODO: 從系統內部獲取用戶持倉（目前 mock）
     const systemPositions = this.getSystemPositions(userId);
 
-    // TODO: 從真實交易所獲取持倉
-    const exchangePositions = await this.getExchangePositions(userId, exchange);
+    let exchangePositions: any[] = [];
+    if (this.positionProvider) {
+      exchangePositions = await this.positionProvider.getPositions(userId);
+    } else {
+      // Fallback to mock if no provider is injected
+      exchangePositions = this.getMockExchangePositions();
+    }
 
-    // 進行比對
     const differences = this.comparePositions(systemPositions, exchangePositions);
 
     const result: ReconciliationResult = {
@@ -52,51 +48,30 @@ export class ReconciliationService {
     };
 
     if (result.hasDiscrepancy) {
-      console.warn(`[Reconciliation] Found discrepancies for user ${userId}:`, differences);
-    } else {
-      console.log(`[Reconciliation] Positions are in sync for user ${userId}`);
+      console.warn(`[Reconciliation] Found discrepancies for user ${userId}`);
     }
 
     return result;
   }
 
-  /**
-   * 從系統內部獲取持倉（Phase 2.2 暫時 mock）
-   */
   private getSystemPositions(userId: string) {
-    // TODO: 之後從資料庫或倉位服務獲取
+    // TODO: 從真實系統獲取
     return [
       { symbol: 'BTCUSDT', quantity: 0.5, side: 'BUY' },
       { symbol: 'ETHUSDT', quantity: 2.0, side: 'BUY' },
     ];
   }
 
-  /**
-   * 從交易所獲取最新持倉
-   * 目前為 mock，之後替換成真實 API 呼叫
-   */
-  private async getExchangePositions(userId: string, exchange?: string) {
-    // TODO: 這裡應該根據 exchange 類型呼叫對應的 service
-    // 例如：
-    // if (exchange === 'BINANCE') return this.binanceService.getPositions(userId);
-    // if (exchange === 'BYBIT') return this.bybitService.getPositions(userId);
-
-    console.log(`[Reconciliation] Fetching positions from exchange for user ${userId}...`);
-
-    // Mock 數據
+  private getMockExchangePositions() {
     return [
       { symbol: 'BTCUSDT', quantity: 0.5, side: 'BUY' },
-      { symbol: 'ETHUSDT', quantity: 1.8, side: 'BUY' }, // 故意與系統不同
+      { symbol: 'ETHUSDT', quantity: 1.8, side: 'BUY' },
     ];
   }
 
-  /**
-   * 比對系統持倉與交易所持倉
-   */
   private comparePositions(systemPositions: any[], exchangePositions: any[]): PositionDifference[] {
     const differences: PositionDifference[] = [];
 
-    // 簡單比對邏輯（之後可以加強）
     for (const exchangePos of exchangePositions) {
       const systemPos = systemPositions.find((p: any) => p.symbol === exchangePos.symbol);
 
@@ -122,9 +97,5 @@ export class ReconciliationService {
     }
 
     return differences;
-  }
-
-  async reconcileAllUsers(): Promise<void> {
-    console.log('[Reconciliation] reconcileAllUsers - TODO');
   }
 }
