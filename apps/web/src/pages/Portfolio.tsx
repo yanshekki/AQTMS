@@ -1,42 +1,60 @@
 // ── Portfolio Detail Page ──
-// ... (existing imports remain)
 
+import { usePortfolio } from '@/features/portfolio/model/usePortfolio';
 import { PortfolioSummary } from '@/features/portfolio/ui/PortfolioSummary';
+import { PositionTable } from '@/features/portfolio/ui/PositionTable';
 
-// ... existing interfaces and components (AssetAllocationPie, TopHoldingsTable, PerformanceChart, etc.)
+// ... other existing imports and components
 
 export function PortfolioPage() {
-  // ... existing state and logic
+  const { summary, positions, isLoading, error, refresh } = usePortfolio();
+
+  if (isLoading && !summary) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Alert severity="error" sx={{ mt: 4 }}>
+          {error}
+          <Button onClick={refresh} sx={{ ml: 2 }}>重試</Button>
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 4 } }}>
-      <Box className="fade-in-up">
-        <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-          <PieChartIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#3b82f6' }} />{t('portfolio.title')}
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight={800}>
+          Portfolio Dashboard
         </Typography>
-        <Typography variant="body2" sx={{ color: mutedText, mb: { xs: 2, md: 4 } }}>
-          {t('portfolio.subtitle')}
-        </Typography>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refresh} disabled={isLoading}>
+          刷新
+        </Button>
       </Box>
 
-      {/* 使用新的 PortfolioSummary 元件 */}
       {summary && (
-        <Box mb={4}>
-          <PortfolioSummary
-            totalValue={summary.totalValue}
-            totalUnrealizedPnl={summary.unrealizedPnL ?? 0}
-            totalRiskExposure={42} // TODO: 之後從後端計算
-            positionCount={holdings.length}
-          />
-        </Box>
+        <PortfolioSummary
+          totalValue={summary.totalValue}
+          totalUnrealizedPnl={summary.totalUnrealizedPnl}
+          totalRiskExposure={summary.totalRiskExposure}
+          positionCount={summary.positionCount}
+          isLoading={isLoading}
+        />
       )}
 
-      <Grid container spacing={{ xs: 1.5, md: 3 }} className="stagger-children">
-        {/* 保留原有的 Asset Allocation + Top Holdings + Performance Chart 等 */}
-        {/* ... existing Grid items ... */}
-      </Grid>
-
-      {/* ... existing Snackbar ... */}
+      <Box mt={4}>
+        <Typography variant="h6" fontWeight={700} mb={2}>
+          持倉明細
+        </Typography>
+        <PositionTable positions={positions} isLoading={isLoading} />
+      </Box>
     </Container>
   );
 }
