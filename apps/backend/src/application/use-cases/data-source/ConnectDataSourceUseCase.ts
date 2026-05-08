@@ -1,4 +1,4 @@
-// ── Connect DataSource UseCase (with auto polling start) ──
+// ── Connect DataSource UseCase (Real Telegram Polling) ──
 
 import { DataSource, type DataSourceType } from '../../../domain/entities/DataSource';
 import type { DataSourceRepository } from '../../../domain/repositories/DataSourceRepository';
@@ -6,6 +6,8 @@ import { InfraError } from '../../../shared/errors';
 import { TelegramConnectionService } from '../../services/TelegramConnectionService';
 import { logger } from '../../../shared/logger';
 import { dataSourceManager } from '../../services/DataSourceManager';
+import { TelegramAdapter } from '../../../infrastructure/adapters/datasources/TelegramAdapter';
+import { enqueueNews } from '../../../queues/processors/news.processor';
 
 export interface ConnectDataSourceCommand {
   userId: string;
@@ -65,10 +67,12 @@ export class ConnectDataSourceUseCase {
 
       const saved = await this.dataSourceRepository.save(dataSource);
 
-      // Auto start polling (placeholder for now)
-      this.startPollingForDataSource(saved);
+      // Start real polling for Telegram
+      if (saved.type === 'TELEGRAM') {
+        this.startTelegramPolling(saved);
+      }
 
-      logger.info(`✅ DataSource connected and polling started: ${saved.id} (${saved.type})`);
+      logger.info(`✅ DataSource connected: ${saved.id} (${saved.type})`);
 
       return saved;
     } catch (error) {
@@ -77,13 +81,46 @@ export class ConnectDataSourceUseCase {
     }
   }
 
-  private startPollingForDataSource(dataSource: DataSource) {
-    // For now, we just register with DataSourceManager
-    // Real polling implementation can be added later
-    dataSourceManager.startPolling(dataSource.id, dataSource.type, () => {
-      logger.info(`Polling stopped for DataSource: ${dataSource.id}`);
-    });
+  private startTelegramPolling(dataSource: DataSource) {
+    try {
+      const token = dataSource.config.token as string;
+      const channel = dataSource.config.channel as string | undefined;
 
-    logger.info(`📡 Registered DataSource for polling: ${dataSource.id} (${dataSource.type})`);
+      if (!token) {
+        logger.warn(`No token found for DataSource ${dataSource.id}`);
+        return;
+      }
+
+      const channels = channel ? [channel] : [];
+
+      const adapter = new TelegramAdapter({
+        botToken: token,
+        channelUsernames: channels,
+      });
+
+      adapter.startPolling(async (newsItem) => {
+        try {
+          await enqueueNews({
+            newsId: newsItem.id,
+            source: 'TELEGRAM',
+            sourceId: newsItem.sourceId,
+            content: newsItem.content,
+            channelName: newsItem.channelName,
+            retryCount: 0,
+          });
+        } catch (err) {
+          logger.warn({ err, dataSourceId: dataSource.id }, 'Failed to enqueue news from Telegram');
+        }
+      }, 30_000);
+
+      // Register with manager so we can stop it later
+      dataSourceManager.startPolling(dataSource.id, 'TELEGRAM', () => {
+        adapter.stopPolling();
+      });
+
+      logger.info(`📡 Telegram polling started for DataSource: ${dataSource.id}`);
+    } catch (error) {
+      logger.error({ error, dataSourceId: dataSource.id }, 'Failed to start Telegram polling');
+    }
   }
 }
