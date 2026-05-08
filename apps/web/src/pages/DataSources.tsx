@@ -31,6 +31,9 @@ export function DataSourcesPage() {
   const [formChannels, setFormChannels] = useState('');
   const [connecting, setConnecting] = useState(false);
 
+  // Detail dialog
+  const [selectedSource, setSelectedSource] = useState<any>(null);
+
   const fetchDataSources = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
@@ -70,6 +73,9 @@ export function DataSourcesPage() {
       setSuccessMessage(`已成功刪除「${deletingSource.name}」`);
       setDeleteDialogOpen(false);
       setDeletingSource(null);
+      if (selectedSource?.id === deletingSource.id) {
+        setSelectedSource(null);
+      }
       setTimeout(() => fetchDataSources(false), 500);
     } catch (err: any) {
       setError(err.message || '刪除失敗，請稍後再試');
@@ -193,6 +199,14 @@ export function DataSourcesPage() {
     return null;
   };
 
+  const openSourceDetail = (source: any) => {
+    setSelectedSource(source);
+  };
+
+  const closeSourceDetail = () => {
+    setSelectedSource(null);
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -254,13 +268,18 @@ export function DataSourcesPage() {
               <Card
                 key={source.id}
                 variant="outlined"
+                onClick={() => openSourceDetail(source)}
                 sx={{
                   transition: 'all 0.3s ease',
+                  cursor: 'pointer',
                   ...(isNew && {
                     bgcolor: 'rgba(59, 130, 246, 0.08)',
                     borderColor: '#3b82f6',
                     boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.2)',
                   }),
+                  '&:hover': {
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  },
                 }}
               >
                 <CardContent>
@@ -286,7 +305,13 @@ export function DataSourcesPage() {
                       )}
                     </Stack>
 
-                    <IconButton color="error" onClick={() => openDeleteDialog(source)}>
+                    <IconButton
+                      color="error"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteDialog(source);
+                      }}
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </Stack>
@@ -359,6 +384,56 @@ export function DataSourcesPage() {
           >
             {connecting ? '連接中...' : '連接'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Source Detail Dialog */}
+      <Dialog open={!!selectedSource} onClose={closeSourceDetail} maxWidth="sm" fullWidth>
+        <DialogTitle>數據來源詳情</DialogTitle>
+        <DialogContent>
+          {selectedSource && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="h6">{selectedSource.name}</Typography>
+                <Chip label={selectedSource.type} color="primary" variant="outlined" />
+                <Chip label={selectedSource.status} color={getStatusColor(selectedSource.status) as any} />
+              </Stack>
+
+              <Typography variant="body2" color="text.secondary">
+                連接時間：{formatDate(selectedSource.createdAt)}　|　最後更新：{formatDate(selectedSource.lastFetchedAt)}
+              </Typography>
+
+              {selectedSource.lastError && (
+                <Alert severity="error">
+                  <Typography variant="body2" fontWeight={600}>最後錯誤</Typography>
+                  <Typography variant="body2">{selectedSource.lastError}</Typography>
+                </Alert>
+              )}
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>配置詳情</Typography>
+                <Card variant="outlined" sx={{ p: 2, bgcolor: 'action.hover' }}>
+                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                    {JSON.stringify(selectedSource.config, null, 2)}
+                  </Typography>
+                </Card>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeSourceDetail}>關閉</Button>
+          {selectedSource && (
+            <Button
+              color="error"
+              onClick={() => {
+                closeSourceDetail();
+                openDeleteDialog(selectedSource);
+              }}
+            >
+              刪除此來源
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
