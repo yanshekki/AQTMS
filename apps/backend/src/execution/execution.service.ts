@@ -3,6 +3,7 @@ import { RiskService } from '../risk/risk.service';
 import { RiskCheckContext } from '../risk/interfaces/risk-rule.interface';
 import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
 import { MaxDailyLossRule } from '../risk/rules/max-daily-loss.rule';
+import { MaxOpenPositionsRule } from '../risk/rules/max-open-positions.rule';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
@@ -11,6 +12,7 @@ export class ExecutionService implements OnModuleInit {
   onModuleInit() {
     this.riskService.registerRule(new PositionSizingRule());
     this.riskService.registerRule(new MaxDailyLossRule());
+    this.riskService.registerRule(new MaxOpenPositionsRule());
 
     console.log(
       '[ExecutionService] Registered rules:',
@@ -26,7 +28,8 @@ export class ExecutionService implements OnModuleInit {
     quantity: number;
     price?: number;
     accountBalance?: number;
-    currentDailyLoss?: number; // 今日已虧損金額
+    currentDailyLoss?: number;
+    currentOpenPositions?: number;
   }) {
     const context: RiskCheckContext = {
       userId: orderData.userId,
@@ -37,6 +40,7 @@ export class ExecutionService implements OnModuleInit {
       price: orderData.price,
       accountBalance: orderData.accountBalance,
       ...(orderData.currentDailyLoss !== undefined && { currentDailyLoss: orderData.currentDailyLoss }),
+      ...(orderData.currentOpenPositions !== undefined && { currentOpenPositions: orderData.currentOpenPositions }),
     };
 
     const riskResult = await this.riskService.check(context);
