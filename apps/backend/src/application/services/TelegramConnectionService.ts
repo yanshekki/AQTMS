@@ -1,21 +1,30 @@
-// ── Telegram Connection Service (using native fetch) ──
+// ── Telegram Connection Service ──
+
+interface TelegramGetMeResponse {
+  ok: boolean;
+  result?: { id: number; is_bot: boolean; first_name: string; username?: string };
+  description?: string;
+}
+
+interface TelegramGetChatResponse {
+  ok: boolean;
+  result?: { id: number; title?: string; username?: string };
+  description?: string;
+}
 
 export class TelegramConnectionService {
   async validateBotToken(botToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
     try {
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`, {
-        method: 'GET',
-      });
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+      const data: TelegramGetMeResponse = await response.json();
 
-      const data = await response.json();
-
-      if (data?.ok) {
+      if (data.ok) {
         return { valid: true };
       }
 
       return {
         valid: false,
-        error: 'Bot Token 無效或已過期',
+        error: data.description || 'Bot Token 無效或已過期',
         errorCode: 'INVALID_BOT_TOKEN',
       };
     } catch (error: any) {
@@ -31,20 +40,16 @@ export class TelegramConnectionService {
     try {
       const chatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`;
 
-      const response = await fetch(
-        `https://api.telegram.org/bot${botToken}/getChat?chat_id=${chatId}`,
-        { method: 'GET' }
-      );
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/getChat?chat_id=${chatId}`);
+      const data: TelegramGetChatResponse = await response.json();
 
-      const data = await response.json();
-
-      if (data?.ok) {
+      if (data.ok) {
         return { accessible: true };
       }
 
       return {
         accessible: false,
-        error: '無法訪問該 Channel，請確認 Bot 已加入並擁有權限',
+        error: data.description || '無法訪問該 Channel，請確認 Bot 已加入並擁有權限',
         errorCode: 'CHANNEL_ACCESS_DENIED',
       };
     } catch (error: any) {
