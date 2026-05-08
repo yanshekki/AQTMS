@@ -1,24 +1,24 @@
-// ── Connect Exchange Modal (Improved) ──
+// ── Connect Exchange Modal ──
 
 import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert, Stack, Typography } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField, MenuItem, Stack, Typography, Alert, CircularProgress, Box
+} from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { ApiKeyForm } from './ApiKeyForm';
-import { ConnectionTestButton } from './ConnectionTestButton';
-import { useThemeMode } from '@/app/Providers';
 import type { ConnectExchangeForm } from '../lib/schemas';
+
+import type { ExchangeAccount } from '../lib/schemas';
 
 interface ConnectExchangeModalProps {
   open: boolean;
   onClose: () => void;
-  onConnect: (data: ConnectExchangeForm) => void;
+  onConnect: (data: ConnectExchangeForm) => Promise<void>;
   isConnecting: boolean;
   connectError: string | null;
   testConnection: (exchangeId: string) => Promise<boolean>;
-  newlyConnectedId?: string | null;           // NEW: pass from parent after successful connect
-  onTestSuccess?: () => void;                 // NEW: callback after successful test
+  newlyConnectedId: string | null;
+  onTestSuccess?: () => void;
 }
 
 export function ConnectExchangeModal({
@@ -31,107 +31,147 @@ export function ConnectExchangeModal({
   newlyConnectedId,
   onTestSuccess,
 }: ConnectExchangeModalProps) {
-  const { mode } = useThemeMode();
   const { t } = useTranslation();
-  const isDark = mode === 'dark';
-  const borderColor = isDark ? '#1f2937' : '#e2e8f0';
 
-  const showTestSection = !!newlyConnectedId && !isConnecting;
+  const [form, setForm] = useState<ConnectExchangeForm>({
+    exchange: 'BINANCE',
+    name: '',
+    apiKey: '',
+    apiSecret: '',
+    testnet: true,
+  });
+
+  const [_testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleChange = (field: keyof ConnectExchangeForm, value: any) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await onConnect(form);
+    } catch (error) {
+      // Error is handled by parent
+    }
+  };
+
+  const handleTest = async () => {
+    if (!newlyConnectedId) return;
+
+    setTestingId(newlyConnectedId);
+    setTestResult(null);
+
+    try {
+      const success = await testConnection(newlyConnectedId);
+      setTestResult({
+        success,
+        message: success ? '連接測試成功！' : '連接測試失敗',
+      });
+
+      if (success && onTestSuccess) {
+        onTestSuccess();
+      }
+    } catch {
+      setTestResult({ success: false, message: '測試過程發生錯誤' });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const handleClose = () => {
+    setForm({
+      exchange: 'BINANCE',
+      name: '',
+      apiKey: '',
+      apiSecret: '',
+      testnet: true,
+    });
+    setTestResult(null);
+    onClose();
+  };
 
   return (
-    <Dialog
-      open={open}
-      onClose={isConnecting ? undefined : onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          bgcolor: isDark ? '#111827' : '#ffffff',
-          border: 1,
-          borderColor,
-          borderRadius: 3,
-          backdropFilter: 'blur(20px)',
-        },
-      }}
-    >
-      <DialogTitle
-        sx={{
-          color: isDark ? '#f3f4f6' : '#0f172a',
-          fontWeight: 700,
-          borderBottom: 1,
-          borderColor,
-        }}
-      >
-        {t('exchanges.connectExchange')}
-      </DialogTitle>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{t('exchanges.connectTitle')}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {connectError && <Alert severity="error">{connectError}</Alert>}
 
-      <DialogContent sx={{ pt: 3 }}>
-        {connectError && (
-          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-            {connectError.includes('invalid') || connectError.includes('permission')
-              ? t('exchanges.apiKeyInvalid')
-              : connectError}
-          </Alert>
-        )}
+          {testResult && (
+            <Alert severity={testResult.success ? 'success' : 'error'}>
+              {testResult.message}
+            </Alert>
+          )}
 
-        {!showTestSection ? (
-          <ApiKeyForm onSubmit={onConnect} disabled={isConnecting} />
-        ) : (
-          <Stack spacing={2} alignItems="center" py={2}>
-            <CheckCircleIcon sx={{ fontSize: 48, color: '#22c55e' }} />
-            <Typography variant="h6" sx={{ color: isDark ? '#f3f4f6' : '#0f172a' }}>
-              {t('exchanges.connectionSuccess') || 'Exchange connected successfully!'}
-            </Typography>
-            <Typography variant="body2" sx={{ color: isDark ? '#9ca3af' : '#64748b', textAlign: 'center' }}>
-              {t('exchanges.testConnectionHint') || 'Test the connection to verify your API keys are working.'}
-            </Typography>
-
-            <ConnectionTestButton
-              onTest={async () => {
-                if (newlyConnectedId) {
-                  const success = await testConnection(newlyConnectedId);
-                  if (success && onTestSuccess) onTestSuccess();
-                }
-              }}
-              disabled={false}
-            />
-          </Stack>
-        )}
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, pb: 2, borderTop: 1, borderColor, pt: 2 }}>
-        <Button
-          onClick={onClose}
-          disabled={isConnecting}
-          sx={{ color: isDark ? '#6b7280' : '#94a3b8' }}
-        >
-          {showTestSection ? t('exchanges.close') : t('exchanges.cancel')}
-        </Button>
-
-        {!showTestSection && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {
-              // Trigger form submit
-              const form = document.querySelector('form');
-              form?.requestSubmit();
-            }}
-            disabled={isConnecting}
-            sx={{
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              borderRadius: 3,
-              fontWeight: 700,
-              '&:hover': {
-                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                transform: 'translateY(-1px)',
-                boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
-              },
-            }}
+          <TextField
+            select
+            label="交易所"
+            value={form.exchange}
+            onChange={(e) => handleChange('exchange', e.target.value)}
+            fullWidth
           >
-            {isConnecting ? t('exchanges.connecting') : t('exchanges.connect')}
-          </Button>
-        )}
+            <MenuItem value="BINANCE">Binance</MenuItem>
+            <MenuItem value="BYBIT">Bybit</MenuItem>
+          </TextField>
+
+          <TextField
+            label="帳戶名稱 (自訂)"
+            value={form.name}
+            onChange={(e) => handleChange('name', e.target.value)}
+            fullWidth
+            placeholder="例如：我的 Binance 帳戶"
+          />
+
+          <TextField
+            label="API Key"
+            value={form.apiKey}
+            onChange={(e) => handleChange('apiKey', e.target.value)}
+            fullWidth
+          />
+
+          <TextField
+            label="API Secret"
+            type="password"
+            value={form.apiSecret}
+            onChange={(e) => handleChange('apiSecret', e.target.value)}
+            fullWidth
+          />
+
+          <TextField
+            select
+            label="環境"
+            value={form.testnet ? 'testnet' : 'mainnet'}
+            onChange={(e) => handleChange('testnet', e.target.value === 'testnet')}
+            fullWidth
+          >
+            <MenuItem value="testnet">Testnet（推薦先用這個測試）</MenuItem>
+            <MenuItem value="mainnet">Mainnet（實盤）</MenuItem>
+          </TextField>
+
+          {newlyConnectedId && (
+            <Box sx={{ pt: 1 }}>
+              <Button
+                variant="outlined"
+                onClick={handleTest}
+                disabled={!!_testingId}
+                fullWidth
+              >
+                {_testingId ? '測試中...' : '測試連接'}
+              </Button>
+            </Box>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose}>取消</Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={isConnecting || !form.apiKey || !form.apiSecret}
+        >
+          {isConnecting ? '連接中...' : '連接'}
+        </Button>
       </DialogActions>
     </Dialog>
   );
