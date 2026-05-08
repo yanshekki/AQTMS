@@ -12,23 +12,24 @@ model User {
   walletAddress     String             @unique
   nonce             String
   role              String             @default("VIEWER")
-  permissions       String             @default("[]") @db.VarChar(2000)  // JSON array
+  permissions       String             @default("[]") @db.VarChar(2000)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   exchangeAccounts  ExchangeAccount[]
   trades            Trade[]
   auditLogs         AuditLog[]
+  dataSources       DataSource[]
 }
 
 model ExchangeAccount {
   id           String        @id @default(uuid())
   userId       String
-  exchange     String        // BINANCE, BYBIT, FUTU, IBKR
+  exchange     String
   name         String
-  apiKey       String        // Encrypted at rest
-  apiSecret    String        // Encrypted at rest
+  apiKey       String
+  apiSecret    String
   testnet      Boolean       @default(false)
-  status       String        @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR, TESTING
+  status       String        @default("DISCONNECTED")
   testPassed   Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -45,13 +46,13 @@ model Trade {
   exchangeAccountId   String
   exchangeOrderId     String?
   symbol              String
-  side                String        // BUY, SELL
-  type                String        // MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT
-  status              String        @default("PENDING") // PENDING, FILLED, PARTIALLY_FILLED, CANCELLED, REJECTED, EXPIRED
+  side                String
+  type                String
+  status              String        @default("PENDING")
   quantity            Float
   price               Float?
   stopPrice           Float?
-  timeInForce         String        @default("GTC") // GTC, IOC, FOK
+  timeInForce         String        @default("GTC")
   filledQuantity      Float         @default(0)
   idempotencyKey      String        @unique
   errorMessage        String?
@@ -70,10 +71,10 @@ model Trade {
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String
-  action     String   // trade:execute, trade:cancel, exchange:connect, user:login
-  resource   String   // trade, exchange, user
+  action     String
+  resource   String
   resourceId String?
-  details    String?  // JSON
+  details    String?
   ipAddress  String?
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id])
@@ -85,7 +86,7 @@ model AuditLog {
 
 model NewsEvent {
   id            String   @id @default(uuid())
-  source        String   // TELEGRAM, X, ONCHAIN
+  source        String
   sourceId      String
   channelName   String?
   authorName    String?
@@ -98,7 +99,7 @@ model NewsEvent {
   sentimentScore Float?
   relevanceScore Float?
   compositeScore Float?
-  aiAnalysis    String?  @db.Text  // JSON
+  aiAnalysis    String?  @db.Text
   createdAt     DateTime @default(now())
   processedAt   DateTime?
 
@@ -106,6 +107,26 @@ model NewsEvent {
   @@index([compositeScore])
   @@index([isProcessed])
   @@index([createdAt])
+}
+
+model DataSource {
+  id            String   @id @default(uuid())
+  userId        String
+  type          String   // TELEGRAM, X, RSS, ONCHAIN
+  name          String
+  config        String   @db.Text  // JSON (encrypted sensitive fields)
+  status        String   @default("PENDING") // PENDING, CONNECTED, ERROR, DISABLED
+  lastError     String?
+  lastFetchedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type, name])
+  @@index([userId])
+  @@index([type])
+  @@index([status])
 }
 
 model BacktestReport {
@@ -131,11 +152,11 @@ model BacktestReport {
   sortinoRatio        Float
   calmarRatio         Float
   totalFees           Float
-  equityCurve         String   @db.LongText  // JSON
-  drawdownCurve       String   @db.LongText  // JSON  
-  monthlyReturns      String   @db.LongText  // JSON
-  trades              String   @db.LongText  // JSON
-  parameters          String   @db.LongText  // JSON
+  equityCurve         String   @db.LongText
+  drawdownCurve       String   @db.LongText
+  monthlyReturns      String   @db.LongText
+  trades              String   @db.LongText
+  parameters          String   @db.LongText
   createdAt           DateTime @default(now())
 
   @@index([userId])
@@ -147,13 +168,13 @@ model ScoringRule {
   id        String   @id @default(uuid())
   userId    String
   name      String
-  status    String   @default("Active") // Active, Draft
+  status    String   @default("Active")
   version   String   @default("v1")
-  weights   String                // JSON: { truth, sentiment, relevance, confidence }
+  weights   String
   threshold Float    @default(80)
-  action    String   @default("ALERT") // BUY, SELL, ALERT, IGNORE
+  action    String   @default("ALERT")
   enabled   Boolean  @default(true)
-  versions  String   @db.LongText // JSON array of version history
+  versions  String   @db.LongText
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -164,7 +185,7 @@ model ScoringRule {
 model Notification {
   id          String   @id @default(uuid())
   userId      String
-  type        String   // trade, signal, risk, system
+  type        String
   title       String
   message     String   @db.Text
   read        Boolean  @default(false)
