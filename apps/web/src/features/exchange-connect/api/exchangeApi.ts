@@ -41,7 +41,6 @@ export const exchangeApi = {
     return safeGet(`/api/v1/exchanges/${exchangeId}/balance`, ExchangeBalanceResponseSchema);
   },
 
-  // NEW: Delete / Disconnect exchange
   async deleteExchange(exchangeId: string): Promise<void> {
     await safeDelete(`/api/v1/exchanges/${exchangeId}`);
   },
