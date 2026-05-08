@@ -1,4 +1,4 @@
-// ── Data Sources Page (Improved with Connect Form) ──
+// ── Data Sources Page (with multi-channel support) ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -20,7 +20,7 @@ export function DataSourcesPage() {
   const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
   const [formName, setFormName] = useState('');
   const [formToken, setFormToken] = useState('');
-  const [formChannel, setFormChannel] = useState('');
+  const [formChannels, setFormChannels] = useState(''); // comma separated
   const [connecting, setConnecting] = useState(false);
 
   const fetchDataSources = async () => {
@@ -64,8 +64,13 @@ export function DataSourcesPage() {
         token: formToken,
       };
 
-      if (formType === 'TELEGRAM' && formChannel) {
-        config.channel = formChannel;
+      if (formType === 'TELEGRAM' && formChannels.trim()) {
+        // Support multiple channels separated by comma
+        const channels = formChannels
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean);
+        config.channels = channels; // array format
       }
 
       await dataSourceApi.connectDataSource({
@@ -77,7 +82,7 @@ export function DataSourcesPage() {
       // Reset form
       setFormName('');
       setFormToken('');
-      setFormChannel('');
+      setFormChannels('');
       setShowConnectForm(false);
 
       await fetchDataSources();
@@ -149,11 +154,12 @@ export function DataSourcesPage() {
 
             {formType === 'TELEGRAM' && (
               <TextField
-                label="Channel Username（可選）"
-                value={formChannel}
-                onChange={(e) => setFormChannel(e.target.value)}
-                placeholder="@yourchannel"
+                label="Channel Username(s)（可用逗號分隔多個）"
+                value={formChannels}
+                onChange={(e) => setFormChannels(e.target.value)}
+                placeholder="@channel1, @channel2"
                 fullWidth
+                helperText="例如：@cointelegraph, @whale_alert"
               />
             )}
 
