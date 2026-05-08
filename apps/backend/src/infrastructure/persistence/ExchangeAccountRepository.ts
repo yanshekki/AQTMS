@@ -24,6 +24,7 @@ export interface ExchangeAccountDto {
   status: string;
   testPassed: boolean;
   testnet: boolean;
+  isPaperTrading?: boolean; // 新增
   createdAt: Date;
 }
 
@@ -46,37 +47,19 @@ export class ExchangeAccountRepository {
         apiKey: encryptedKey,
         apiSecret: encryptedSecret,
         testnet: data.testnet ?? false,
+        isPaperTrading: false, // 預設關閉
       },
     });
 
     logger.info({ exchangeId: account.id, exchange: account.exchange }, 'Exchange account created (encrypted)');
 
-    return {
-      id: account.id,
-      userId: account.userId,
-      exchange: account.exchange,
-      name: account.name,
-      status: account.status,
-      testPassed: account.testPassed,
-      testnet: account.testnet,
-      createdAt: account.createdAt,
-    };
+    return this.mapToDto(account);
   }
 
   async findById(id: string): Promise<ExchangeAccountDto | null> {
     const account = await prisma.exchangeAccount.findUnique({ where: { id } });
     if (!account) return null;
-
-    return {
-      id: account.id,
-      userId: account.userId,
-      exchange: account.exchange,
-      name: account.name,
-      status: account.status,
-      testPassed: account.testPassed,
-      testnet: account.testnet,
-      createdAt: account.createdAt,
-    };
+    return this.mapToDto(account);
   }
 
   async findByUser(userId: string): Promise<ExchangeAccountDto[]> {
@@ -85,21 +68,30 @@ export class ExchangeAccountRepository {
       orderBy: { createdAt: 'desc' },
     });
 
-    return accounts.map((a) => ({
-      id: a.id,
-      userId: a.userId,
-      exchange: a.exchange,
-      name: a.name,
-      status: a.status,
-      testPassed: a.testPassed,
-      testnet: a.testnet,
-      createdAt: a.createdAt,
-    }));
+    return accounts.map((a) => this.mapToDto(a));
+  }
+
+  async findByIdAndUserId(accountId: string, userId: string) {
+    return prisma.exchangeAccount.findFirst({
+      where: {
+        id: accountId,
+        userId,
+      },
+    });
+  }
+
+  async update(accountId: string, data: { isPaperTrading?: boolean }) {
+    return prisma.exchangeAccount.update({
+      where: { id: accountId },
+      data: {
+        ...(data.isPaperTrading !== undefined && { isPaperTrading: data.isPaperTrading }),
+        updatedAt: new Date(),
+      },
+    });
   }
 
   /**
    * Returns decrypted API credentials — use ONLY when initializing adapters.
-   * Requires userId for ownership verification.
    */
   async getDecryptedCredentials(id: string, userId: string): Promise<{
     apiKey: string;
@@ -110,9 +102,8 @@ export class ExchangeAccountRepository {
     const account = await prisma.exchangeAccount.findUnique({ where: { id } });
     if (!account) return null;
 
-    // Ownership check — prevent horizontal privilege escalation
     if (account.userId !== userId) {
-      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user access to exchange credentials');
+      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user access');
       return null;
     }
 
@@ -133,16 +124,8 @@ export class ExchangeAccountRepository {
   }
 
   async updateStatus(id: string, userId: string, status: string, testPassed?: boolean): Promise<void> {
-    // Ownership check
     const account = await prisma.exchangeAccount.findUnique({ where: { id } });
-    if (!account) {
-      logger.warn({ exchangeId: id }, 'Attempted to update status of non-existent exchange account');
-      return;
-    }
-    if (account.userId !== userId) {
-      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user exchange status update');
-      return;
-    }
+    if (!account || account.userId !== userId) return;
 
     await prisma.exchangeAccount.update({
       where: { id },
@@ -154,17 +137,24 @@ export class ExchangeAccountRepository {
   }
 
   async delete(id: string, userId: string): Promise<void> {
-    // Ownership check — defense in depth
     const account = await prisma.exchangeAccount.findUnique({ where: { id } });
-    if (!account) {
-      logger.warn({ exchangeId: id }, 'Attempted to delete non-existent exchange account');
-      return;
-    }
-    if (account.userId !== userId) {
-      logger.warn({ exchangeId: id, requestUserId: userId, ownerUserId: account.userId }, 'Attempted cross-user exchange deletion');
-      return;
-    }
+    if (!account || account.userId !== userId) return;
+
     await prisma.exchangeAccount.delete({ where: { id } });
     logger.info({ exchangeId: id }, 'Exchange account deleted');
+  }
+
+  private mapToDto(account: any): ExchangeAccountDto {
+    return {
+      id: account.id,
+      userId: account.userId,
+      exchange: account.exchange,
+      name: account.name,
+      status: account.status,
+      testPassed: account.testPassed,
+      testnet: account.testnet,
+      isPaperTrading: account.isPaperTrading,
+      createdAt: account.createdAt,
+    };
   }
 }
