@@ -1,6 +1,5 @@
 // ── Binance Trading Adapter ──
 // Strictly follows Binance Spot API v3 documentation
-// Official Docs: https://binance-docs.github.io/apidocs/spot/en/
 
 import crypto from 'node:crypto';
 import { BaseTradingAdapter, type OrderRequest, type Balance, type Position, type CancelOrderRequest } from './BaseTradingAdapter';
@@ -46,10 +45,8 @@ export class BinanceAdapter extends BaseTradingAdapter {
   private readonly apiSecret: string;
   private readonly baseUrl: string;
 
-  // recvWindow (官方建議設定，防止 timestamp 偏差)
   private readonly recvWindow = 5000;
 
-  // Circuit breaker
   private _failureCount = 0;
   private _lastFailureTime = 0;
   private _circuitOpen = false;
@@ -172,7 +169,7 @@ export class BinanceAdapter extends BaseTradingAdapter {
   }
 
   async getPositions(): Promise<Position[]> {
-    return []; // Spot only
+    return [];
   }
 
   async testConnection(): Promise<boolean> {
@@ -186,29 +183,24 @@ export class BinanceAdapter extends BaseTradingAdapter {
 
   async getExchangeInfo(): Promise<Record<string, unknown>> {
     const res = await fetch(`${this.baseUrl}/api/v3/exchangeInfo`);
-    return res.json();
+    const data = await res.json();
+    return data as Record<string, unknown>;
   }
 
-  async getOpenOrders(symbol?: string): Promise<Trade[]> {
-    this.checkCircuitBreaker();
-
-    const params: Record<string, string> = {
-      timestamp: Date.now().toString(),
-      recvWindow: this.recvWindow.toString(),
-    };
-    if (symbol) params.symbol = symbol;
-    params.signature = this.sign(params);
-
-    try {
-      const response = await this.privateGet('/api/v3/openOrders', params);
-      const orders = response as BinanceOrderResponse[];
-      return orders.map((o) => this.mapOrderToTrade(o, { type: 'MARKET' } as any));
-    } catch (error) {
-      throw this.handleBinanceError(error, 'getOpenOrders');
-    }
+  // ── Asset Info (from BaseTradingAdapter) ──
+  getAssetType(): 'crypto' {
+    return 'crypto';
   }
 
-  // ── Signing (Official: HMAC SHA256 of query string) ──
+  supportsLeverage(): boolean {
+    return false;
+  }
+
+  getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
+    return ['MARKET', 'LIMIT', 'STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'];
+  }
+
+  // ── Signing ──
   private sign(params: Record<string, string>): string {
     const queryString = new URLSearchParams(params).toString();
     return crypto.createHmac('sha256', this.apiSecret).update(queryString).digest('hex');
