@@ -1,5 +1,6 @@
-// ── Binance Trading Adapter (Real Implementation) ──
-// Implements Binance Spot REST API v3 with HMAC SHA256 signing.
+// ── Binance Trading Adapter ──
+// Strictly follows Binance Spot API v3 documentation
+// Official Docs: https://binance-docs.github.io/apidocs/spot/en/
 
 import crypto from 'node:crypto';
 import { BaseTradingAdapter, type OrderRequest, type Balance, type Position, type CancelOrderRequest } from './BaseTradingAdapter';
@@ -34,13 +35,21 @@ interface BinanceBalance {
   locked: string;
 }
 
+interface BinanceError {
+  code: number;
+  msg: string;
+}
+
 export class BinanceAdapter extends BaseTradingAdapter {
   public readonly exchangeName = 'BINANCE';
   private readonly apiKey: string;
   private readonly apiSecret: string;
   private readonly baseUrl: string;
 
-  // Circuit breaker state
+  // recvWindow (官方建議設定，防止 timestamp 偏差)
+  private readonly recvWindow = 5000;
+
+  // Circuit breaker
   private _failureCount = 0;
   private _lastFailureTime = 0;
   private _circuitOpen = false;
@@ -66,12 +75,13 @@ export class BinanceAdapter extends BaseTradingAdapter {
       quantity: request.quantity.toString(),
       newClientOrderId: request.idempotencyKey,
       timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
     };
 
     if (request.price && request.type !== 'MARKET') {
       params.price = request.price.toString();
     }
-    if (request.stopPrice && (request.type === 'STOP_LOSS' || request.type === 'STOP_LOSS_LIMIT' || request.type === 'TAKE_PROFIT' || request.type === 'TAKE_PROFIT_LIMIT')) {
+    if (request.stopPrice && ['STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'].includes(request.type)) {
       params.stopPrice = request.stopPrice.toString();
     }
     if (request.timeInForce && request.type === 'LIMIT') {
@@ -85,29 +95,10 @@ export class BinanceAdapter extends BaseTradingAdapter {
       const order = response as BinanceOrderResponse;
 
       this.recordSuccess();
-      return {
-        id: order.clientOrderId || crypto.randomUUID(),
-        exchangeOrderId: order.orderId.toString(),
-        exchangeAccountId: '',
-        symbol: order.symbol,
-        side: order.side as Trade['side'],
-        type: order.type as Trade['type'],
-        quantity: parseFloat(order.origQty),
-        price: order.price ? parseFloat(order.price) : null,
-        stopPrice: null,
-        timeInForce: (request.timeInForce as Trade['timeInForce']) ?? 'GTC',
-        status: this.mapStatus(order.status),
-        filledQuantity: parseFloat(order.executedQty),
-        idempotencyKey: request.idempotencyKey,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      return this.mapOrderToTrade(order, request);
     } catch (error) {
       this.recordFailure();
-      throw new InfraError(
-        `Binance order failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'BINANCE_ORDER_FAILED',
-      );
+      throw this.handleBinanceError(error, 'createOrder');
     }
   }
 
@@ -118,6 +109,7 @@ export class BinanceAdapter extends BaseTradingAdapter {
       symbol: request.symbol,
       orderId: request.exchangeOrderId,
       timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
     };
     params.signature = this.sign(params);
 
@@ -126,29 +118,10 @@ export class BinanceAdapter extends BaseTradingAdapter {
       const order = response as BinanceOrderResponse;
 
       this.recordSuccess();
-      return {
-        id: order.clientOrderId || crypto.randomUUID(),
-        exchangeOrderId: order.orderId.toString(),
-        exchangeAccountId: '',
-        symbol: order.symbol,
-        side: order.side as Trade['side'],
-        type: order.type as Trade['type'],
-        quantity: parseFloat(order.origQty),
-        price: order.price ? parseFloat(order.price) : null,
-        stopPrice: null,
-        timeInForce: 'GTC',
-        status: 'CANCELLED',
-        filledQuantity: parseFloat(order.executedQty),
-        idempotencyKey: '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      return this.mapOrderToTrade(order, { type: 'MARKET' } as any);
     } catch (error) {
       this.recordFailure();
-      throw new InfraError(
-        `Binance cancel failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'BINANCE_CANCEL_FAILED',
-      );
+      throw this.handleBinanceError(error, 'cancelOrder');
     }
   }
 
@@ -159,129 +132,83 @@ export class BinanceAdapter extends BaseTradingAdapter {
       symbol,
       orderId: exchangeOrderId,
       timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
     };
     params.signature = this.sign(params);
 
     try {
       const response = await this.privateGet('/api/v3/order', params);
       const order = response as BinanceOrderResponse;
-
-      return {
-        id: order.clientOrderId || crypto.randomUUID(),
-        exchangeOrderId: order.orderId.toString(),
-        exchangeAccountId: '',
-        symbol: order.symbol,
-        side: order.side as Trade['side'],
-        type: order.type as Trade['type'],
-        quantity: parseFloat(order.origQty),
-        price: order.price ? parseFloat(order.price) : null,
-        stopPrice: null,
-        timeInForce: 'GTC',
-        status: this.mapStatus(order.status),
-        filledQuantity: parseFloat(order.executedQty),
-        idempotencyKey: order.clientOrderId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      return this.mapOrderToTrade(order, { type: 'MARKET' } as any);
     } catch (error) {
-      throw new InfraError(
-        `Binance getOrder failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'BINANCE_GET_ORDER_FAILED',
-      );
+      throw this.handleBinanceError(error, 'getOrder');
     }
   }
-
-  // ── Balance & Position ──
 
   async getBalances(): Promise<Balance[]> {
     this.checkCircuitBreaker();
 
-    const params: Record<string, string> = { timestamp: Date.now().toString() };
+    const params: Record<string, string> = {
+      timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
+    };
     params.signature = this.sign(params);
 
     try {
       const response = await this.privateGet('/api/v3/account', params);
       const balances = (response as { balances: BinanceBalance[] }).balances;
+
       return balances
-        .filter((b: BinanceBalance) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
-        .map((b: BinanceBalance) => ({
+        .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+        .map((b) => ({
           asset: b.asset,
           free: b.free,
           locked: b.locked,
         }));
     } catch (error) {
       this.recordFailure();
-      throw new InfraError(
-        `Binance getBalances failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'BINANCE_BALANCE_FAILED',
-      );
+      throw this.handleBinanceError(error, 'getBalances');
     }
   }
 
   async getPositions(): Promise<Position[]> {
-    return []; // Spot exchange — positions are non-zero balances
+    return []; // Spot only
   }
-
-  // ── Connectivity ──
 
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v3/ping`);
-      return response.ok;
+      const res = await fetch(`${this.baseUrl}/api/v3/ping`);
+      return res.ok;
     } catch {
       return false;
     }
   }
 
   async getExchangeInfo(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/api/v3/exchangeInfo`);
-    return response.json() as Promise<Record<string, unknown>>;
-  }
-
-  // ── Asset Info ──
-  getAssetType(): 'crypto' { return 'crypto'; }
-  supportsLeverage(): boolean { return false; } // Spot only
-  getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
-    return ['MARKET', 'LIMIT', 'STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'];
+    const res = await fetch(`${this.baseUrl}/api/v3/exchangeInfo`);
+    return res.json();
   }
 
   async getOpenOrders(symbol?: string): Promise<Trade[]> {
     this.checkCircuitBreaker();
 
-    const params: Record<string, string> = { timestamp: Date.now().toString() };
+    const params: Record<string, string> = {
+      timestamp: Date.now().toString(),
+      recvWindow: this.recvWindow.toString(),
+    };
     if (symbol) params.symbol = symbol;
     params.signature = this.sign(params);
 
     try {
       const response = await this.privateGet('/api/v3/openOrders', params);
       const orders = response as BinanceOrderResponse[];
-      return orders.map((o) => ({
-        id: o.clientOrderId || crypto.randomUUID(),
-        exchangeOrderId: o.orderId.toString(),
-        exchangeAccountId: '',
-        symbol: o.symbol,
-        side: o.side as Trade['side'],
-        type: o.type as Trade['type'],
-        quantity: parseFloat(o.origQty),
-        price: o.price ? parseFloat(o.price) : null,
-        stopPrice: null,
-        timeInForce: 'GTC' as Trade['timeInForce'],
-        status: this.mapStatus(o.status),
-        filledQuantity: parseFloat(o.executedQty),
-        idempotencyKey: o.clientOrderId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
+      return orders.map((o) => this.mapOrderToTrade(o, { type: 'MARKET' } as any));
     } catch (error) {
-      throw new InfraError(
-        `Binance getOpenOrders failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'BINANCE_OPEN_ORDERS_FAILED',
-      );
+      throw this.handleBinanceError(error, 'getOpenOrders');
     }
   }
 
-  // ── HMAC SHA256 Signing ──
-
+  // ── Signing (Official: HMAC SHA256 of query string) ──
   private sign(params: Record<string, string>): string {
     const queryString = new URLSearchParams(params).toString();
     return crypto.createHmac('sha256', this.apiSecret).update(queryString).digest('hex');
@@ -291,7 +218,8 @@ export class BinanceAdapter extends BaseTradingAdapter {
 
   private async privatePost(path: string, params: Record<string, string>): Promise<unknown> {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${this.baseUrl}${path}`, {
+
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'X-MBX-APIKEY': this.apiKey,
@@ -300,47 +228,71 @@ export class BinanceAdapter extends BaseTradingAdapter {
       body: queryString,
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Binance HTTP ${response.status}: ${errorBody}`);
-    }
-
-    return response.json();
+    return this.handleResponse(res);
   }
 
   private async privateGet(path: string, params: Record<string, string>): Promise<unknown> {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${this.baseUrl}${path}?${queryString}`, {
+    const res = await fetch(`${this.baseUrl}${path}?${queryString}`, {
       headers: { 'X-MBX-APIKEY': this.apiKey },
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Binance HTTP ${response.status}: ${errorBody}`);
-    }
-
-    return response.json();
+    return this.handleResponse(res);
   }
 
   private async privateDelete(path: string, params: Record<string, string>): Promise<unknown> {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${this.baseUrl}${path}?${queryString}`, {
+    const res = await fetch(`${this.baseUrl}${path}?${queryString}`, {
       method: 'DELETE',
       headers: { 'X-MBX-APIKEY': this.apiKey },
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Binance HTTP ${response.status}: ${errorBody}`);
-    }
-
-    return response.json();
+    return this.handleResponse(res);
   }
 
-  // ── Status Mapping ──
+  private async handleResponse(res: Response): Promise<unknown> {
+    if (!res.ok) {
+      const text = await res.text();
+      let message = text;
 
-  private mapStatus(binanceStatus: string): Trade['status'] {
-    const mapping: Record<string, Trade['status']> = {
+      try {
+        const err = JSON.parse(text) as BinanceError;
+        message = `[Code ${err.code}] ${err.msg}`;
+      } catch {}
+
+      throw new Error(`Binance API Error: ${message}`);
+    }
+
+    return res.json();
+  }
+
+  private handleBinanceError(error: unknown, operation: string): InfraError {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new InfraError(`Binance ${operation} failed: ${message}`, `BINANCE_${operation.toUpperCase()}_FAILED`);
+  }
+
+  private mapOrderToTrade(order: BinanceOrderResponse, request: Partial<OrderRequest>): Trade {
+    return {
+      id: order.clientOrderId || crypto.randomUUID(),
+      exchangeOrderId: order.orderId.toString(),
+      exchangeAccountId: '',
+      symbol: order.symbol,
+      side: order.side as Trade['side'],
+      type: order.type as Trade['type'],
+      quantity: parseFloat(order.origQty),
+      price: order.price ? parseFloat(order.price) : null,
+      stopPrice: null,
+      timeInForce: (request.timeInForce as Trade['timeInForce']) ?? 'GTC',
+      status: this.mapStatus(order.status),
+      filledQuantity: parseFloat(order.executedQty),
+      idempotencyKey: order.clientOrderId || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  private mapStatus(status: string): Trade['status'] {
+    const map: Record<string, Trade['status']> = {
       NEW: 'PENDING',
       PARTIALLY_FILLED: 'PARTIALLY_FILLED',
       FILLED: 'FILLED',
@@ -348,11 +300,10 @@ export class BinanceAdapter extends BaseTradingAdapter {
       REJECTED: 'REJECTED',
       EXPIRED: 'EXPIRED',
     };
-    return mapping[binanceStatus] ?? 'PENDING';
+    return map[status] ?? 'PENDING';
   }
 
   // ── Circuit Breaker ──
-
   private checkCircuitBreaker(): void {
     if (this._circuitOpen) {
       const elapsed = Date.now() - this._lastFailureTime;
