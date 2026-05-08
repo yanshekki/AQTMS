@@ -9,7 +9,7 @@ export interface DataSourceProps {
   userId: string;
   type: DataSourceType;
   name: string;
-  config: Record<string, unknown>; // Decrypted config for business logic
+  config: Record<string, unknown>;
   status: DataSourceStatus;
   lastError?: string;
   lastFetchedAt?: Date;
@@ -20,47 +20,17 @@ export interface DataSourceProps {
 export class DataSource {
   constructor(private props: DataSourceProps) {}
 
-  get id(): string {
-    return this.props.id;
-  }
+  get id(): string { return this.props.id; }
+  get userId(): string { return this.props.userId; }
+  get type(): DataSourceType { return this.props.type; }
+  get name(): string { return this.props.name; }
+  get config(): Record<string, unknown> { return this.props.config; }
+  get status(): DataSourceStatus { return this.props.status; }
+  get lastError(): string | undefined { return this.props.lastError; }
+  get lastFetchedAt(): Date | undefined { return this.props.lastFetchedAt; }
+  get createdAt(): Date { return this.props.createdAt; }
+  get updatedAt(): Date { return this.props.updatedAt; }
 
-  get userId(): string {
-    return this.props.userId;
-  }
-
-  get type(): DataSourceType {
-    return this.props.type;
-  }
-
-  get name(): string {
-    return this.props.name;
-  }
-
-  get config(): Record<string, unknown> {
-    return this.props.config;
-  }
-
-  get status(): DataSourceStatus {
-    return this.props.status;
-  }
-
-  get lastError(): string | undefined {
-    return this.props.lastError;
-  }
-
-  get lastFetchedAt(): Date | undefined {
-    return this.props.lastFetchedAt;
-  }
-
-  get createdAt(): Date {
-    return this.props.createdAt;
-  }
-
-  get updatedAt(): Date {
-    return this.props.updatedAt;
-  }
-
-  // Business methods
   connect(): void {
     this.props.status = 'CONNECTED';
     this.props.lastError = undefined;
@@ -88,6 +58,8 @@ export class DataSource {
       ...props,
       id: crypto.randomUUID(),
       status: props.status ?? 'PENDING',
+      lastError: props.lastError ?? undefined,
+      lastFetchedAt: props.lastFetchedAt ?? undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
