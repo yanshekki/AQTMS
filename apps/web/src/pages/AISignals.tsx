@@ -1,8 +1,8 @@
-// ── AI Signals Page (With Filters) ──
+// ── AI Signals Page (Improved Error Handling) ──
 
 import { useState } from 'react';
 import {
-  Container, Typography, Box, Stack,
+  Container, Typography, Box, Stack, Alert
 } from '@mui/material';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import { useTranslation } from 'react-i18next';
@@ -27,18 +27,20 @@ export function AISignalsPage() {
       <Box className="fade-in-up">
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} mb={1} spacing={1}>
           <Typography variant="h5" sx={{ color: primaryText, fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-            <AutoGraphIcon sx={{ mr: 1, verticalAlign: 'middle', color: isDark ? '#00f0ff' : '#2563eb' }} />
-            {t('aiSignals.title')}
+            <AutoGraphIcon sx={{ mr: 1, verticalAlign: 'middle', color: isDark ? '#00f0ff' : '#2563eb' }} />{t('aiSignals.title')}
           </Typography>
-          <Typography variant="body2" sx={{ color: mutedText, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-            {signals.length} {t('aiSignals.signalCount')} · {t('aiSignals.refreshRate')}
-          </Typography>
+          <Typography variant="body2" sx={{ color: mutedText, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>{signals.length} {t('aiSignals.signalCount')} · {t('aiSignals.refreshRate')}</Typography>
         </Stack>
 
-        <Typography variant="body2" sx={{ color: mutedText, mb: { xs: 2, md: 3 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-          {t('aiSignals.description')}
-        </Typography>
+        <Typography variant="body2" sx={{ color: mutedText, mb: { xs: 2, md: 3 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{t('aiSignals.description')}</Typography>
       </Box>
+
+      {/* Error Display */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Filters */}
       <FiltersBar filters={filters} onChange={setFilters} />
