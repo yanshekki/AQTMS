@@ -1,9 +1,9 @@
-// ── Exchange API Client (Zod-guarded) ──
+// ── Exchange API Client ──
 
 import { z } from 'zod';
-import { safePost, safeGet, safeDelete } from '@/shared/api';
-import type { ExchangeAccount } from '../lib/schemas';
+import { safeGet, safePost, safeDelete } from '@/shared/api';
 import { ConnectExchangeSchema, ExchangeAccountResponseSchema } from '../lib/schemas';
+import type { ExchangeAccount } from '../lib/schemas';
 
 const ExchangeBalanceResponseSchema = z.object({
   success: z.literal(true),
@@ -31,8 +31,14 @@ export const exchangeApi = {
   },
 
   async testConnection(exchangeId: string): Promise<boolean> {
-    const result = await safePost(`/api/v1/exchanges/${exchangeId}/test`, {},
-      z.object({ success: z.literal(true), data: z.object({ connected: z.boolean(), status: z.string() }), timestamp: z.string() })
+    const result = await safePost(
+      `/api/v1/exchanges/${exchangeId}/test`,
+      {},
+      z.object({
+        success: z.literal(true),
+        data: z.object({ connected: z.boolean(), status: z.string() }),
+        timestamp: z.string(),
+      })
     );
     return result.data.connected;
   },
