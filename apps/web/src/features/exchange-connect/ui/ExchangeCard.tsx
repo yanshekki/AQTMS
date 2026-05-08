@@ -1,6 +1,22 @@
-// ── Exchange Card ──
+// ── Exchange Card (Improved) ──
 
-import { Card, CardContent, Typography, Chip, Box, Stack, IconButton, Tooltip, LinearProgress } from '@mui/material';
+import { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Box,
+  Stack,
+  IconButton,
+  Tooltip,
+  LinearProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+} from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -12,7 +28,7 @@ import type { ExchangeAccount } from '../lib/schemas';
 
 interface ExchangeCardProps {
   account: ExchangeAccount;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => Promise<boolean> | void;
   onTest?: (id: string) => Promise<boolean>;
   isTesting?: boolean;
   isDeleting?: boolean;
@@ -33,50 +49,180 @@ export function ExchangeCard({
   const mutedText = isDark ? '#9ca3af' : '#64748b';
   const dimText = isDark ? '#6b7280' : '#94a3b8';
 
-  const color = '#3b82f6';
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const statusConfig: any = {
-    CONNECTED: { icon: <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 16 }} />, color: '#22c55e', label: t('exchanges.status.connected') },
-    ERROR: { icon: <ErrorIcon sx={{ color: '#ef4444', fontSize: 16 }} />, color: '#ef4444', label: t('exchanges.status.error') },
+  const color = account.exchange.toLowerCase() === 'binance' ? '#F0B90B' : '#F7A600';
+
+  const statusConfig: Record<string, any> = {
+    CONNECTED: {
+      icon: <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 16 }} />,
+      color: '#22c55e',
+      label: t('exchanges.status.connected', '已連接'),
+    },
+    ERROR: {
+      icon: <ErrorIcon sx={{ color: '#ef4444', fontSize: 16 }} />,
+      color: '#ef4444',
+      label: t('exchanges.status.error', '錯誤'),
+    },
+    TESTING: {
+      icon: <SyncIcon sx={{ color: '#f59e0b', fontSize: 16 }} />,
+      color: '#f59e0b',
+      label: t('exchanges.status.testing', '測試中'),
+    },
   };
 
   const currentStatus = statusConfig[account.status] || statusConfig.ERROR;
 
-  const handleDelete = () => {
-    if (onDelete && window.confirm('Disconnect this exchange?')) {
-      onDelete(account.id);
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (onDelete) {
+      await onDelete(account.id);
     }
+    setDeleteDialogOpen(false);
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
   };
 
   const handleTest = async () => {
-    if (onTest) await onTest(account.id);
+    if (onTest) {
+      await onTest(account.id);
+    }
   };
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Box>
-            <Typography variant="subtitle1" fontWeight={600}>
-              {account.name || account.exchange}
-            </Typography>
-            <Chip label={account.exchange} size="small" />
+    <>
+      <Card
+        variant="outlined"
+        sx={{
+          borderLeft: `4px solid ${color}`,
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          },
+        }}
+      >
+        <CardContent sx={{ p: 2.5 }}>
+          {/* Header */}
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} color={primaryText}>
+                {account.name || account.exchange}
+              </Typography>
+              <Chip
+                label={account.exchange}
+                size="small"
+                sx={{ mt: 0.5, bgcolor: `${color}20`, color: color, fontWeight: 600 }}
+              />
+            </Box>
+
+            <Stack direction="row" spacing={0.5}>
+              {onTest && (
+                <Tooltip title={t('exchanges.testConnection', '測試連接')}>
+                  <IconButton
+                    size="small"
+                    onClick={handleTest}
+                    disabled={isTesting || isDeleting}
+                  >
+                    <RefreshIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {onDelete && (
+                <Tooltip title={t('exchanges.disconnect', '斷開連接')}>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={handleDeleteClick}
+                    disabled={isDeleting || isTesting}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
           </Stack>
 
-          <Stack direction="row" spacing={1}>
-            {onTest && (
-              <IconButton size="small" onClick={handleTest} disabled={isTesting || isDeleting}>
-                <RefreshIcon fontSize="small" />
-              </IconButton>
-            )}
-            {onDelete && (
-              <IconButton size="small" color="error" onClick={handleDelete} disabled={isDeleting || isTesting}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            )}
+          {/* Status */}
+          <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+            {currentStatus.icon}
+            <Typography variant="body2" sx={{ color: currentStatus.color, fontWeight: 600 }}>
+              {currentStatus.label}
+            </Typography>
           </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
+
+          {/* Balances */}
+          {account.balances && account.balances.length > 0 ? (
+            <Box sx={{ mb: 1.5 }}>
+              <Typography variant="caption" color={dimText} fontWeight={600}>
+                {t('exchanges.balances', '餘額')}
+              </Typography>
+              <Stack spacing={0.5} mt={0.5}>
+                {account.balances.slice(0, 3).map((balance, index) => (
+                  <Stack key={index} direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color={mutedText}>
+                      {balance.asset}
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600} color={primaryText}>
+                      {parseFloat(balance.free).toFixed(4)}
+                    </Typography>
+                  </Stack>
+                ))}
+                {account.balances.length > 3 && (
+                  <Typography variant="caption" color={dimText}>
+                    +{account.balances.length - 3} more...
+                  </Typography>
+                )}
+              </Stack>
+            </Box>
+          ) : (
+            <Typography variant="caption" color={dimText} sx={{ fontStyle: 'italic', mb: 1 }}>
+              {t('exchanges.noBalanceData', '尚未同步餘額')}
+            </Typography>
+          )}
+
+          {/* Last Sync */}
+          <Typography variant="caption" color={dimText}>
+            {account.lastSyncAt
+              ? `${t('exchanges.lastSynced', '最後同步')}: ${new Date(account.lastSyncAt).toLocaleString()}`
+              : t('exchanges.notYetSynced', '尚未同步')}
+          </Typography>
+
+          {(isTesting || account.status === 'TESTING') && (
+            <LinearProgress sx={{ mt: 1.5, height: 3, borderRadius: 2 }} />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={cancelDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('exchanges.confirmDisconnect', '確認斷開連接')}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            確定要斷開「<strong>{account.name || account.exchange}</strong>」的連接嗎？
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            斷開後將無法繼續接收該交易所的數據。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete} disabled={isDeleting}>
+            {t('common.cancel', '取消')}
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            color="error"
+            variant="contained"
+            disabled={isDeleting}
+          >
+            {isDeleting ? t('common.deleting', '斷開中...') : t('exchanges.disconnect', '確認斷開')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
