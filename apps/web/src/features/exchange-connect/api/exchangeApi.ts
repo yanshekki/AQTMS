@@ -1,7 +1,7 @@
 // ── Exchange API Client (Zod-guarded) ──
 
 import { z } from 'zod';
-import { safePost, safeGet } from '@/shared/api';
+import { safePost, safeGet, safeDelete } from '@/shared/api';
 import type { ExchangeAccount } from '../lib/schemas';
 import { ConnectExchangeSchema, ExchangeAccountResponseSchema } from '../lib/schemas';
 
@@ -24,7 +24,6 @@ export const exchangeApi = {
   async connectExchange(data: z.infer<typeof ConnectExchangeSchema>): Promise<ExchangeAccount> {
     const parsed = ConnectExchangeSchema.parse(data);
     const result = await safePost('/api/v1/exchanges/connect', parsed, ExchangeAccountResponseSchema);
-    // The response wraps data in { success, data: [...], timestamp }
     if (result.success && result.data.length > 0) {
       return result.data[0]!;
     }
@@ -40,5 +39,10 @@ export const exchangeApi = {
 
   async getBalances(exchangeId: string) {
     return safeGet(`/api/v1/exchanges/${exchangeId}/balance`, ExchangeBalanceResponseSchema);
+  },
+
+  // NEW: Delete / Disconnect exchange
+  async deleteExchange(exchangeId: string): Promise<void> {
+    await safeDelete(`/api/v1/exchanges/${exchangeId}`);
   },
 };
