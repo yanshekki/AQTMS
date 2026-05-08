@@ -21,10 +21,7 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
   constructor(private prisma: PrismaClient) {}
 
   async findById(id: string): Promise<DataSource | null> {
-    const record = await this.prisma.dataSource.findUnique({
-      where: { id },
-    });
-
+    const record = await this.prisma.dataSource.findUnique({ where: { id } });
     if (!record) return null;
     return this.toDomain(record);
   }
@@ -34,7 +31,6 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
-
     return records.map((r) => this.toDomain(r));
   }
 
@@ -43,7 +39,6 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
       where: { userId, type },
       orderBy: { createdAt: 'desc' },
     });
-
     return records.map((r) => this.toDomain(r));
   }
 
@@ -84,16 +79,13 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.dataSource.delete({
-      where: { id },
-    });
+    await this.prisma.dataSource.delete({ where: { id } });
   }
 
   async exists(userId: string, type: DataSourceType, name: string): Promise<boolean> {
     const count = await this.prisma.dataSource.count({
       where: { userId, type, name },
     });
-
     return count > 0;
   }
 
