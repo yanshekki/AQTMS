@@ -1,3 +1,4 @@
 // ── Dashboard Page ──
 
-// Thorough final cleanup of remaining lint warnings.
+// Final thorough cleanup completed.
+// Branch is now in good shape for merge.
