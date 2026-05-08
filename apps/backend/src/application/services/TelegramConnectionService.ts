@@ -1,16 +1,15 @@
-// ── Telegram Connection Service ──
-
-import axios, { AxiosError } from 'axios';
+// ── Telegram Connection Service (using native fetch) ──
 
 export class TelegramConnectionService {
   async validateBotToken(botToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
     try {
-      const response = await axios.get(
-        `https://api.telegram.org/bot${botToken}/getMe`,
-        { timeout: 8000 }
-      );
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`, {
+        method: 'GET',
+      });
 
-      if (response.data?.ok) {
+      const data = await response.json();
+
+      if (data?.ok) {
         return { valid: true };
       }
 
@@ -19,22 +18,10 @@ export class TelegramConnectionService {
         error: 'Bot Token 無效或已過期',
         errorCode: 'INVALID_BOT_TOKEN',
       };
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError<{ description?: string }>;
-      const status = axiosError.response?.status;
-      const description = axiosError.response?.data?.description || '';
-
-      if (status === 401) {
-        return {
-          valid: false,
-          error: 'Bot Token 不正確，請檢查是否輸入錯誤',
-          errorCode: 'INVALID_BOT_TOKEN',
-        };
-      }
-
+    } catch (error: any) {
       return {
         valid: false,
-        error: description || '無法驗證 Telegram Bot Token',
+        error: error.message || '無法驗證 Telegram Bot Token',
         errorCode: 'TELEGRAM_VALIDATION_FAILED',
       };
     }
@@ -44,12 +31,14 @@ export class TelegramConnectionService {
     try {
       const chatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`;
 
-      const response = await axios.get(
+      const response = await fetch(
         `https://api.telegram.org/bot${botToken}/getChat?chat_id=${chatId}`,
-        { timeout: 8000 }
+        { method: 'GET' }
       );
 
-      if (response.data?.ok) {
+      const data = await response.json();
+
+      if (data?.ok) {
         return { accessible: true };
       }
 
@@ -58,11 +47,10 @@ export class TelegramConnectionService {
         error: '無法訪問該 Channel，請確認 Bot 已加入並擁有權限',
         errorCode: 'CHANNEL_ACCESS_DENIED',
       };
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError<{ description?: string }>;
-      const description = axiosError.response?.data?.description || '';
+    } catch (error: any) {
+      const message = error.message || '';
 
-      if (description.includes('chat not found')) {
+      if (message.includes('chat not found')) {
         return {
           accessible: false,
           error: '找不到該 Channel，請確認 Channel Username 是否正確',
@@ -70,7 +58,7 @@ export class TelegramConnectionService {
         };
       }
 
-      if (description.includes('bot is not a member')) {
+      if (message.includes('bot is not a member')) {
         return {
           accessible: false,
           error: 'Bot 尚未加入該 Channel，請先將 Bot 加入頻道',
@@ -80,7 +68,7 @@ export class TelegramConnectionService {
 
       return {
         accessible: false,
-        error: description || '無法訪問 Telegram Channel',
+        error: message || '無法訪問 Telegram Channel',
         errorCode: 'CHANNEL_ACCESS_FAILED',
       };
     }
