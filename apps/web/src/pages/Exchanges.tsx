@@ -1,4 +1,4 @@
-// ── Exchanges Page (Improved Exchange Connect Flow) ──
+// ── Exchanges Page (Final Improved Exchange Connect Flow) ──
 
 import { useState } from 'react';
 import {
@@ -14,7 +14,6 @@ import type { ConnectExchangeForm } from '@/features/exchange-connect/lib/schema
 
 export function ExchangesPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [newlyConnectedId, setNewlyConnectedId] = useState<string | null>(null);
 
   const { mode } = useThemeMode();
   const { t } = useTranslation();
@@ -28,6 +27,8 @@ export function ExchangesPage() {
     isConnecting,
     connectError,
     testConnection,
+    lastConnectedId,
+    resetLastConnected,
   } = useExchangeConnection();
 
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
@@ -36,38 +37,25 @@ export function ExchangesPage() {
   const emptyBg = isDark ? 'rgba(17,24,39,0.7)' : 'rgba(255,255,255,0.7)';
   const emptyBorder = isDark ? 'rgba(30,41,59,0.5)' : 'rgba(226,232,240,0.8)';
 
-  // Handle connect with success tracking
   const handleConnect = async (data: ConnectExchangeForm) => {
     try {
-      // Note: connect() is from useMutation, we can enhance this later
-      // For now we use a simple approach - the list will auto-refresh via query invalidation
-      connect(data);
-
-      // Optimistic: keep modal open for a moment so user sees success state
-      // In a better implementation we would get the new ID from mutation result
-      setTimeout(() => {
-        if (!connectError) {
-          // We don't have the exact ID here easily, so we let the list refresh
-          // and user can test from the card instead for now
-          // TODO: Improve hook to return newly created ID
-        }
-      }, 1200);
+      await connect(data);
+      // lastConnectedId will be automatically set by the hook on success
     } catch (e) {
-      // error already handled in hook
+      // Error handled in hook + mutation
     }
   };
 
   const handleCloseModal = () => {
     setModalOpen(false);
-    setNewlyConnectedId(null); // reset
+    resetLastConnected();
   };
 
   const handleTestSuccess = () => {
-    // After successful test, we can close modal or show success message
     setTimeout(() => {
       setModalOpen(false);
-      setNewlyConnectedId(null);
-    }, 800);
+      resetLastConnected();
+    }, 600);
   };
 
   return (
@@ -95,7 +83,7 @@ export function ExchangesPage() {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => {
-              setNewlyConnectedId(null);
+              resetLastConnected();
               setModalOpen(true);
             }}
             sx={{
@@ -191,7 +179,7 @@ export function ExchangesPage() {
         </Grid>
       )}
 
-      {/* Coming Soon Exchanges */}
+      {/* Coming Soon */}
       <Typography
         variant="subtitle2"
         sx={{ color: mutedText, mt: 4, mb: 2, fontWeight: 700 }}
@@ -263,7 +251,7 @@ export function ExchangesPage() {
         isConnecting={isConnecting}
         connectError={connectError}
         testConnection={testConnection}
-        newlyConnectedId={newlyConnectedId}
+        newlyConnectedId={lastConnectedId}
         onTestSuccess={handleTestSuccess}
       />
     </Container>
