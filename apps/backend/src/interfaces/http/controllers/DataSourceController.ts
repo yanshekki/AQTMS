@@ -19,13 +19,20 @@ export class DataSourceController {
         return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
       }
 
-      const { type, name, config } = req.body;
+      // Explicitly type to avoid undefined issues
+      const body = req.body as {
+        type: string;
+        name: string;
+        config?: Record<string, unknown> | string | string[];
+      };
+
+      const { type, name, config } = body;
 
       const dataSource = await this.connectDataSourceUseCase.execute({
         userId,
         type,
         name,
-        config: config ?? {},
+        config: (config as any) ?? {},
       });
 
       res.status(201).json({
