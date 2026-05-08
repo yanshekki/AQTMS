@@ -1,15 +1,13 @@
-// ── Data Sources Page (MVP) ──
+// ── Data Sources Page (Improved with Connect Form) ──
 
 import { useState, useEffect } from 'react';
 import {
-  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert
+  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useTranslation } from 'react-i18next';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
-
-import type { DataSource } from '@/features/data-sources/api/dataSourceApi';
 
 export function DataSourcesPage() {
   const { t } = useTranslation();
@@ -17,6 +15,13 @@ export function DataSourcesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
+
+  // Connect form state
+  const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
+  const [formName, setFormName] = useState('');
+  const [formToken, setFormToken] = useState('');
+  const [formChannel, setFormChannel] = useState('');
+  const [connecting, setConnecting] = useState(false);
 
   const fetchDataSources = async () => {
     try {
@@ -45,6 +50,44 @@ export function DataSourcesPage() {
     }
   };
 
+  const handleConnect = async () => {
+    if (!formName || !formToken) {
+      alert('請填寫名稱和 Token');
+      return;
+    }
+
+    setConnecting(true);
+    setError(null);
+
+    try {
+      const config: any = {
+        token: formToken,
+      };
+
+      if (formType === 'TELEGRAM' && formChannel) {
+        config.channel = formChannel;
+      }
+
+      await dataSourceApi.connectDataSource({
+        type: formType,
+        name: formName,
+        config,
+      });
+
+      // Reset form
+      setFormName('');
+      setFormToken('');
+      setFormChannel('');
+      setShowConnectForm(false);
+
+      await fetchDataSources();
+    } catch (err: any) {
+      setError(err.message || '連接失敗');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'CONNECTED': return 'success';
@@ -63,14 +106,78 @@ export function DataSourcesPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setShowConnectForm(true)}
+          onClick={() => setShowConnectForm(!showConnectForm)}
         >
           連接新數據來源
         </Button>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
+      {/* Connect Form */}
+      {showConnectForm && (
+        <Card sx={{ mb: 3, p: 3 }} variant="outlined">
+          <Typography variant="h6" mb={2}>連接新數據來源</Typography>
+
+          <Stack spacing={2}>
+            <TextField
+              select
+              label="類型"
+              value={formType}
+              onChange={(e) => setFormType(e.target.value as 'TELEGRAM' | 'X')}
+              fullWidth
+            >
+              <MenuItem value="TELEGRAM">Telegram</MenuItem>
+              <MenuItem value="X">X (Twitter)</MenuItem>
+            </TextField>
+
+            <TextField
+              label="自訂名稱"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="例如：我的 Telegram 頻道"
+              fullWidth
+            />
+
+            <TextField
+              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
+              value={formToken}
+              onChange={(e) => setFormToken(e.target.value)}
+              type="password"
+              fullWidth
+            />
+
+            {formType === 'TELEGRAM' && (
+              <TextField
+                label="Channel Username（可選）"
+                value={formChannel}
+                onChange={(e) => setFormChannel(e.target.value)}
+                placeholder="@yourchannel"
+                fullWidth
+              />
+            )}
+
+            <Stack direction="row" spacing={2} mt={1}>
+              <Button 
+                variant="outlined" 
+                onClick={() => setShowConnectForm(false)}
+                disabled={connecting}
+              >
+                取消
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={handleConnect}
+                disabled={connecting || !formName || !formToken}
+              >
+                {connecting ? '連接中...' : '連接'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* Data Sources List */}
       {loading ? (
         <Typography>載入中...</Typography>
       ) : dataSources.length === 0 ? (
@@ -123,19 +230,6 @@ export function DataSourcesPage() {
             </Card>
           ))}
         </Stack>
-      )}
-
-      {/* TODO: Connect Form Modal */}
-      {showConnectForm && (
-        <Card sx={{ mt: 3, p: 3 }}>
-          <Typography variant="h6" mb={2}>連接新數據來源（開發中）</Typography>
-          <Typography color="text.secondary">
-            目前支援：Telegram（開發中）
-          </Typography>
-          <Button sx={{ mt: 2 }} onClick={() => setShowConnectForm(false)}>
-            關閉
-          </Button>
-        </Card>
       )}
     </Container>
   );
