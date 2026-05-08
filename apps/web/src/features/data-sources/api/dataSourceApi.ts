@@ -37,8 +37,8 @@ export const dataSourceApi = {
     name: string;
     config: Record<string, unknown>;
   }) {
-    const response = await safePost('/api/v1/data-sources', data, ConnectDataSourceResponseSchema);
-    return response.data;
+    const result = await safePost('/api/v1/data-sources', data, ConnectDataSourceResponseSchema);
+    return result.data;
   },
 
   async deleteDataSource(id: string) {
