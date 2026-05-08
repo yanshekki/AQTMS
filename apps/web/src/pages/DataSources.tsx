@@ -1,6 +1,6 @@
 // ── Data Sources Page ──
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
@@ -12,6 +12,8 @@ import SourceIcon from '@mui/icons-material/Source';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
 
 export function DataSourcesPage() {
+  const listRef = useRef<HTMLDivElement>(null);
+
   const [dataSources, setDataSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function DataSourcesPage() {
   const [formToken, setFormToken] = useState('');
   const [formChannels, setFormChannels] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false); // for re-connect mode
 
   // Detail dialog
   const [selectedSource, setSelectedSource] = useState<any>(null);
@@ -52,8 +55,20 @@ export function DataSourcesPage() {
 
   useEffect(() => {
     if (newlyAddedId) {
-      const timer = setTimeout(() => setNewlyAddedId(null), 4000);
+      const timer = setTimeout(() => setNewlyAddedId(null), 5000);
       return () => clearTimeout(timer);
+    }
+  }, [newlyAddedId]);
+
+  // Auto scroll to newly added source
+  useEffect(() => {
+    if (newlyAddedId && listRef.current) {
+      setTimeout(() => {
+        const newCard = document.getElementById(`source-${newlyAddedId}`);
+        if (newCard) {
+          newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
     }
   }, [newlyAddedId]);
 
@@ -73,9 +88,7 @@ export function DataSourcesPage() {
       setSuccessMessage(`已成功刪除「${deletingSource.name}」`);
       setDeleteDialogOpen(false);
       setDeletingSource(null);
-      if (selectedSource?.id === deletingSource.id) {
-        setSelectedSource(null);
-      }
+      if (selectedSource?.id === deletingSource.id) setSelectedSource(null);
       setTimeout(() => fetchDataSources(false), 500);
     } catch (err: any) {
       setError(err.message || '刪除失敗，請稍後再試');
@@ -90,7 +103,21 @@ export function DataSourcesPage() {
     setDeletingSource(null);
   };
 
-  const openConnectModal = () => {
+  const openConnectModal = (sourceToReconnect?: any) => {
+    if (sourceToReconnect) {
+      // Re-connect mode
+      setFormType(sourceToReconnect.type);
+      setFormName(sourceToReconnect.name);
+      setFormToken('');
+      setFormChannels(sourceToReconnect.config?.channels?.join(', ') || '');
+      setIsReconnecting(true);
+    } else {
+      setFormType('TELEGRAM');
+      setFormName('');
+      setFormToken('');
+      setFormChannels('');
+      setIsReconnecting(false);
+    }
     setConnectModalOpen(true);
     setError(null);
   };
@@ -101,6 +128,7 @@ export function DataSourcesPage() {
     setFormToken('');
     setFormChannels('');
     setError(null);
+    setIsReconnecting(false);
   };
 
   const handleConnect = async () => {
@@ -112,7 +140,7 @@ export function DataSourcesPage() {
       setError('請輸入自訂名稱');
       return;
     }
-    if (!trimmedToken) {
+    if (!trimmedToken && !isReconnecting) {
       setError(formType === 'TELEGRAM' ? '請輸入 Bot Token' : '請輸入 Bearer Token');
       return;
     }
@@ -121,7 +149,7 @@ export function DataSourcesPage() {
     setError(null);
 
     try {
-      const config: any = { token: trimmedToken };
+      const config: any = { token: trimmedToken || undefined };
 
       if (formType === 'TELEGRAM' && trimmedChannels) {
         const channels = trimmedChannels.split(',').map((c) => c.trim()).filter(Boolean);
@@ -134,7 +162,9 @@ export function DataSourcesPage() {
         config,
       });
 
-      setSuccessMessage(`「${trimmedName}」連接成功！`);
+      setSuccessMessage(isReconnecting 
+        ? `「${trimmedName}」已更新連接！` 
+        : `「${trimmedName}」連接成功！`);
       setNewlyAddedId(newSource.id);
 
       closeConnectModal();
@@ -219,7 +249,7 @@ export function DataSourcesPage() {
           </IconButton>
         </Stack>
 
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openConnectModal}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => openConnectModal()}>
           連接新數據來源
         </Button>
       </Stack>
@@ -254,18 +284,19 @@ export function DataSourcesPage() {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={openConnectModal}
+            onClick={() => openConnectModal()}
           >
             立即連接數據來源
           </Button>
         </Card>
       ) : (
-        <Stack spacing={2}>
+        <Stack spacing={2} ref={listRef}>
           {dataSources.map((source) => {
             const isNew = source.id === newlyAddedId;
 
             return (
               <Card
+                id={`source-${source.id}`}
                 key={source.id}
                 variant="outlined"
                 onClick={() => openSourceDetail(source)}
@@ -276,6 +307,7 @@ export function DataSourcesPage() {
                     bgcolor: 'rgba(59, 130, 246, 0.08)',
                     borderColor: '#3b82f6',
                     boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.2)',
+                    animation: 'pulse 2s ease-in-out',
                   }),
                   '&:hover': {
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -322,9 +354,11 @@ export function DataSourcesPage() {
         </Stack>
       )}
 
-      {/* Connect DataSource Modal */}
+      {/* Connect / Re-connect DataSource Modal */}
       <Dialog open={connectModalOpen} onClose={closeConnectModal} maxWidth="sm" fullWidth>
-        <DialogTitle>連接新數據來源</DialogTitle>
+        <DialogTitle>
+          {isReconnecting ? '更新數據來源連接' : '連接新數據來源'}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -335,7 +369,7 @@ export function DataSourcesPage() {
               value={formType}
               onChange={(e) => setFormType(e.target.value as any)}
               fullWidth
-              disabled={connecting}
+              disabled={connecting || isReconnecting}
             >
               <MenuItem value="TELEGRAM">Telegram</MenuItem>
               <MenuItem value="X">X (Twitter)</MenuItem>
@@ -345,13 +379,12 @@ export function DataSourcesPage() {
               label="自訂名稱"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="例如：我的 Telegram 頻道"
               fullWidth
-              disabled={connecting}
+              disabled={connecting || isReconnecting}
             />
 
             <TextField
-              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
+              label={formType === 'TELEGRAM' ? 'Bot Token（留空則保持原有）' : 'Bearer Token（留空則保持原有）'}
               value={formToken}
               onChange={(e) => setFormToken(e.target.value)}
               type="password"
@@ -379,10 +412,10 @@ export function DataSourcesPage() {
           <Button
             variant="contained"
             onClick={handleConnect}
-            disabled={connecting || !formName.trim() || !formToken.trim()}
+            disabled={connecting || !formName.trim()}
             startIcon={connecting ? <CircularProgress size={18} color="inherit" /> : null}
           >
-            {connecting ? '連接中...' : '連接'}
+            {connecting ? '連接中...' : (isReconnecting ? '更新連接' : '連接')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -423,6 +456,19 @@ export function DataSourcesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeSourceDetail}>關閉</Button>
+
+          {selectedSource && selectedSource.status === 'ERROR' && (
+            <Button
+              variant="outlined"
+              onClick={() => {
+                closeSourceDetail();
+                openConnectModal(selectedSource);
+              }}
+            >
+              重新連接
+            </Button>
+          )}
+
           {selectedSource && (
             <Button
               color="error"
