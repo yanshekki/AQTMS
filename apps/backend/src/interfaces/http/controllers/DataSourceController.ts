@@ -70,7 +70,8 @@ export class DataSourceController {
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user?.userId;
-      const { id } = req.params;
+      const rawId = req.params.id;
+      const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
       if (!userId || !id) {
         return res.status(400).json({ success: false, error: { code: 'INVALID_REQUEST' } });
