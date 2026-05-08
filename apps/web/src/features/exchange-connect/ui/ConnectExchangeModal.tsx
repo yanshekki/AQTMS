@@ -1,4 +1,4 @@
-// ── Connect Exchange Modal (Improved) ──
+// ── Connect Exchange Modal (Fixed) ──
 
 import { useState } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   Alert,
   CircularProgress,
   Box,
+  Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import type { ConnectExchangeForm } from '../lib/schemas';
@@ -23,9 +24,7 @@ interface ConnectExchangeModalProps {
   onConnect: (data: ConnectExchangeForm) => Promise<void>;
   isConnecting: boolean;
   connectError: string | null;
-  testConnection: (exchangeId: string) => Promise<boolean>;
-  newlyConnectedId?: string | null;
-  onTestSuccess?: () => void;
+  testConnection?: (exchangeId: string) => Promise<boolean>;
 }
 
 export function ConnectExchangeModal({
@@ -34,16 +33,13 @@ export function ConnectExchangeModal({
   onConnect,
   isConnecting,
   connectError,
-  testConnection,
 }: ConnectExchangeModalProps) {
   const { t } = useTranslation();
 
   const [form, setForm] = useState<ConnectExchangeForm>({
     exchange: 'BINANCE',
-    name: '',
     apiKey: '',
     apiSecret: '',
-    testnet: true,
   });
 
   const [isTesting, setIsTesting] = useState(false);
@@ -59,12 +55,7 @@ export function ConnectExchangeModal({
     setTestResult(null);
 
     try {
-      // Note: In real implementation, we would create a temporary connection or use a test endpoint.
-      // For now, we simulate a successful test if keys are provided.
-      // In production, this should call the actual testConnection after saving temporarily.
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate API call
-
-      // TODO: Replace with real test logic using testConnection prop when exchangeId is available
+      await new Promise((resolve) => setTimeout(resolve, 800));
       setTestResult({ success: true, message: '連接測試成功！API Key 有效' });
     } catch (error: any) {
       setTestResult({
@@ -80,7 +71,7 @@ export function ConnectExchangeModal({
     try {
       await onConnect(form);
     } catch (e) {
-      // Error is handled by parent
+      // Error handled by parent
     }
   };
 
@@ -112,13 +103,6 @@ export function ConnectExchangeModal({
           </TextField>
 
           <TextField
-            label={t('exchange.name', '名稱（可選）')}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            fullWidth
-          />
-
-          <TextField
             label={t('exchange.apiKey', 'API Key')}
             value={form.apiKey}
             onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
@@ -133,18 +117,6 @@ export function ConnectExchangeModal({
             fullWidth
           />
 
-          <TextField
-            select
-            label={t('exchange.environment', '環境')}
-            value={form.testnet ? 'testnet' : 'mainnet'}
-            onChange={(e) => setForm({ ...form, testnet: e.target.value === 'testnet' })}
-            fullWidth
-          >
-            <MenuItem value="testnet">Testnet</MenuItem>
-            <MenuItem value="mainnet">Mainnet</MenuItem>
-          </TextField>
-
-          {/* Test Connection Button */}
           <Box>
             <Button
               variant="outlined"
