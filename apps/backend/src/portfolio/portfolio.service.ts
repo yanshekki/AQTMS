@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { PaperTradingService } from '../paper-trading/paper-trading.service';
+// TODO: 之後注入 ExecutionService / Exchange adapters 來獲取真實持倉
 
 export interface PortfolioSummary {
-  totalValue: number;           // 總資產價值（USDT）
-  totalUnrealizedPnl: number;   // 總未實現盈虧
-  totalRiskExposure: number;    // 風險暴露比例（%）
-  positionCount: number;        // 持倉數量
+  totalValue: number;
+  totalUnrealizedPnl: number;
+  totalRiskExposure: number;
+  positionCount: number;
   lastUpdated: Date;
 }
 
@@ -22,56 +24,50 @@ export interface Position {
 
 @Injectable()
 export class PortfolioService {
-  /**
-   * 獲取用戶 Portfolio 總覽（MVP 版本使用 mock 數據）
-   */
+  constructor(
+    private readonly paperTradingService: PaperTradingService,
+    // TODO: private readonly executionService: ExecutionService,
+  ) {}
+
   async getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
-    // TODO: 之後要聚合以下數據：
-    // - 各交易所真實持倉 + 餘額
-    // - Paper Trading 持倉 + 餘額
-    // - 計算總價值與風險
+    const positions = await this.getPositions(userId);
 
-    console.log(`[Portfolio] Generating summary for user: ${userId}`);
+    const totalValue = positions.reduce((sum, p) => sum + p.quantity * p.currentPrice, 0);
+    const totalUnrealizedPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
+    const totalRiskExposure = totalValue > 0 ? Math.min((totalValue / 30000) * 100, 100) : 0; // 簡單風險計算
 
-    // MVP Mock 數據
     return {
-      totalValue: 12450.75,
-      totalUnrealizedPnl: 385.5,
-      totalRiskExposure: 42.3,
-      positionCount: 4,
+      totalValue,
+      totalUnrealizedPnl,
+      totalRiskExposure,
+      positionCount: positions.length,
       lastUpdated: new Date(),
     };
   }
 
-  /**
-   * 獲取用戶所有持倉詳情（MVP）
-   */
   async getPositions(userId: string): Promise<Position[]> {
-    // TODO: 聚合真實交易所 + Paper Trading 持倉
+    const positions: Position[] = [];
 
-    return [
-      {
-        symbol: 'BTCUSDT',
-        exchange: 'BINANCE',
-        side: 'BUY',
-        quantity: 0.25,
-        averagePrice: 64200,
-        currentPrice: 65800,
-        unrealizedPnl: 400,
-        unrealizedPnlPercent: 2.49,
-        isPaper: false,
-      },
-      {
-        symbol: 'ETHUSDT',
-        exchange: 'BYBIT',
-        side: 'BUY',
-        quantity: 4.5,
-        averagePrice: 3050,
-        currentPrice: 3120,
-        unrealizedPnl: 315,
-        unrealizedPnlPercent: 2.3,
+    // 1. 獲取 Paper Trading 持倉
+    const paperPositions = this.paperTradingService.getVirtualPositions(userId);
+    for (const p of paperPositions) {
+      positions.push({
+        symbol: p.symbol,
+        exchange: 'PAPER',
+        side: p.quantity > 0 ? 'BUY' : 'SELL',
+        quantity: Math.abs(p.quantity),
+        averagePrice: p.averagePrice,
+        currentPrice: p.averagePrice, // TODO: 之後從行情服務獲取最新價
+        unrealizedPnl: p.unrealizedPnl,
+        unrealizedPnlPercent: 0,
         isPaper: true,
-      },
-    ];
+      });
+    }
+
+    // 2. TODO: 獲取真實交易所持倉
+    // const livePositions = await this.executionService.getLivePositions(userId);
+    // positions.push(...livePositions);
+
+    return positions;
   }
 }
