@@ -1,3 +1,3 @@
 // ── Exchanges Page ──
 
-// Continued thorough lint cleanup.
+// Thorough final lint cleanup completed.
