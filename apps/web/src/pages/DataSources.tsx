@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar,
-  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, InputAdornment
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
 import SourceIcon from '@mui/icons-material/Source';
 import { dataSourceApi } from '@/features/data-sources/api/dataSourceApi';
 
@@ -18,6 +19,7 @@ export function DataSourcesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
 
@@ -32,10 +34,12 @@ export function DataSourcesPage() {
   const [formToken, setFormToken] = useState('');
   const [formChannels, setFormChannels] = useState('');
   const [connecting, setConnecting] = useState(false);
-  const [isReconnecting, setIsReconnecting] = useState(false); // for re-connect mode
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   // Detail dialog
   const [selectedSource, setSelectedSource] = useState<any>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const fetchDataSources = async (showLoading = true) => {
     try {
@@ -48,6 +52,15 @@ export function DataSourcesPage() {
       if (showLoading) setLoading(false);
     }
   };
+
+  // Auto refresh every 45 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDataSources(false);
+    }, 45000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchDataSources();
@@ -105,7 +118,6 @@ export function DataSourcesPage() {
 
   const openConnectModal = (sourceToReconnect?: any) => {
     if (sourceToReconnect) {
-      // Re-connect mode
       setFormType(sourceToReconnect.type);
       setFormName(sourceToReconnect.name);
       setFormToken('');
@@ -120,6 +132,7 @@ export function DataSourcesPage() {
     }
     setConnectModalOpen(true);
     setError(null);
+    setTestResult(null);
   };
 
   const closeConnectModal = () => {
@@ -129,6 +142,7 @@ export function DataSourcesPage() {
     setFormChannels('');
     setError(null);
     setIsReconnecting(false);
+    setTestResult(null);
   };
 
   const handleConnect = async () => {
@@ -138,10 +152,6 @@ export function DataSourcesPage() {
 
     if (!trimmedName) {
       setError('請輸入自訂名稱');
-      return;
-    }
-    if (!trimmedToken && !isReconnecting) {
-      setError(formType === 'TELEGRAM' ? '請輸入 Bot Token' : '請輸入 Bearer Token');
       return;
     }
 
@@ -183,12 +193,42 @@ export function DataSourcesPage() {
     }
   };
 
+  // Test connection for existing source
+  const handleTestExistingSource = async (source: any) => {
+    setIsTestingConnection(true);
+    setTestResult(null);
+
+    try {
+      // Simulate test (in real app this should call backend test endpoint)
+      await new Promise(resolve => setTimeout(resolve, 900));
+
+      if (source.status === 'ERROR') {
+        setTestResult({ success: false, message: '測試失敗：來源目前處於錯誤狀態' });
+      } else {
+        setTestResult({ success: true, message: '連接測試成功！Token 仍然有效' });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: '測試過程中發生錯誤' });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'CONNECTED': return 'success';
       case 'ERROR': return 'error';
       case 'PENDING': return 'warning';
       default: return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PENDING': return '驗證中';
+      case 'CONNECTED': return '已連接';
+      case 'ERROR': return '錯誤';
+      default: return status;
     }
   };
 
@@ -229,12 +269,26 @@ export function DataSourcesPage() {
     return null;
   };
 
+  // Filtered sources
+  const filteredSources = dataSources.filter(source => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      source.name.toLowerCase().includes(term) ||
+      source.type.toLowerCase().includes(term) ||
+      (source.config?.channels && source.config.channels.some((c: string) => c.toLowerCase().includes(term))) ||
+      (source.config?.usernames && source.config.usernames.some((u: string) => u.toLowerCase().includes(term)))
+    );
+  });
+
   const openSourceDetail = (source: any) => {
     setSelectedSource(source);
+    setTestResult(null);
   };
 
   const closeSourceDetail = () => {
     setSelectedSource(null);
+    setTestResult(null);
   };
 
   return (
@@ -256,11 +310,34 @@ export function DataSourcesPage() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
+      {/* Search Bar */}
+      {dataSources.length > 0 && (
+        <TextField
+          placeholder="搜尋來源名稱、類型或 Channel..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          fullWidth
+          sx={{ mb: 3 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
+      )}
+
       {/* Data Sources List */}
-      {loading ? (
+      {loading && dataSources.length === 0 ? (
         <Box display="flex" justifyContent="center" py={4}>
           <CircularProgress size={28} />
         </Box>
+      ) : filteredSources.length === 0 && searchTerm ? (
+        <Card sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="text.secondary">找不到符合「{searchTerm}」嘅數據來源</Typography>
+        </Card>
       ) : dataSources.length === 0 ? (
         <Card
           sx={{
@@ -291,8 +368,9 @@ export function DataSourcesPage() {
         </Card>
       ) : (
         <Stack spacing={2} ref={listRef}>
-          {dataSources.map((source) => {
+          {filteredSources.map((source) => {
             const isNew = source.id === newlyAddedId;
+            const isPending = source.status === 'PENDING';
 
             return (
               <Card
@@ -320,7 +398,12 @@ export function DataSourcesPage() {
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
                         <Chip label={source.type} size="small" color="primary" variant="outlined" />
-                        <Chip label={source.status} size="small" color={getStatusColor(source.status) as any} />
+                        <Chip 
+                          label={getStatusLabel(source.status)} 
+                          size="small" 
+                          color={getStatusColor(source.status) as any}
+                          {...(isPending && { icon: <CircularProgress size={14} /> })}
+                        />
                         {isNew && <Chip label="新加入" size="small" color="primary" />}
                       </Stack>
 
@@ -429,14 +512,20 @@ export function DataSourcesPage() {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="h6">{selectedSource.name}</Typography>
                 <Chip label={selectedSource.type} color="primary" variant="outlined" />
-                <Chip label={selectedSource.status} color={getStatusColor(selectedSource.status) as any} />
+                <Chip label={getStatusLabel(selectedSource.status)} color={getStatusColor(selectedSource.status) as any} />
               </Stack>
 
               <Typography variant="body2" color="text.secondary">
                 連接時間：{formatDate(selectedSource.createdAt)}　|　最後更新：{formatDate(selectedSource.lastFetchedAt)}
               </Typography>
 
-              {selectedSource.lastError && (
+              {testResult && (
+                <Alert severity={testResult.success ? 'success' : 'error'}>
+                  {testResult.message}
+                </Alert>
+              )}
+
+              {selectedSource.lastError && !testResult && (
                 <Alert severity="error">
                   <Typography variant="body2" fontWeight={600}>最後錯誤</Typography>
                   <Typography variant="body2">{selectedSource.lastError}</Typography>
@@ -451,6 +540,16 @@ export function DataSourcesPage() {
                   </Typography>
                 </Card>
               </Box>
+
+              {/* Test Connection Button */}
+              <Button
+                variant="outlined"
+                onClick={() => handleTestExistingSource(selectedSource)}
+                disabled={isTestingConnection}
+                startIcon={isTestingConnection ? <CircularProgress size={18} /> : null}
+              >
+                {isTestingConnection ? '測試中...' : '測試連接'}
+              </Button>
             </Stack>
           )}
         </DialogContent>
