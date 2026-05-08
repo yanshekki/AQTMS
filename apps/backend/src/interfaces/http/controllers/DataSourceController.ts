@@ -22,7 +22,6 @@ export class DataSourceController {
 
       const { type: rawType, name, config } = req.body;
 
-      // Validate and cast type
       const allowedTypes: DataSourceType[] = ['TELEGRAM', 'X', 'RSS', 'ONCHAIN'];
       if (!allowedTypes.includes(rawType)) {
         return res.status(400).json({
@@ -73,8 +72,8 @@ export class DataSourceController {
       const userId = req.user?.userId;
       const { id } = req.params;
 
-      if (!userId) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+      if (!userId || !id) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_REQUEST' } });
       }
 
       await this.deleteDataSourceUseCase.execute(id, userId);
