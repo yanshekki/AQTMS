@@ -1,4 +1,4 @@
-// ── Exchanges Page (Final Lint Clean) ──
+// ── Exchanges Page ──
 
-// All critical lint issues resolved.
-// Minor unused imports can be prefixed with _ if still reported.
+// All major lint issues resolved.
+// Remaining minor unused imports can be prefixed with _ if needed.
