@@ -1,8 +1,9 @@
-// ── Data Sources Page (with detailed info) ──
+// ── Data Sources Page (with Delete Dialog) ──
 
 import { useState, useEffect } from 'react';
 import {
-  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar
+  Container, Typography, Box, Button, Card, CardContent, Stack, Chip, IconButton, Alert, TextField, MenuItem, Snackbar,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -16,6 +17,11 @@ export function DataSourcesPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingSource, setDeletingSource] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
   const [formName, setFormName] = useState('');
@@ -39,16 +45,34 @@ export function DataSourcesPage() {
     fetchDataSources();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('確定要刪除這個數據來源嗎？')) return;
+  // Open delete confirmation dialog
+  const openDeleteDialog = (source: any) => {
+    setDeletingSource(source);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm delete
+  const confirmDelete = async () => {
+    if (!deletingSource) return;
+
+    setIsDeleting(true);
 
     try {
-      await dataSourceApi.deleteDataSource(id);
-      setSuccessMessage('數據來源已刪除');
+      await dataSourceApi.deleteDataSource(deletingSource.id);
+      setSuccessMessage(`「${deletingSource.name}」已刪除`);
+      setDeleteDialogOpen(false);
+      setDeletingSource(null);
       await fetchDataSources();
     } catch (err: any) {
       setError(err.message || '刪除失敗');
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setDeletingSource(null);
   };
 
   const handleConnect = async () => {
@@ -146,7 +170,7 @@ export function DataSourcesPage() {
         </Card>
       )}
 
-      {/* Data Sources List with more details */}
+      {/* Data Sources List */}
       {loading ? (
         <Typography>載入中...</Typography>
       ) : dataSources.length === 0 ? (
@@ -185,7 +209,7 @@ export function DataSourcesPage() {
                       {source.lastError && <Typography variant="caption" color="error">錯誤：{source.lastError}</Typography>}
                     </Stack>
 
-                    <IconButton color="error" onClick={() => handleDelete(source.id)}>
+                    <IconButton color="error" onClick={() => openDeleteDialog(source)}>
                       <DeleteIcon />
                     </IconButton>
                   </Stack>
@@ -195,6 +219,25 @@ export function DataSourcesPage() {
           })}
         </Stack>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={cancelDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>確認刪除</DialogTitle>
+        <DialogContent>
+          <Typography>
+            確定要刪除「<strong>{deletingSource?.name}</strong>」嗎？
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            刪除後將停止該數據來源的訊號接收。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete} disabled={isDeleting}>取消</Button>
+          <Button onClick={confirmDelete} color="error" variant="contained" disabled={isDeleting}>
+            {isDeleting ? '刪除中...' : '確認刪除'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={!!successMessage}
