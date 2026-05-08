@@ -1,4 +1,4 @@
-// ── Detail Drawer (Improved Error Handling) ──
+// ── Detail Drawer (Fixed Type Error) ──
 
 import { useState, useEffect, useRef } from 'react';
 import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, CircularProgress, Card, CardContent, Button, Alert } from '@mui/material';
@@ -35,7 +35,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
   const [signalChartData, setSignalChartData] = useState<ChartCandle[]>([]);
   const feed = useRef(new ChartDatafeed());
 
-  // For manual order placement
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const { exchanges: exchangeAccounts } = useExchangeConnection();
 
@@ -51,9 +50,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
     signalsApi
       .getSignalDetail(signalId)
-      .then((res) => {
-        setDetail(res.data);
-      })
+      .then((res) => setDetail(res.data))
       .catch((err) => {
         const friendlyError = getFriendlyErrorMessage(err);
         setError(friendlyError);
@@ -61,7 +58,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
       .finally(() => setLoading(false));
   }, [signalId]);
 
-  // Helper for friendly errors
   const getFriendlyErrorMessage = (err: any): string => {
     const message = err?.message || '';
     if (message.includes('network') || message.includes('fetch')) {
@@ -80,7 +76,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
     feed.current.fetchKlines(detectedSymbol, '1h', 100).then(setSignalChartData).catch(console.error);
   }, [detail]);
 
-  // Extract suggested action
   let topSuggestedAction: string | null = null;
   let topUrgency: string | null = null;
   let defaultSide: 'BUY' | 'SELL' = 'BUY';
@@ -135,17 +130,10 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
           <Divider sx={{ borderColor, mb: 2 }} />
 
-          {/* Loading */}
           {loading && <Box display="flex" justifyContent="center" py={4}><CircularProgress sx={{ color: '#3b82f6' }} /></Box>}
 
-          {/* Error */}
-          {error && !loading && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+          {error && !loading && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-          {/* Content */}
           {detail && !error && (
             <>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -175,7 +163,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
               <Divider sx={{ borderColor, my: 2 }} />
 
-              {/* Top Verdict */}
               {(topSuggestedAction || topUrgency) && (
                 <Stack direction="row" spacing={1} mb={2}>
                   {topSuggestedAction && (
@@ -201,7 +188,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
                 </Stack>
               )}
 
-              {/* Scores */}
               <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 700 }}>
                 {t('aiSignals.drawer.scoreSummary')}
               </Typography>
@@ -215,7 +201,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
               <Divider sx={{ borderColor, my: 2 }} />
 
-              {/* Multi-AI Analysis */}
               <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1.5, fontWeight: 700 }}>
                 {t('aiSignals.drawer.aiConsensus')}
               </Typography>
@@ -304,7 +289,6 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
                 <Typography variant="body2" sx={{ color: mutedText }}>{t('aiSignals.drawer.noAnalysis')}</Typography>
               )}
 
-              {/* Price Chart */}
               {signalChartData.length > 0 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="subtitle2" sx={{ color: mutedText, mb: 1, fontWeight: 600 }}>
@@ -318,16 +302,13 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
         </Box>
       </Drawer>
 
-      {/* Place Order Modal */}
       <PlaceOrderModal
         open={orderModalOpen}
         onClose={() => setOrderModalOpen(false)}
         exchangeAccounts={exchangeAccounts}
         defaultSymbol={defaultSymbol}
         defaultSide={defaultSide}
-        onSuccess={() => {
-          // Can add refresh logic here if needed
-        }}
+        onSuccess={() => {}}
       />
     </>
   );
