@@ -65,19 +65,13 @@ export function DataSourcesPage() {
 
     try {
       await dataSourceApi.deleteDataSource(deletingSource.id);
-
-      // Optimistic UI update
       setDataSources(prev => prev.filter(s => s.id !== deletingSource.id));
-
       setSuccessMessage(`已成功刪除「${deletingSource.name}」`);
       setDeleteDialogOpen(false);
       setDeletingSource(null);
-
-      // Refresh in background to sync with server
       setTimeout(() => fetchDataSources(false), 500);
     } catch (err: any) {
       setError(err.message || '刪除失敗，請稍後再試');
-      // If delete failed, refresh to restore correct state
       await fetchDataSources(false);
     } finally {
       setIsDeleting(false);
@@ -166,6 +160,39 @@ export function DataSourcesPage() {
     return new Date(dateStr).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  // Helper to render channels/usernames nicely
+  const renderTargets = (source: any) => {
+    if (source.type === 'TELEGRAM' && source.config?.channels?.length > 0) {
+      const channels = source.config.channels;
+      return (
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+          {channels.slice(0, 3).map((ch: string, idx: number) => (
+            <Chip key={idx} label={ch} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+          ))}
+          {channels.length > 3 && (
+            <Chip label={`+${channels.length - 3}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+          )}
+        </Stack>
+      );
+    }
+
+    if (source.type === 'X' && source.config?.usernames?.length > 0) {
+      const usernames = source.config.usernames;
+      return (
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+          {usernames.slice(0, 3).map((u: string, idx: number) => (
+            <Chip key={idx} label={`@${u}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+          ))}
+          {usernames.length > 3 && (
+            <Chip label={`+${usernames.length - 3}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+          )}
+        </Stack>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -199,8 +226,6 @@ export function DataSourcesPage() {
         <Stack spacing={2}>
           {dataSources.map((source) => {
             const isNew = source.id === newlyAddedId;
-            const channelCount = source.config?.channels?.length || (source.config?.channel ? 1 : 0);
-            const usernameCount = source.config?.usernames?.length || (source.config?.username ? 1 : 0);
 
             return (
               <Card
@@ -217,7 +242,7 @@ export function DataSourcesPage() {
               >
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Stack spacing={0.5}>
+                    <Stack spacing={0.8}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
                         <Chip label={source.type} size="small" color="primary" variant="outlined" />
@@ -229,14 +254,14 @@ export function DataSourcesPage() {
                         連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt)}
                       </Typography>
 
-                      {(channelCount > 0 || usernameCount > 0) && (
-                        <Typography variant="caption" color="text.secondary">
-                          {source.type === 'TELEGRAM' && `已連接 ${channelCount} 個 Channel`}
-                          {source.type === 'X' && `已追蹤 ${usernameCount} 個用戶`}
+                      {/* Show actual channels/usernames */}
+                      {renderTargets(source)}
+
+                      {source.lastError && (
+                        <Typography variant="caption" color="error">
+                          錯誤：{source.lastError}
                         </Typography>
                       )}
-
-                      {source.lastError && <Typography variant="caption" color="error">錯誤：{source.lastError}</Typography>}
                     </Stack>
 
                     <IconButton color="error" onClick={() => openDeleteDialog(source)}>
