@@ -1,6 +1,6 @@
-// ── Telegram Connection Service (Improved Error Messages) ──
+// ── Telegram Connection Service ──
 
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export class TelegramConnectionService {
   async validateBotToken(botToken: string): Promise<{ valid: boolean; error?: string; errorCode?: string }> {
@@ -19,23 +19,16 @@ export class TelegramConnectionService {
         error: 'Bot Token 無效或已過期',
         errorCode: 'INVALID_BOT_TOKEN',
       };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const description = error.response?.data?.description || '';
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ description?: string }>;
+      const status = axiosError.response?.status;
+      const description = axiosError.response?.data?.description || '';
 
       if (status === 401) {
         return {
           valid: false,
           error: 'Bot Token 不正確，請檢查是否輸入錯誤',
           errorCode: 'INVALID_BOT_TOKEN',
-        };
-      }
-
-      if (description.includes('bot was blocked')) {
-        return {
-          valid: false,
-          error: 'Bot 已被用戶封鎖，請解除封鎖後再試',
-          errorCode: 'BOT_BLOCKED',
         };
       }
 
@@ -65,8 +58,9 @@ export class TelegramConnectionService {
         error: '無法訪問該 Channel，請確認 Bot 已加入並擁有權限',
         errorCode: 'CHANNEL_ACCESS_DENIED',
       };
-    } catch (error: any) {
-      const description = error.response?.data?.description || '';
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ description?: string }>;
+      const description = axiosError.response?.data?.description || '';
 
       if (description.includes('chat not found')) {
         return {
