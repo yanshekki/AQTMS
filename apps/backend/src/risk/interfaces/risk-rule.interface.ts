@@ -5,7 +5,8 @@ export interface RiskCheckContext {
   side: 'BUY' | 'SELL';
   quantity: number;
   price?: number;
-  // 可以之後擴充更多欄位，例如 stopLoss, takeProfit 等
+  accountBalance?: number; // 用戶帳戶餘額（用於倉位計算）
+  // 之後可擴充 stopLoss, takeProfit 等
 }
 
 export interface RiskCheckResult {
