@@ -1,11 +1,10 @@
-// ── Place Order Modal (Further Improved) ──
+// ── Place Order Modal ──
 
 import { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, MenuItem, Stack, Alert, CircularProgress
 } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 import { tradeApi, type CreateTradeInput } from '../api/tradeApi';
 import type { ExchangeAccount } from '@/features/exchange-connect/lib/schemas';
 
@@ -26,8 +25,6 @@ export function PlaceOrderModal({
   defaultSide = 'BUY',
   onSuccess,
 }: PlaceOrderModalProps) {
-  const { t } = useTranslation();
-
   const [form, setForm] = useState<CreateTradeInput>({
     exchangeAccountId: exchangeAccounts[0]?.id || '',
     symbol: defaultSymbol,
@@ -80,7 +77,6 @@ export function PlaceOrderModal({
       const rawMessage = err?.message || '';
       let friendlyMessage = '下單失敗，請稍後再試';
 
-      // Map common backend errors to user-friendly messages
       if (rawMessage.includes('Insufficient balance') || rawMessage.includes('balance')) {
         friendlyMessage = '帳戶餘額不足，請先充值或減少下單數量';
       } else if (rawMessage.includes('Invalid quantity') || rawMessage.includes('quantity')) {
@@ -123,7 +119,7 @@ export function PlaceOrderModal({
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
-          {successMessage && <Alert severity="success">{successMessage}</Alert>}
+          {successMessage && <Alert severity="success" onClose={() => setSuccessMessage(null)}>{successMessage}</Alert>}
 
           <TextField
             select
