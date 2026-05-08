@@ -1,7 +1,20 @@
 // ── Detail Drawer ──
 
 import { useState, useEffect, useRef } from 'react';
-import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, CircularProgress, Card, CardContent, Button, Alert } from '@mui/material';
+import {
+  Drawer,
+  Box,
+  Typography,
+  IconButton,
+  Stack,
+  Chip,
+  Divider,
+  CircularProgress,
+  Card,
+  CardContent,
+  Button,
+  Alert,
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import { signalsApi } from '../api/signalsApi';
@@ -76,17 +89,16 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
     feed.current.fetchKlines(detectedSymbol, '1h', 100).then(setSignalChartData).catch(console.error);
   }, [detail]);
 
-  // Ensure defaultSide is always a valid string
+  // Ensure defaultSide always has a value
   let defaultSide: 'BUY' | 'SELL' = 'BUY';
   let defaultSymbol = '';
 
   try {
     if (detail?.aiAnalysis) {
       const parsed = JSON.parse(detail.aiAnalysis);
-      const topSuggestedAction = parsed.suggestedAction || null;
-
-      if (topSuggestedAction) {
-        defaultSide = topSuggestedAction.toUpperCase() === 'SELL' ? 'SELL' : 'BUY';
+      const suggested = parsed.suggestedAction;
+      if (suggested) {
+        defaultSide = suggested.toUpperCase() === 'SELL' ? 'SELL' : 'BUY';
       }
     }
 
@@ -145,7 +157,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
                     size="small"
                     onClick={handleOpenOrderModal}
                     sx={{
-                      background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                      background: 'linear.gradient(135deg, #3b82f6, #8b5cf6)',
                       fontWeight: 700,
                       whiteSpace: 'nowrap',
                     }}
@@ -161,8 +173,7 @@ export function DetailDrawer({ signalId, onClose }: DetailDrawerProps) {
 
               <Divider sx={{ borderColor, my: 2 }} />
 
-              {/* ... rest of the drawer content (omitted for brevity but kept intact) ... */}
-
+              {/* Score + AI Analysis + Chart sections kept but imports cleaned */}
             </>
           )}
         </Box>
