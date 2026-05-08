@@ -1,4 +1,4 @@
-// ── Data Sources Page (with better notifications) ──
+// ── Data Sources Page (with detailed info) ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -17,7 +17,6 @@ export function DataSourcesPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
 
-  // Connect form state
   const [formType, setFormType] = useState<'TELEGRAM' | 'X'>('TELEGRAM');
   const [formName, setFormName] = useState('');
   const [formToken, setFormToken] = useState('');
@@ -62,27 +61,16 @@ export function DataSourcesPage() {
     setError(null);
 
     try {
-      const config: any = {
-        token: formToken,
-      };
+      const config: any = { token: formToken };
 
       if (formType === 'TELEGRAM' && formChannels.trim()) {
-        const channels = formChannels
-          .split(',')
-          .map((c) => c.trim())
-          .filter(Boolean);
+        const channels = formChannels.split(',').map((c) => c.trim()).filter(Boolean);
         config.channels = channels;
       }
 
-      await dataSourceApi.connectDataSource({
-        type: formType,
-        name: formName,
-        config,
-      });
+      await dataSourceApi.connectDataSource({ type: formType, name: formName, config });
 
-      setSuccessMessage('數據來源連接成功！');
-
-      // Reset form
+      setSuccessMessage(`「${formName}」連接成功！`);
       setFormName('');
       setFormToken('');
       setFormChannels('');
@@ -105,17 +93,18 @@ export function DataSourcesPage() {
     }
   };
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight={700}>
           數據來源設定
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setShowConnectForm(!showConnectForm)}
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowConnectForm(!showConnectForm)}>
           連接新數據來源
         </Button>
       </Stack>
@@ -126,38 +115,19 @@ export function DataSourcesPage() {
       {showConnectForm && (
         <Card sx={{ mb: 3, p: 3 }} variant="outlined">
           <Typography variant="h6" mb={2}>連接新數據來源</Typography>
-
           <Stack spacing={2}>
-            <TextField
-              select
-              label="類型"
-              value={formType}
-              onChange={(e) => setFormType(e.target.value as 'TELEGRAM' | 'X')}
-              fullWidth
-            >
+            <TextField select label="類型" value={formType} onChange={(e) => setFormType(e.target.value as any)} fullWidth>
               <MenuItem value="TELEGRAM">Telegram</MenuItem>
               <MenuItem value="X">X (Twitter)</MenuItem>
             </TextField>
 
-            <TextField
-              label="自訂名稱"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="例如：我的 Telegram 頻道"
-              fullWidth
-            />
+            <TextField label="自訂名稱" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="例如：我的 Telegram 頻道" fullWidth />
 
-            <TextField
-              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
-              value={formToken}
-              onChange={(e) => setFormToken(e.target.value)}
-              type="password"
-              fullWidth
-            />
+            <TextField label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'} value={formToken} onChange={(e) => setFormToken(e.target.value)} type="password" fullWidth />
 
             {formType === 'TELEGRAM' && (
               <TextField
-                label="Channel Username(s)（可用逗號分隔多個）"
+                label="Channel Username(s)（可用逗號分隔）"
                 value={formChannels}
                 onChange={(e) => setFormChannels(e.target.value)}
                 placeholder="@channel1, @channel2"
@@ -167,18 +137,8 @@ export function DataSourcesPage() {
             )}
 
             <Stack direction="row" spacing={2} mt={1}>
-              <Button 
-                variant="outlined" 
-                onClick={() => setShowConnectForm(false)}
-                disabled={connecting}
-              >
-                取消
-              </Button>
-              <Button 
-                variant="contained" 
-                onClick={handleConnect}
-                disabled={connecting || !formName || !formToken}
-              >
+              <Button variant="outlined" onClick={() => setShowConnectForm(false)} disabled={connecting}>取消</Button>
+              <Button variant="contained" onClick={handleConnect} disabled={connecting || !formName || !formToken}>
                 {connecting ? '連接中...' : '連接'}
               </Button>
             </Stack>
@@ -186,62 +146,56 @@ export function DataSourcesPage() {
         </Card>
       )}
 
-      {/* Data Sources List */}
+      {/* Data Sources List with more details */}
       {loading ? (
         <Typography>載入中...</Typography>
       ) : dataSources.length === 0 ? (
         <Card sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">
-            尚未連接任何數據來源
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mt={1}>
-            連接 Telegram 或 X 來開始接收訊號
-          </Typography>
+          <Typography color="text.secondary">尚未連接任何數據來源</Typography>
+          <Typography variant="body2" color="text.secondary" mt={1}>連接 Telegram 或 X 來開始接收訊號</Typography>
         </Card>
       ) : (
         <Stack spacing={2}>
-          {dataSources.map((source) => (
-            <Card key={source.id} variant="outlined">
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {source.name}
-                      </Typography>
-                      <Chip 
-                        label={source.type} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined" 
-                      />
-                      <Chip 
-                        label={source.status} 
-                        size="small" 
-                        color={getStatusColor(source.status) as any}
-                      />
-                    </Stack>
-                    {source.lastError && (
-                      <Typography variant="caption" color="error">
-                        錯誤: {source.lastError}
-                      </Typography>
-                    )}
-                  </Stack>
+          {dataSources.map((source) => {
+            const channelCount = source.config?.channels?.length || (source.config?.channel ? 1 : 0);
+            const usernameCount = source.config?.usernames?.length || (source.config?.username ? 1 : 0);
 
-                  <IconButton 
-                    color="error" 
-                    onClick={() => handleDelete(source.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
+            return (
+              <Card key={source.id} variant="outlined">
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
+                        <Chip label={source.type} size="small" color="primary" variant="outlined" />
+                        <Chip label={source.status} size="small" color={getStatusColor(source.status) as any} />
+                      </Stack>
+
+                      <Typography variant="caption" color="text.secondary">
+                        連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt)}
+                      </Typography>
+
+                      {(channelCount > 0 || usernameCount > 0) && (
+                        <Typography variant="caption" color="text.secondary">
+                          {source.type === 'TELEGRAM' && `已連接 ${channelCount} 個 Channel`}
+                          {source.type === 'X' && `已追蹤 ${usernameCount} 個用戶`}
+                        </Typography>
+                      )}
+
+                      {source.lastError && <Typography variant="caption" color="error">錯誤：{source.lastError}</Typography>}
+                    </Stack>
+
+                    <IconButton color="error" onClick={() => handleDelete(source.id)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
         </Stack>
       )}
 
-      {/* Success Notification */}
       <Snackbar
         open={!!successMessage}
         autoHideDuration={4000}
