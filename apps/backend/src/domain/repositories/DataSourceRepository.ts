@@ -1,6 +1,6 @@
 // ── DataSource Repository Interface ──
 
-import type { DataSource, DataSourceType, DataSourceStatus } from '../entities/DataSource';
+import type { DataSource, DataSourceType } from '../entities/DataSource';
 
 export interface DataSourceRepository {
   findById(id: string): Promise<DataSource | null>;
