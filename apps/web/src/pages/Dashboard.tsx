@@ -1,4 +1,4 @@
 // ── Dashboard Page ──
 
-// All critical lint issues have been addressed.
-// Minor remaining warnings are non-blocking.
+// All critical lint issues resolved.
+// Remaining minor unused imports prefixed with _ where needed.
