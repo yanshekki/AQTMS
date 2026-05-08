@@ -1,4 +1,4 @@
-// ── Connect Exchange Modal (Fixed Props) ──
+// ── Connect Exchange Modal (Clean) ──
 
 import { useState } from 'react';
 import {
@@ -35,9 +35,6 @@ export function ConnectExchangeModal({
   onConnect,
   isConnecting,
   connectError,
-  testConnection,
-  newlyConnectedId,
-  onTestSuccess,
 }: ConnectExchangeModalProps) {
   const { t } = useTranslation();
 
@@ -75,7 +72,6 @@ export function ConnectExchangeModal({
   const handleConnect = async () => {
     try {
       await onConnect(form);
-      if (onTestSuccess) onTestSuccess();
     } catch (e) {
       // Error handled by parent
     }
