@@ -1,4 +1,4 @@
-// ── Data Sources Page (with Delete Dialog) ──
+// ── Data Sources Page (with highlight on new source) ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -17,6 +17,9 @@ export function DataSourcesPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
+
+  // Highlight newly added source
+  const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -45,13 +48,21 @@ export function DataSourcesPage() {
     fetchDataSources();
   }, []);
 
-  // Open delete confirmation dialog
+  // Auto remove highlight after 4 seconds
+  useEffect(() => {
+    if (newlyAddedId) {
+      const timer = setTimeout(() => {
+        setNewlyAddedId(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [newlyAddedId]);
+
   const openDeleteDialog = (source: any) => {
     setDeletingSource(source);
     setDeleteDialogOpen(true);
   };
 
-  // Confirm delete
   const confirmDelete = async () => {
     if (!deletingSource) return;
 
@@ -92,9 +103,11 @@ export function DataSourcesPage() {
         config.channels = channels;
       }
 
-      await dataSourceApi.connectDataSource({ type: formType, name: formName, config });
+      const newSource = await dataSourceApi.connectDataSource({ type: formType, name: formName, config });
 
       setSuccessMessage(`「${formName}」連接成功！`);
+      setNewlyAddedId(newSource.id); // Highlight the new source
+
       setFormName('');
       setFormToken('');
       setFormChannels('');
@@ -181,11 +194,23 @@ export function DataSourcesPage() {
       ) : (
         <Stack spacing={2}>
           {dataSources.map((source) => {
+            const isNew = source.id === newlyAddedId;
             const channelCount = source.config?.channels?.length || (source.config?.channel ? 1 : 0);
             const usernameCount = source.config?.usernames?.length || (source.config?.username ? 1 : 0);
 
             return (
-              <Card key={source.id} variant="outlined">
+              <Card
+                key={source.id}
+                variant="outlined"
+                sx={{
+                  transition: 'all 0.3s ease',
+                  ...(isNew && {
+                    bgcolor: 'rgba(59, 130, 246, 0.08)',
+                    borderColor: '#3b82f6',
+                    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.2)',
+                  }),
+                }}
+              >
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                     <Stack spacing={0.5}>
@@ -193,6 +218,7 @@ export function DataSourcesPage() {
                         <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
                         <Chip label={source.type} size="small" color="primary" variant="outlined" />
                         <Chip label={source.status} size="small" color={getStatusColor(source.status) as any} />
+                        {isNew && <Chip label="新加入" size="small" color="primary" />}
                       </Stack>
 
                       <Typography variant="caption" color="text.secondary">
