@@ -20,13 +20,12 @@ export class DataSourceController {
       }
 
       const { type, name, config } = req.body;
-      const safeConfig = config ?? {};
 
       const dataSource = await this.connectDataSourceUseCase.execute({
         userId,
         type,
         name,
-        config: safeConfig,
+        config: config ?? {},
       });
 
       res.status(201).json({
