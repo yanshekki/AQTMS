@@ -1,4 +1,4 @@
-// ── Exchange Card (Improved) ──
+// ── Exchange Card (with Paper Trading support) ──
 
 import { useState } from 'react';
 import {
@@ -16,6 +16,8 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -27,9 +29,10 @@ import { useThemeMode } from '@/app/Providers';
 import type { ExchangeAccount } from '../lib/schemas';
 
 interface ExchangeCardProps {
-  account: ExchangeAccount;
+  account: ExchangeAccount & { isPaperTrading?: boolean };
   onDelete?: (id: string) => Promise<boolean> | void;
   onTest?: (id: string) => Promise<boolean>;
+  onTogglePaperTrading?: (id: string, isPaperTrading: boolean) => Promise<void>;
   isTesting?: boolean;
   isDeleting?: boolean;
 }
@@ -38,6 +41,7 @@ export function ExchangeCard({
   account,
   onDelete,
   onTest,
+  onTogglePaperTrading,
   isTesting = false,
   isDeleting = false,
 }: ExchangeCardProps) {
@@ -50,8 +54,11 @@ export function ExchangeCard({
   const dimText = isDark ? '#6b7280' : '#94a3b8';
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   const color = account.exchange.toLowerCase() === 'binance' ? '#F0B90B' : '#F7A600';
+
+  const isPaperTrading = account.isPaperTrading ?? false;
 
   const statusConfig: Record<string, any> = {
     CONNECTED: {
@@ -94,6 +101,17 @@ export function ExchangeCard({
     }
   };
 
+  const handleTogglePaperTrading = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!onTogglePaperTrading) return;
+
+    setIsToggling(true);
+    try {
+      await onTogglePaperTrading(account.id, event.target.checked);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   return (
     <>
       <Card
@@ -113,11 +131,23 @@ export function ExchangeCard({
               <Typography variant="subtitle1" fontWeight={700} color={primaryText}>
                 {account.name || account.exchange}
               </Typography>
-              <Chip
-                label={account.exchange}
-                size="small"
-                sx={{ mt: 0.5, bgcolor: `${color}20`, color: color, fontWeight: 600 }}
-              />
+              <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
+                <Chip
+                  label={account.exchange}
+                  size="small"
+                  sx={{ bgcolor: `${color}20`, color: color, fontWeight: 600 }}
+                />
+                {/* Paper Trading Badge */}
+                {isPaperTrading && (
+                  <Chip
+                    label="PAPER"
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                  />
+                )}
+              </Stack>
             </Box>
 
             <Stack direction="row" spacing={0.5}>
@@ -154,6 +184,26 @@ export function ExchangeCard({
               {currentStatus.label}
             </Typography>
           </Stack>
+
+          {/* Paper Trading Toggle */}
+          {onTogglePaperTrading && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isPaperTrading}
+                  onChange={handleTogglePaperTrading}
+                  disabled={isToggling || isDeleting || isTesting}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="caption" color={isPaperTrading ? 'warning.main' : mutedText}>
+                  {isPaperTrading ? '模擬交易' : '真實交易'}
+                </Typography>
+              }
+              sx={{ mb: 1 }}
+            />
+          )}
 
           {/* Balances */}
           {account.balances && account.balances.length > 0 ? (
