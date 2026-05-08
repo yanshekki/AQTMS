@@ -1,10 +1,9 @@
-// ── DataSource API (Fixed) ──
+// ── DataSource API ──
 
 import { z } from 'zod';
 import { safeGet, safePost, safeDelete } from '@/shared/api';
 
-// ... schemas remain the same ...
-
+// Schemas
 const DataSourceSchema = z.object({
   id: z.string(),
   type: z.enum(['TELEGRAM', 'X', 'RSS', 'ONCHAIN']),
