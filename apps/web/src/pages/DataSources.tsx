@@ -1,4 +1,4 @@
-// ── Data Sources Page ──
+// ── Data Sources Page (Improved) ──
 
 import { useState, useEffect } from 'react';
 import {
@@ -85,8 +85,12 @@ export function DataSourcesPage() {
     const trimmedToken = formToken.trim();
     const trimmedChannels = formChannels.trim();
 
-    if (!trimmedName || !trimmedToken) {
-      setError('請填寫名稱和 Token');
+    if (!trimmedName) {
+      setError('請輸入自訂名稱');
+      return;
+    }
+    if (!trimmedToken) {
+      setError(formType === 'TELEGRAM' ? '請輸入 Bot Token' : '請輸入 Bearer Token');
       return;
     }
 
@@ -110,6 +114,7 @@ export function DataSourcesPage() {
       setSuccessMessage(`「${trimmedName}」連接成功！`);
       setNewlyAddedId(newSource.id);
 
+      // Reset form
       setFormName('');
       setFormToken('');
       setFormChannels('');
@@ -117,7 +122,14 @@ export function DataSourcesPage() {
 
       await fetchDataSources(false);
     } catch (err: any) {
-      setError(err.message || '連接失敗，請檢查 Token 是否正確');
+      const message = err.message || '';
+      if (message.includes('token') || message.includes('Token')) {
+        setError('Token 無效或已過期，請檢查後重試');
+      } else if (message.includes('channel') || message.includes('Channel')) {
+        setError('Channel 用戶名無效或無法訪問');
+      } else {
+        setError(message || '連接失敗，請檢查 Token 是否正確');
+      }
     } finally {
       setConnecting(false);
     }
@@ -161,14 +173,35 @@ export function DataSourcesPage() {
         <Card sx={{ mb: 3, p: 3 }} variant="outlined">
           <Typography variant="h6" mb={2}>連接新數據來源</Typography>
           <Stack spacing={2}>
-            <TextField select label="類型" value={formType} onChange={(e) => setFormType(e.target.value as any)} fullWidth>
+            <TextField
+              select
+              label="類型"
+              value={formType}
+              onChange={(e) => setFormType(e.target.value as any)}
+              fullWidth
+              disabled={connecting}
+            >
               <MenuItem value="TELEGRAM">Telegram</MenuItem>
               <MenuItem value="X">X (Twitter)</MenuItem>
             </TextField>
 
-            <TextField label="自訂名稱" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="例如：我的 Telegram 頻道" fullWidth />
+            <TextField
+              label="自訂名稱"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="例如：我的 Telegram 頻道"
+              fullWidth
+              disabled={connecting}
+            />
 
-            <TextField label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'} value={formToken} onChange={(e) => setFormToken(e.target.value)} type="password" fullWidth />
+            <TextField
+              label={formType === 'TELEGRAM' ? 'Bot Token' : 'Bearer Token'}
+              value={formToken}
+              onChange={(e) => setFormToken(e.target.value)}
+              type="password"
+              fullWidth
+              disabled={connecting}
+            />
 
             {formType === 'TELEGRAM' && (
               <TextField
@@ -177,13 +210,21 @@ export function DataSourcesPage() {
                 onChange={(e) => setFormChannels(e.target.value)}
                 placeholder="@channel1, @channel2"
                 fullWidth
+                disabled={connecting}
                 helperText="例如：@cointelegraph, @whale_alert"
               />
             )}
 
             <Stack direction="row" spacing={2} mt={1}>
-              <Button variant="outlined" onClick={() => setShowConnectForm(false)} disabled={connecting}>取消</Button>
-              <Button variant="contained" onClick={handleConnect} disabled={connecting || !formName.trim() || !formToken.trim()}>
+              <Button variant="outlined" onClick={() => setShowConnectForm(false)} disabled={connecting}>
+                取消
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleConnect}
+                disabled={connecting || !formName.trim() || !formToken.trim()}
+                startIcon={connecting ? <CircularProgress size={18} color="inherit" /> : null}
+              >
                 {connecting ? '連接中...' : '連接'}
               </Button>
             </Stack>
@@ -228,12 +269,12 @@ export function DataSourcesPage() {
                         <Typography variant="subtitle1" fontWeight={600}>{source.name}</Typography>
                         <Chip label={source.type} size="small" color="primary" variant="outlined" />
                         <Chip label={source.status} size="small" color={getStatusColor(source.status) as any} />
-                        {isNew && <Chip label="新加入" size="small" color="primary" />} 
+                        {isNew && <Chip label="新加入" size="small" color="primary" />}
                       </Stack>
 
                       <Typography variant="caption" color="text.secondary">
-                        連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt)}
-                      </Typography>
+                        連接時間：{formatDate(source.createdAt)}　|　最後更新：{formatDate(source.lastFetchedAt
+)}                      </Typography>
 
                       {(channelCount > 0 || usernameCount > 0) && (
                         <Typography variant="caption" color="text.secondary">
