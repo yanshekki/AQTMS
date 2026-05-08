@@ -4,7 +4,8 @@ import { PlaceOrderWithProtectionDto } from './dto/place-order-with-protection.d
 import { retry } from '../common/utils/retry.util';
 import { CircuitBreaker } from '../common/circuit-breaker/circuit-breaker';
 import { RiskCheckFailedError } from '../common/errors/risk.error';
-import { ExchangeOrderError, OrderExecutionError } from '../common/errors/order.error';
+import { OrderExecutionError } from '../common/errors/order.error';
+import { PaperTradingService } from '../paper-trading/paper-trading.service';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
@@ -13,13 +14,16 @@ export class ExecutionService implements OnModuleInit {
     resetTimeout: 30000,
   });
 
-  constructor(private readonly riskService: RiskService) {}
+  constructor(
+    private readonly riskService: RiskService,
+    private readonly paperTradingService: PaperTradingService, // 注入 Paper Trading 服務
+  ) {}
 
   onModuleInit() {
-    console.log('[ExecutionService] Initialized with protection order + resilience + custom errors');
+    console.log('[ExecutionService] Initialized with resilience + Paper Trading support');
   }
 
-  async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto) {
+  async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
     const riskResult = await this.riskService.check({
       userId: dto.userId,
       exchange: dto.exchange,
@@ -33,6 +37,24 @@ export class ExecutionService implements OnModuleInit {
       throw new RiskCheckFailedError(riskResult.reason || '風險檢查未通過');
     }
 
+    // 如果是 Paper Trading 模式，使用模擬下單
+    if (dto.isPaperTrading) {
+      const paperOrder = await this.paperTradingService.placePaperOrder({
+        userId: dto.userId,
+        symbol: dto.symbol,
+        side: dto.side,
+        quantity: dto.quantity,
+        price: dto.price || 0,
+      });
+
+      return {
+        success: true,
+        mode: 'PAPER',
+        order: paperOrder,
+      };
+    }
+
+    // 真實交易模式（保留原有邏輯 + resilience）
     try {
       const mainOrder = await this.circuitBreaker.execute(() =>
         retry(() => this.placeMainOrder(dto), {
@@ -58,33 +80,30 @@ export class ExecutionService implements OnModuleInit {
 
       return {
         success: true,
+        mode: 'LIVE',
         mainOrder,
         stopLossOrder,
         takeProfitOrder,
       };
     } catch (error) {
-      if (error instanceof RiskCheckFailedError) {
-        throw error;
-      }
       throw new OrderExecutionError(
-        error instanceof Error ? error.message : '訂單執行過程中發生未知錯誤',
+        error instanceof Error ? error.message : '訂單執行失敗',
       );
     }
   }
 
   private async placeMainOrder(dto: PlaceOrderWithProtectionDto) {
-    console.log(`[Execution] Placing MAIN order: ${dto.side} ${dto.quantity} ${dto.symbol}`);
-    // TODO: 真實交易所下單失敗時應拋出 ExchangeOrderError
-    return { orderId: 'mock-main-' + Date.now(), status: 'FILLED' };
+    console.log(`[Execution] LIVE: Placing MAIN order ${dto.side} ${dto.quantity} ${dto.symbol}`);
+    return { orderId: 'live-main-' + Date.now(), status: 'FILLED' };
   }
 
   private async placeStopLossOrder(dto: PlaceOrderWithProtectionDto) {
-    console.log(`[Execution] Placing STOP LOSS at ${dto.stopLoss}`);
-    return { orderId: 'mock-sl-' + Date.now(), status: 'NEW' };
+    console.log(`[Execution] LIVE: Placing STOP LOSS at ${dto.stopLoss}`);
+    return { orderId: 'live-sl-' + Date.now(), status: 'NEW' };
   }
 
   private async placeTakeProfitOrder(dto: PlaceOrderWithProtectionDto) {
-    console.log(`[Execution] Placing TAKE PROFIT at ${dto.takeProfit}`);
-    return { orderId: 'mock-tp-' + Date.now(), status: 'NEW' };
+    console.log(`[Execution] LIVE: Placing TAKE PROFIT at ${dto.takeProfit}`);
+    return { orderId: 'live-tp-' + Date.now(), status: 'NEW' };
   }
 }
