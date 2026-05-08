@@ -1,6 +1,5 @@
 // ── Bybit Trading Adapter ──
 // Strictly follows Bybit Unified Trading API v5 documentation
-// Official Docs: https://bybit-exchange.github.io/docs/v5/intro
 
 import crypto from 'node:crypto';
 import { BaseTradingAdapter, type OrderRequest, type Balance, type Position, type CancelOrderRequest } from './BaseTradingAdapter';
@@ -245,16 +244,24 @@ export class BybitAdapter extends BaseTradingAdapter {
 
   async getExchangeInfo(): Promise<Record<string, unknown>> {
     const res = await fetch(`${this.baseUrl}/v5/market/instruments-info?category=spot`);
-    return res.json();
+    const data = await res.json();
+    return data as Record<string, unknown>;
   }
 
-  getAssetType(): 'crypto' { return 'crypto'; }
-  supportsLeverage(): boolean { return false; }
+  // ── Asset Info (from BaseTradingAdapter) ──
+  getAssetType(): 'crypto' {
+    return 'crypto';
+  }
+
+  supportsLeverage(): boolean {
+    return false;
+  }
+
   getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
     return ['MARKET', 'LIMIT'];
   }
 
-  // ── Signing (Official Bybit V5 format) ──
+  // ── Signing ──
   private sign(timestamp: string, params: string): string {
     const signStr = `${timestamp}${this.apiKey}${RECV_WINDOW}${params}`;
     return crypto.createHmac('sha256', this.apiSecret).update(signStr).digest('hex');
@@ -294,7 +301,6 @@ export class BybitAdapter extends BaseTradingAdapter {
       const errorMsg = `Bybit API Error [${data.retCode}]: ${data.retMsg}`;
       logger.error({ retCode: data.retCode, retMsg: data.retMsg, path }, errorMsg);
 
-      // Map common error codes
       if (data.retCode === 10003) throw new Error('Bybit: Insufficient permissions');
       if (data.retCode === 10004) throw new Error('Bybit: Invalid signature');
       if (data.retCode === 10006) throw new Error('Bybit: Rate limit exceeded');
