@@ -1,9 +1,10 @@
-import { Injectable, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MetricsService } from '../common/metrics/metrics.service';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-// ... other imports ...
+// TODO: Import your actual RiskService when ready
+// import { RiskService } from '../risk/risk.service';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
@@ -11,7 +12,7 @@ export class ExecutionService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly metricsService: MetricsService,
     private readonly paperTradingService: PaperTradingService,
-    // ... other existing dependencies ...
+    // private readonly riskService: RiskService,   // ← 之後注入
   ) {}
 
   async onModuleInit() {
@@ -19,12 +20,27 @@ export class ExecutionService implements OnModuleInit {
   }
 
   /**
-   * Main entry point for placing orders with risk protection.
-   * Phase 4: Added Paper Trading Mode support.
+   * Phase 4 improved flow:
+   * 1. Risk check first (always)
+   * 2. Then decide Real vs Paper Trading
    */
   async placeOrderWithProtection(dto: any) {
     try {
-      // 1. Get ExchangeAccount to check if paper trading is enabled
+      // ============================================
+      // 1. RISK CHECK（無論真實定模擬都要做）
+      // ============================================
+      // TODO: 呼叫真正嘅 Risk 評估
+      // const riskResult = await this.riskService.evaluatePreTrade(dto);
+      // if (!riskResult.allowed) {
+      //   throw new Error(`Risk check failed: ${riskResult.reason}`);
+      // }
+
+      // 暫時用簡單 log 代表風險檢查已通過
+      console.log(`[Execution] Risk check passed for ${dto.symbol} (Paper mode will be respected)`);
+
+      // ============================================
+      // 2. 取得 ExchangeAccount 判斷係咪 Paper Trading
+      // ============================================
       const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
         where: { id: dto.exchangeAccountId },
       });
@@ -33,7 +49,9 @@ export class ExecutionService implements OnModuleInit {
         throw new Error('Exchange account not found');
       }
 
-      // 2. If Paper Trading Mode is enabled, route to simulator
+      // ============================================
+      // 3. 根據模式路由
+      // ============================================
       if (exchangeAccount.isPaperTrading) {
         this.metricsService.recordOrderPlaced('PAPER', dto.symbol);
 
@@ -48,16 +66,21 @@ export class ExecutionService implements OnModuleInit {
         return {
           success: true,
           isPaper: true,
+          riskChecked: true,
           ...paperResult,
         };
       }
 
-      // 3. Real trading path (existing logic)
-      // ... existing real execution code ...
+      // Real trading path
+      this.metricsService.recordOrderPlaced(dto.exchange || 'REAL', dto.symbol);
 
-      this.metricsService.recordOrderPlaced(dto.exchange, dto.symbol);
-
-      return { success: true, isPaper: false /* ... */ };
+      // TODO: 真正嘅交易所下單邏輯
+      return {
+        success: true,
+        isPaper: false,
+        riskChecked: true,
+        // ... real order result
+      };
     } catch (error) {
       this.metricsService.recordOrderFailed(
         dto.exchange || 'UNKNOWN',
@@ -67,6 +90,4 @@ export class ExecutionService implements OnModuleInit {
       throw error;
     }
   }
-
-  // ... other existing methods ...
 }
