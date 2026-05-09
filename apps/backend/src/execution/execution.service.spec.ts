@@ -11,6 +11,9 @@ import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
 
 describe('ExecutionService', () => {
   let service: ExecutionService;
+  let riskService: RiskService;
+  let killSwitchService: KillSwitchService;
+  let metricsCollector: ExecutionMetricsCollector;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -70,9 +73,10 @@ describe('ExecutionService', () => {
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
+    riskService = module.get<RiskService>(RiskService);
+    killSwitchService = module.get<KillSwitchService>(KillSwitchService);
+    metricsCollector = module.get<ExecutionMetricsCollector>(ExecutionMetricsCollector);
 
-    // Register risk rule
-    const riskService = module.get<RiskService>(RiskService);
     riskService.registerRule(new PositionSizingRule());
   });
 
@@ -80,9 +84,8 @@ describe('ExecutionService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should block trading when Kill Switch is active', async () => {
-    const killSwitch = module.get(KillSwitchService);
-    jest.spyOn(killSwitch, 'isTradingAllowed').mockResolvedValue({
+  it('should block order when Kill Switch is active', async () => {
+    jest.spyOn(killSwitchService, 'isTradingAllowed').mockResolvedValue({
       allowed: false,
       reason: 'Kill switch active',
     });
@@ -99,7 +102,22 @@ describe('ExecutionService', () => {
     ).rejects.toThrow('交易已停止');
   });
 
-  it('should successfully place live order via ExchangeService', async () => {
+  it('should reject order when risk check fails', async () => {
+    jest.spyOn(riskService, 'check').mockResolvedValue({ passed: false, reason: 'Risk check failed' });
+
+    await expect(
+      service.placeOrderWithProtection({
+        userId: 'user-1',
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        quantity: 1,
+        isPaperTrading: false,
+      } as any)
+    ).rejects.toThrow('風險檢查未通過');
+  });
+
+  it('should successfully place live order and record metrics', async () => {
     const result = await service.placeOrderWithProtection({
       userId: 'user-1',
       exchange: 'BINANCE',
@@ -111,5 +129,22 @@ describe('ExecutionService', () => {
 
     expect(result.success).toBe(true);
     expect(result.mode).toBe('LIVE');
+    expect(metricsCollector.recordOrder).toHaveBeenCalledWith(true);
+  });
+
+  it('should use Paper Trading path when isPaperTrading is true', async () => {
+    const paperTradingService = module.get<PaperTradingService>(PaperTradingService);
+    const spy = jest.spyOn(paperTradingService, 'placePaperOrder');
+
+    await service.placeOrderWithProtection({
+      userId: 'user-1',
+      exchange: 'BINANCE',
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 0.01,
+      isPaperTrading: true,
+    } as any);
+
+    expect(spy).toHaveBeenCalled();
   });
 });
