@@ -26,4 +26,14 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   getBybitClient(): BybitWebsocketClient {
     return this.bybitClient;
   }
+
+  /**
+   * Unified method to get WebSocket connection states (useful for health checks)
+   */
+  getConnectionStates() {
+    return {
+      binance: this.binanceClient.getConnectionState?.() || 'UNKNOWN',
+      bybit: 'NOT_IMPLEMENTED_YET',
+    };
+  }
 }
