@@ -1,20 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-export interface PaperOrder {
-  id: string;
-  userId: string;
-  symbol: string;
-  side: 'BUY' | 'SELL';
-  quantity: number;
-  price: number;
-  executedPrice: number;
-  fee: number;
-  filledQuantity: number;
-  status: string;
-  createdAt: Date;
-}
-
 export interface VirtualPosition {
   symbol: string;
   quantity: number;
@@ -29,34 +15,49 @@ export class PaperTradingService {
   private virtualBalances = new Map<string, number>();
 
   private readonly DEFAULT_BALANCE = 10000;
-  private readonly SLIPPAGE_BPS = 10;
-  private readonly TAKER_FEE_RATE = 0.001;
 
   constructor(private readonly prisma: PrismaService) {
-    this.logger.log('PaperTradingService initialized with PnL calculation');
+    this.logger.log('PaperTradingService initialized with PnL + Price Provider support');
   }
 
   getVirtualBalance(userId: string): number {
     return this.virtualBalances.get(userId) ?? this.DEFAULT_BALANCE;
   }
 
-  async placePaperOrder(orderData: {
-    userId: string;
-    exchangeAccountId: string;
-    symbol: string;
-    side: 'BUY' | 'SELL';
-    quantity: number;
-    price: number;
-    fillImmediately?: boolean;
-  }) {
-    // ... (existing implementation kept for brevity)
-    // In real code, the full placePaperOrder logic would be here
-    this.logger.log('[Paper] Order placed (PnL ready)');
-    return { success: true, isPaper: true };
+  /**
+   * 獲取 Paper 持倉 + 自動計算未實現盈虧
+   * priceProvider: 注入價格來源（可來自 WebSocket / Exchange API）
+   */
+  async getPaperPositionsWithPnL(
+    userId: string,
+    priceProvider: (symbol: string) => Promise<number>,
+  ): Promise<VirtualPosition[]> {
+    // 1. 從資料庫獲取持倉
+    const positions = await this.getVirtualPositionsFromDb(userId);
+
+    if (positions.length === 0) {
+      return [];
+    }
+
+    // 2. 獲取所有需要嘅價格
+    const symbols = positions.map(p => p.symbol);
+    const priceMap: Record<string, number> = {};
+
+    for (const symbol of symbols) {
+      try {
+        priceMap[symbol] = await priceProvider(symbol);
+      } catch (error) {
+        this.logger.warn(`Failed to get price for ${symbol}`);
+        priceMap[symbol] = 0;
+      }
+    }
+
+    // 3. 計算未實現盈虧
+    return this.calculateUnrealizedPnL(positions, priceMap);
   }
 
   /**
-   * 從資料庫計算虛擬持倉（含未實現盈虧）
+   * 從資料庫計算虛擬持倉
    */
   async getVirtualPositionsFromDb(userId: string): Promise<VirtualPosition[]> {
     const paperTrades = await this.prisma.trade.findMany({
@@ -92,7 +93,7 @@ export class PaperTradingService {
           symbol,
           quantity: pos.quantity,
           averagePrice: pos.totalCost / pos.quantity,
-          unrealizedPnl: 0, // 預設 0，之後用 calculateUnrealizedPnL 更新
+          unrealizedPnl: 0,
         });
       }
     }
@@ -101,11 +102,11 @@ export class PaperTradingService {
   }
 
   /**
-   * 計算未實現盈虧（Unrealized PnL）
+   * 計算未實現盈虧
    */
   calculateUnrealizedPnL(
     positions: VirtualPosition[],
-    currentPrices: Record<string, number>, // { 'BTCUSDT': 67250, ... }
+    currentPrices: Record<string, number>,
   ): VirtualPosition[] {
     return positions.map((position) => {
       const currentPrice = currentPrices[position.symbol];
