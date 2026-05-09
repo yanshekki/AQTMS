@@ -1,6 +1,7 @@
-// ── Exchanges Page (with Paper Trading toggle) ──
+// ── Exchanges Page (with Paper Positions) ──
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Container, Typography, Grid, Button, Alert, Box, CircularProgress, Stack, Card, CardContent, Chip
 } from '@mui/material';
@@ -10,7 +11,26 @@ import { ExchangeCard } from '@/features/exchange-connect/ui/ExchangeCard';
 import { ConnectExchangeModal } from '@/features/exchange-connect/ui/ConnectExchangeModal';
 import { useExchangeConnection } from '@/features/exchange-connect/model/useExchangeConnection';
 import { useThemeMode } from '@/app/Providers';
+import { useAuth } from '@/hooks/useAuth'; // assume this exists or use atom
 import type { ConnectExchangeForm } from '@/features/exchange-connect/lib/schemas';
+
+import { safeGet } from '@/shared/api';
+
+interface PaperPosition {
+  symbol: string;
+  quantity: number;
+  averagePrice: number;
+  unrealizedPnl: number;
+}
+
+interface PaperPositionsResponse {
+  success: boolean;
+  data: {
+    positions: PaperPosition[];
+    totalUnrealizedPnl: number;
+    count: number;
+  };
+}
 
 export function ExchangesPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -32,8 +52,26 @@ export function ExchangesPage() {
     deleteExchange,
     isDeleting,
     togglePaperTrading,
-    isTogglingPaperTrading,
   } = useExchangeConnection();
+
+  // Get current user ID (adjust according to your auth implementation)
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  // Fetch paper positions for current user
+  const { data: paperData, isLoading: isLoadingPaper } = useQuery({
+    queryKey: ['paper-positions', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const res = await safeGet(`/paper-trading/positions?userId=${userId}`, null as any);
+      return res as PaperPositionsResponse;
+    },
+    enabled: !!userId,
+    refetchInterval: 15000, // refresh every 15s for live PnL
+  });
+
+  const paperPositions = paperData?.data?.positions || [];
+  const totalUnrealizedPnl = paperData?.data?.totalUnrealizedPnl || 0;
 
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -189,6 +227,9 @@ export function ExchangesPage() {
             <Grid item xs={12} sm={6} lg={4} key={account.id}>
               <ExchangeCard
                 account={account}
+                paperPositions={account.isPaperTrading ? paperPositions : []}
+                totalUnrealizedPnl={account.isPaperTrading ? totalUnrealizedPnl : 0}
+                isLoadingPositions={isLoadingPaper}
                 onDelete={handleDelete}
                 onTest={handleTest}
                 onTogglePaperTrading={handleTogglePaperTrading}
