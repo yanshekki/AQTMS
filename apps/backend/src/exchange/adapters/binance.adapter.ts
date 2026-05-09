@@ -18,39 +18,57 @@ export class BinanceAdapter implements IExchangeAdapter {
       : 'https://api.binance.com';
   }
 
-  async placeOrder(params: PlaceOrderParams): Promise<OrderResult> {
-    const timestamp = Date.now();
+  // ... existing placeOrder() implementation ...
 
-    const queryObj: any = {
-      symbol: params.symbol.toUpperCase(),
-      side: params.side.toUpperCase(),
-      type: params.type.toUpperCase(),
-      quantity: params.quantity,
+  async cancelOrder(orderId: string, symbol: string): Promise<boolean> {
+    const timestamp = Date.now();
+    const queryObj = {
+      symbol: symbol.toUpperCase(),
+      orderId,
       timestamp,
     };
-
-    if (params.price) queryObj.price = params.price;
-    if (params.stopPrice) queryObj.stopPrice = params.stopPrice;
-    if (params.timeInForce) queryObj.timeInForce = params.timeInForce;
-    if (params.reduceOnly !== undefined) queryObj.reduceOnly = params.reduceOnly;
 
     const queryString = new URLSearchParams(queryObj).toString();
     const signature = this.createSignature(queryString);
 
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/api/v3/order`,
-        null,
-        {
-          params: {
-            ...queryObj,
-            signature,
-          },
-          headers: {
-            'X-MBX-APIKEY': this.apiKey,
-          },
+      await axios.delete(`${this.baseUrl}/api/v3/order`, {
+        params: {
+          ...queryObj,
+          signature,
         },
-      );
+        headers: {
+          'X-MBX-APIKEY': this.apiKey,
+        },
+      });
+      return true;
+    } catch (error: any) {
+      console.error('[BinanceAdapter] cancelOrder error:', error.response?.data || error.message);
+      return false;
+    }
+  }
+
+  async getOrder(orderId: string, symbol: string): Promise<OrderResult | null> {
+    const timestamp = Date.now();
+    const queryObj = {
+      symbol: symbol.toUpperCase(),
+      orderId,
+      timestamp,
+    };
+
+    const queryString = new URLSearchParams(queryObj).toString();
+    const signature = this.createSignature(queryString);
+
+    try {
+      const response = await axios.get(`${this.baseUrl}/api/v3/order`, {
+        params: {
+          ...queryObj,
+          signature,
+        },
+        headers: {
+          'X-MBX-APIKEY': this.apiKey,
+        },
+      });
 
       const data = response.data;
 
@@ -65,12 +83,26 @@ export class BinanceAdapter implements IExchangeAdapter {
         filledQuantity: parseFloat(data.executedQty),
         price: data.price ? parseFloat(data.price) : undefined,
         averagePrice: data.avgPrice ? parseFloat(data.avgPrice) : undefined,
-        timestamp: data.transactTime || Date.now(),
+        timestamp: data.time || Date.now(),
       };
     } catch (error: any) {
-      console.error('[BinanceAdapter] placeOrder error:', error.response?.data || error.message);
-      throw new Error(`Binance placeOrder failed: ${error.response?.data?.msg || error.message}`);
+      if (error.response?.status === 400) {
+        // Order not found
+        return null;
+      }
+      console.error('[BinanceAdapter] getOrder error:', error.response?.data || error.message);
+      throw error;
     }
+  }
+
+  async getPositions(): Promise<any[]> {
+    // TODO: implement futures/spot position endpoint
+    return [];
+  }
+
+  async getAccountBalance(): Promise<any> {
+    // TODO: implement account balance endpoint
+    return {};
   }
 
   private createSignature(queryString: string): string {
@@ -79,6 +111,4 @@ export class BinanceAdapter implements IExchangeAdapter {
       .update(queryString)
       .digest('hex');
   }
-
-  // ... other methods (cancelOrder, getOrder, etc.) still TODO ...
 }
