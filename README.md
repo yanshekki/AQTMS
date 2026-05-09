@@ -46,7 +46,7 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) | ✅ |
 | **Scoring Rules** | Configurable weight editor (truth/sentiment/relevance/confidence) · Version history · Enable/Disable toggle · PostgreSQL persisted | ✅ |
 | **Notification Center** | In-app notification center · Read/Unread · Filter by type · System seeder · PostgreSQL persisted | ✅ |
-| **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS | ✅ |
+| **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS · **Graceful Shutdown** | ✅ |
 | **Team Collaboration** | 5 roles · Permission validation (whitelist) · Audit logs · CSV export · Audit trail | ✅ |
 | **Complete Documentation** | Bilingual (EN/ZH) · API docs · Architecture docs · User guide · Test wallets · Permission matrix | ✅ |
 
@@ -290,6 +290,13 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 ---
 
 ## 🐳 Deployment
+
+### Graceful Shutdown（Phase 3 新增）
+
+AQTMS 支援 **Graceful Shutdown**，適合 Docker / Kubernetes 環境：
+- 收到 `SIGTERM` / `SIGINT` 時會優雅關閉
+- WebSocket 連線會自動清理
+- 確保進行中嘅交易請求完成後先退出
 
 ### PM2 Process Manager (Recommended)
 
