@@ -5,10 +5,17 @@ import { HistoricalDataService } from '../data/historical-data.service';
 
 // ... existing interfaces
 
-export interface OptimizationResult {
-  bestParams: Record<string, any>;
-  bestResult: BacktestResult;
-  allResults: Array<{
+export interface StrategyConfig {
+  name: string;
+  strategyName: string;
+  params?: Record<string, any>;
+}
+
+export interface StrategyComparisonResult {
+  symbol: string;
+  period: string;
+  results: Array<{
+    strategyName: string;
     params: Record<string, any>;
     result: BacktestResult;
   }>;
@@ -18,76 +25,42 @@ export interface OptimizationResult {
 export class BacktestService {
   constructor(private readonly historicalDataService: HistoricalDataService) {}
 
-  // ... existing runBacktest method ...
+  // ... existing methods (runBacktest, optimizeParameters) ...
 
   /**
-   * 參數優化（簡單 Grid Search）
+   * 多策略比較
    */
-  async optimizeParameters(
-    baseRequest: Omit<BacktestRequest, 'strategyParams'>,
-    paramRanges: Record<string, number[]>, // 例如 { shortPeriod: [5,10,15], longPeriod: [20,30,40] }
-  ): Promise<OptimizationResult> {
-    console.log('[Backtest] Starting parameter optimization...');
+  async compareStrategies(
+    baseRequest: Omit<BacktestRequest, 'strategyName' | 'strategyParams'>,
+    strategies: StrategyConfig[],
+  ): Promise<StrategyComparisonResult> {
+    console.log(`[Backtest] Comparing ${strategies.length} strategies...`);
 
-    const paramNames = Object.keys(paramRanges);
-    const paramValues = Object.values(paramRanges);
+    const results: any[] = [];
 
-    // 產生所有參數組合
-    const combinations = this.generateCombinations(paramValues);
-
-    let bestResult: BacktestResult | null = null;
-    let bestParams: Record<string, any> = {};
-    const allResults: any[] = [];
-
-    for (const combo of combinations) {
-      const params: Record<string, any> = {};
-      paramNames.forEach((name, i) => {
-        params[name] = combo[i];
-      });
-
+    for (const strategyConfig of strategies) {
       const request: BacktestRequest = {
         ...baseRequest,
-        strategyParams: params,
+        strategyName: strategyConfig.strategyName,
+        strategyParams: strategyConfig.params,
       };
 
       const result = await this.runBacktest(request);
 
-      allResults.push({ params, result });
-
-      // 以 totalReturn 為主要排序指標
-      if (!bestResult || result.totalReturn > bestResult.totalReturn) {
-        bestResult = result;
-        bestParams = params;
-      }
+      results.push({
+        strategyName: strategyConfig.name,
+        params: strategyConfig.params || {},
+        result,
+      });
     }
 
-    // 排序結果（由高到低）
-    allResults.sort((a, b) => b.result.totalReturn - a.result.totalReturn);
-
-    console.log(`[Backtest] Optimization done. Best params:`, bestParams);
+    // 按總報酬排序
+    results.sort((a, b) => b.result.totalReturn - a.result.totalReturn);
 
     return {
-      bestParams,
-      bestResult: bestResult!,
-      allResults,
+      symbol: baseRequest.symbol,
+      period: `${baseRequest.startDate} ~ ${baseRequest.endDate}`,
+      results,
     };
-  }
-
-  /**
-   * 產生所有參數組合
-   */
-  private generateCombinations(arrays: number[][]): number[][] {
-    if (arrays.length === 0) return [[]];
-
-    const [first, ...rest] = arrays;
-    const restCombinations = this.generateCombinations(rest);
-
-    const result: number[][] = [];
-    for (const value of first) {
-      for (const combo of restCombinations) {
-        result.push([value, ...combo]);
-      }
-    }
-    return result;
   }
 }
