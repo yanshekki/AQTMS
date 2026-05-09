@@ -22,19 +22,20 @@ model User {
 }
 
 model ExchangeAccount {
-  id           String        @id @default(uuid())
-  userId       String
-  exchange     String
-  name         String
-  apiKey       String
-  apiSecret    String
-  testnet      Boolean       @default(false)
-  status       String        @default("DISCONNECTED")
-  testPassed   Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  user         User          @relation(fields: [userId], references: [id])
-  trades       Trade[]
+  id              String        @id @default(uuid())
+  userId          String
+  exchange        String
+  name            String
+  apiKey          String
+  apiSecret       String
+  testnet         Boolean       @default(false)
+  isPaperTrading  Boolean       @default(false)   // Phase 4: Paper Trading Mode
+  status          String        @default("DISCONNECTED")
+  testPassed      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation(fields: [userId], references: [id])
+  trades          Trade[]
 
   @@unique([userId, exchange, name])
   @@index([userId])
@@ -56,6 +57,7 @@ model Trade {
   filledQuantity      Float         @default(0)
   idempotencyKey      String        @unique
   errorMessage        String?
+  isPaper             Boolean       @default(false)   // Phase 4: mark as paper trade
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   user                User          @relation(fields: [userId], references: [id])
