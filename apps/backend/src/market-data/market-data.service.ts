@@ -1,54 +1,73 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+interface PriceData {
+  price: number;
+  updatedAt: Date;
+}
+
 /**
  * MarketDataService
  *
- * Provides latest market prices for various symbols.
- * Can be backed by WebSocket (Binance/Bybit) or REST fallback.
- *
- * Used by PaperTradingService to calculate real-time Unrealized PnL.
+ * Central service for latest market prices.
+ * Designed to be fed by WebSocket clients (Binance, Bybit, etc.)
+ * and consumed by PaperTradingService for real-time PnL calculation.
  */
 @Injectable()
 export class MarketDataService {
   private readonly logger = new Logger(MarketDataService.name);
 
-  // Simple in-memory price cache
-  // In production, this should be populated by WebSocket clients
-  private priceCache = new Map<string, { price: number; updatedAt: Date }>();
+  // symbol -> { price, updatedAt }
+  private priceCache = new Map<string, PriceData>();
+
+  // Symbols we are interested in tracking
+  private subscribedSymbols = new Set<string>();
 
   constructor() {
-    this.logger.log('MarketDataService initialized');
+    this.logger.log('MarketDataService initialized (ready for WebSocket price feed)');
   }
 
   /**
-   * Get latest price for a symbol (e.g. BTCUSDT)
-   * Returns 0 if price is not available yet.
+   * Subscribe to price updates for specific symbols
+   */
+  subscribeToSymbols(symbols: string[]) {
+    symbols.forEach((symbol) => {
+      this.subscribedSymbols.add(symbol.toUpperCase());
+    });
+    this.logger.log(`Subscribed to price updates: ${symbols.join(', ')}`);
+  }
+
+  /**
+   * Get latest price for a symbol
    */
   async getLatestPrice(symbol: string): Promise<number> {
     const cached = this.priceCache.get(symbol.toUpperCase());
 
     if (cached) {
-      // Price is fresh if updated within last 30 seconds
-      const age = Date.now() - cached.updatedAt.getTime();
-      if (age < 30_000) {
+      const ageMs = Date.now() - cached.updatedAt.getTime();
+      // Consider price fresh if updated within last 10 seconds
+      if (ageMs < 10_000) {
         return cached.price;
       }
     }
 
-    // TODO: Integrate with BinanceWebsocketClient or REST fallback here
-    // For now, return 0 if not in cache
-    this.logger.debug(`Price not available for ${symbol} (cache miss)`);
-    return 0;
+    return 0; // Not available or stale
   }
 
   /**
-   * Update price in cache (called by WebSocket clients)
+   * Update price from external source (WebSocket recommended)
    */
   updatePrice(symbol: string, price: number) {
-    this.priceCache.set(symbol.toUpperCase(), {
+    const normalizedSymbol = symbol.toUpperCase();
+
+    this.priceCache.set(normalizedSymbol, {
       price,
       updatedAt: new Date(),
     });
+
+    // Optional: log only for subscribed symbols
+    if (this.subscribedSymbols.has(normalizedSymbol)) {
+      this.logger.debug(`Price updated: ${normalizedSymbol} = ${price}`);
+    }
   }
 
   /**
@@ -62,5 +81,28 @@ export class MarketDataService {
     }
 
     return result;
+  }
+
+  /**
+   * Get all cached prices (useful for debugging)
+   */
+  getAllCachedPrices(): Record<string, number> {
+    const result: Record<string, number> = {};
+
+    for (const [symbol, data] of this.priceCache.entries()) {
+      result[symbol] = data.price;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if we have fresh price for a symbol
+   */
+  hasFreshPrice(symbol: string, maxAgeMs = 10000): boolean {
+    const cached = this.priceCache.get(symbol.toUpperCase());
+    if (!cached) return false;
+
+    return Date.now() - cached.updatedAt.getTime() < maxAgeMs;
   }
 }
