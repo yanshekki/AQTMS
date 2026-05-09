@@ -50,7 +50,7 @@ AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 
 | **通知中心** | 應用內通知中心 · 已讀/未讀 · 按類型篩選 · 系統種子 · PostgreSQL 持久化 | ✅ |
 | **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS · **Graceful Shutdown** | ✅ |
 | **團隊協作** | 5 角色 · 權限白名單驗證 · 審計日誌 · CSV 導出 · 審計追蹤 | ✅ |
-| **完整文檔** | 雙語（中/英）· API 文件 · 架構文件 · 用戶指南 · 測試錢包 · 權限矩陣 | ✅ |
+| **完整文檔** | 雙語（中/英）· API 文件 · 架構文件 · 用戶指南 · 測試錢包 · 權限矩軸 | ✅ |
 
 ---
 
@@ -202,6 +202,8 @@ apps/web/src/
 
 > 完整 API 文件：參閱 [docs/api.md](docs/api.md)
 
+> **注意**：所有敏感 endpoint（例如 `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
+
 | Method | Endpoint | 權限 | 說明 |
 |--------|----------|------|------|
 | GET | `/health` | Public | 健康檢查 |
@@ -212,7 +214,7 @@ apps/web/src/
 | POST | `/auth/invalidate` | `admin:user:manage` | 撤銷用戶所有 Token |
 | GET | `/api/v1/trades` | `trade:read` | 交易列表（用戶隔離） |
 | GET | `/api/v1/trades/:id` | `trade:read` | 交易詳情（用戶隔離） |
-| POST | `/api/v1/trades` | `trade:execute` | 下單 |
+| POST | `/api/v1/trades` | `trade:execute` | 下單（受 Rate Limiting 保護） |
 | DELETE | `/api/v1/trades` | `trade:cancel` | 撤單 |
 | POST | `/api/v1/exchanges/connect` | `exchange:connect` | 連接交易所（AES-256 加密） |
 | GET | `/api/v1/exchanges` | `exchange:read` | 交易所列表（用戶隔離） |
