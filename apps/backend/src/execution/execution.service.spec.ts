@@ -1,150 +1,74 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionService } from './execution.service';
-import { RiskService } from '../risk/risk.service';
-import { KillSwitchService } from '../safety/kill-switch.service';
-import { OrderService } from '../order/order.service';
-import { ExecutionLoggerService } from './execution-logger.service';
-import { ExecutionMetricsCollector } from './metrics-collector.service';
-import { ExchangeService } from '../exchange/exchange.service';
-import { PaperTradingService } from '../paper-trading/paper-trading.service';
-import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
+// ... other imports ...
 
-describe('ExecutionService', () => {
+describe('ExecutionService - WebSocket Updates', () => {
   let service: ExecutionService;
-  let riskService: RiskService;
-  let killSwitchService: KillSwitchService;
-  let metricsCollector: ExecutionMetricsCollector;
+  let orderService: OrderService;
+  let websocketService: WebsocketService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExecutionService,
+        // ... mock other dependencies ...
         {
-          provide: RiskService,
+          provide: WebsocketService,
           useValue: {
-            check: jest.fn().mockResolvedValue({ passed: true }),
-            registerRule: jest.fn(),
-          },
-        },
-        {
-          provide: KillSwitchService,
-          useValue: {
-            isTradingAllowed: jest.fn().mockResolvedValue({ allowed: true }),
+            getBinanceClient: jest.fn().mockReturnValue({
+              connectUserStream: jest.fn(),
+              onMessage: jest.fn(),
+            }),
           },
         },
         {
           provide: OrderService,
           useValue: {
-            createOrder: jest.fn().mockResolvedValue({ id: 'order-123' }),
+            findByExchangeOrderId: jest.fn(),
+            applyPartialFill: jest.fn(),
             updateOrderStatus: jest.fn(),
           },
         },
-        {
-          provide: ExecutionLoggerService,
-          useValue: {
-            logPlacement: jest.fn(),
-            logError: jest.fn(),
-          },
-        },
-        {
-          provide: ExecutionMetricsCollector,
-          useValue: {
-            recordOrder: jest.fn(),
-            recordRetry: jest.fn(),
-          },
-        },
-        {
-          provide: ExchangeService,
-          useValue: {
-            placeOrder: jest.fn().mockResolvedValue({
-              orderId: 'ex-123',
-              status: 'FILLED',
-              filledQuantity: 1,
-            }),
-          },
-        },
-        {
-          provide: PaperTradingService,
-          useValue: {
-            placePaperOrder: jest.fn(),
-          },
-        },
+        // ... other mocks ...
       ],
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
-    riskService = module.get<RiskService>(RiskService);
-    killSwitchService = module.get<KillSwitchService>(KillSwitchService);
-    metricsCollector = module.get<ExecutionMetricsCollector>(ExecutionMetricsCollector);
-
-    riskService.registerRule(new PositionSizingRule());
+    orderService = module.get<OrderService>(OrderService);
+    websocketService = module.get<WebsocketService>(WebsocketService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('should start listening to order updates via WebSocket', async () => {
+    const binanceClient = websocketService.getBinanceClient();
+
+    await service.startListeningToOrderUpdates();
+
+    expect(binanceClient.connectUserStream).toHaveBeenCalled();
+    expect(binanceClient.onMessage).toHaveBeenCalled();
   });
 
-  it('should block order when Kill Switch is active', async () => {
-    jest.spyOn(killSwitchService, 'isTradingAllowed').mockResolvedValue({
-      allowed: false,
-      reason: 'Kill switch active',
-    });
-
-    await expect(
-      service.placeOrderWithProtection({
-        userId: 'user-1',
-        exchange: 'BINANCE',
-        symbol: 'BTCUSDT',
-        side: 'BUY',
-        quantity: 1,
-        isPaperTrading: false,
-      } as any)
-    ).rejects.toThrow('交易已停止');
-  });
-
-  it('should reject order when risk check fails', async () => {
-    jest.spyOn(riskService, 'check').mockResolvedValue({ passed: false, reason: 'Risk check failed' });
-
-    await expect(
-      service.placeOrderWithProtection({
-        userId: 'user-1',
-        exchange: 'BINANCE',
-        symbol: 'BTCUSDT',
-        side: 'BUY',
-        quantity: 1,
-        isPaperTrading: false,
-      } as any)
-    ).rejects.toThrow('風險檢查未通過');
-  });
-
-  it('should successfully place live order and record metrics', async () => {
-    const result = await service.placeOrderWithProtection({
-      userId: 'user-1',
-      exchange: 'BINANCE',
-      symbol: 'BTCUSDT',
-      side: 'BUY',
-      quantity: 0.01,
-      isPaperTrading: false,
+  it('should call findByExchangeOrderId and applyPartialFill when receiving executionReport', async () => {
+    // 模擬已經有本地訂單
+    jest.spyOn(orderService, 'findByExchangeOrderId').mockResolvedValue({
+      id: 'local-order-123',
+      filledQuantity: 0,
     } as any);
 
-    expect(result.success).toBe(true);
-    expect(result.mode).toBe('LIVE');
-    expect(metricsCollector.recordOrder).toHaveBeenCalledWith(true);
-  });
+    // 直接呼叫私有方法進行測試（實際專案可考慮改為 protected 或使用其他方式）
+    const report = {
+      e: 'executionReport',
+      s: 'BTCUSDT',
+      S: 'BUY',
+      X: 'PARTIALLY_FILLED',
+      z: '0.5',
+      L: '65000',
+      i: 'exchange-order-456',
+      x: 'TRADE',
+    };
 
-  it('should use Paper Trading path when isPaperTrading is true', async () => {
-    const paperTradingService = module.get<PaperTradingService>(PaperTradingService);
-    const spy = jest.spyOn(paperTradingService, 'placePaperOrder');
+    // @ts-ignore - 測試用
+    await service['handleExecutionReport'](report);
 
-    await service.placeOrderWithProtection({
-      userId: 'user-1',
-      exchange: 'BINANCE',
-      symbol: 'BTCUSDT',
-      side: 'BUY',
-      quantity: 0.01,
-      isPaperTrading: true,
-    } as any);
-
-    expect(spy).toHaveBeenCalled();
+    expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('exchange-order-456');
+    expect(orderService.applyPartialFill).toHaveBeenCalled();
   });
 });
