@@ -1,15 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { IStrategy, Candle, Signal } from './interfaces/strategy.interface';
 import { MovingAverageCrossoverStrategy } from './strategies/ma-crossover.strategy';
+import { HistoricalDataService } from '../data/historical-data.service';
 
 export interface BacktestRequest {
   symbol: string;
+  exchange?: 'BINANCE' | 'BYBIT';
   startDate: string;
   endDate: string;
   strategyName: string;
   strategyParams?: Record<string, any>;
   initialCapital: number;
-  candles: Candle[]; // 暫時由外部傳入，之後改成從 HistoricalDataService 獲取
+  interval?: string; // e.g. '1h', '4h', '1d'
 }
 
 export interface BacktestResult {
@@ -23,12 +25,35 @@ export interface BacktestResult {
 
 @Injectable()
 export class BacktestService {
+  constructor(private readonly historicalDataService: HistoricalDataService) {}
+
   async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
-    console.log(`[Backtest] Running backtest for ${request.symbol} using ${request.strategyName}`);
+    const exchange = request.exchange || 'BINANCE';
+    const interval = request.interval || '1h';
 
-    // 根據策略名稱建立策略實例
+    console.log(`[Backtest] Fetching data for ${request.symbol} from ${exchange}...`);
+
+    // 轉換日期為 timestamp
+    const startTime = new Date(request.startDate).getTime();
+    const endTime = new Date(request.endDate).getTime();
+
+    // 獲取歷史數據
+    const candles = await this.historicalDataService.getHistoricalData(
+      exchange,
+      request.symbol,
+      interval,
+      startTime,
+      endTime,
+    );
+
+    if (candles.length === 0) {
+      throw new Error('No historical data found for the given period');
+    }
+
+    console.log(`[Backtest] Loaded ${candles.length} candles. Running strategy...`);
+
+    // 建立策略
     let strategy: IStrategy;
-
     if (request.strategyName === 'MA_Crossover') {
       strategy = new MovingAverageCrossoverStrategy();
     } else {
@@ -37,33 +62,30 @@ export class BacktestService {
 
     strategy.initialize(request.strategyParams);
 
+    // 執行回測邏輯（簡化版）
     let capital = request.initialCapital;
-    let position = 0; // 持倉數量
+    let position = 0;
     let entryPrice = 0;
     let trades = 0;
     let wins = 0;
     let peakCapital = capital;
     let maxDrawdown = 0;
 
-    for (const candle of request.candles) {
+    for (const candle of candles) {
       const signal: Signal | null = strategy.onCandle(candle);
 
       if (!signal || signal.action === 'HOLD') continue;
 
       if (signal.action === 'BUY' && position === 0) {
-        // 買入
         position = 1;
         entryPrice = candle.close;
         trades++;
-      } 
-      else if (signal.action === 'SELL' && position > 0) {
-        // 賣出
+      } else if (signal.action === 'SELL' && position > 0) {
         const pnl = (candle.close - entryPrice) * position;
         capital += pnl;
 
         if (pnl > 0) wins++;
 
-        // 計算最大回撤
         if (capital > peakCapital) peakCapital = capital;
         const drawdown = (peakCapital - capital) / peakCapital;
         if (drawdown > maxDrawdown) maxDrawdown = drawdown;
@@ -81,7 +103,7 @@ export class BacktestService {
       winRate: parseFloat(winRate.toFixed(4)),
       totalReturn: parseFloat(totalReturn.toFixed(4)),
       maxDrawdown: parseFloat(maxDrawdown.toFixed(4)),
-      sharpeRatio: 0, // TODO: 實作 Sharpe Ratio 計算
+      sharpeRatio: 0,
       finalCapital: parseFloat(capital.toFixed(2)),
     };
   }
