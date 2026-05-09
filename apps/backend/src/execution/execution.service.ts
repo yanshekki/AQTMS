@@ -10,45 +10,120 @@ import { KillSwitchService } from '../safety/kill-switch.service';
 import { OrderService } from '../order/order.service';
 import { ExecutionLoggerService } from './execution-logger.service';
 import { ExecutionMetricsCollector } from './metrics-collector.service';
+import { BinanceAdapter } from '../exchange/adapters/binance.adapter';
+import { PlaceOrderParams } from '../exchange/interfaces/exchange.adapter';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
-  // ... existing code ...
+  private circuitBreaker = new CircuitBreaker({
+    failureThreshold: 5,
+    resetTimeout: 30000,
+  });
 
-  /**
-   * 處理交易所發來的成交更新（包含部分成交）
-   */
-  async handleOrderFillUpdate(
-    orderId: string,
-    fillQuantity: number,
-    fillPrice: number,
-  ) {
+  constructor(
+    private readonly riskService: RiskService,
+    private readonly paperTradingService: PaperTradingService,
+    private readonly killSwitchService: KillSwitchService,
+    private readonly orderService: OrderService,
+    private readonly logger: ExecutionLoggerService,
+    private readonly metricsCollector: ExecutionMetricsCollector,
+    private readonly binanceAdapter: BinanceAdapter,
+  ) {}
+
+  async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
     try {
-      const updatedOrder = this.orderService.applyPartialFill(
-        orderId,
-        fillQuantity,
-        fillPrice,
+      if (!dto.isPaperTrading) {
+        const tradingStatus = this.killSwitchService.isTradingAllowed();
+        if (!tradingStatus.allowed) {
+          throw new OrderExecutionError(`交易已停止: ${tradingStatus.reason}`);
+        }
+      }
+
+      const riskResult = await this.riskService.check({
+        userId: dto.userId,
+        exchange: dto.exchange,
+        symbol: dto.symbol,
+        side: dto.side,
+        quantity: dto.quantity,
+        price: dto.price,
+      });
+
+      if (!riskResult.passed) {
+        throw new RiskCheckFailedError(riskResult.reason || '風險檢查未通過');
+      }
+
+      if (dto.isPaperTrading) {
+        return this.paperTradingService.placePaperOrder({
+          userId: dto.userId,
+          symbol: dto.symbol,
+          side: dto.side,
+          quantity: dto.quantity,
+          price: dto.price || 0,
+        });
+      }
+
+      // === Real Live Trading with BinanceAdapter ===
+      const mainOrderRecord = this.orderService.createOrder({
+        userId: dto.userId,
+        exchange: dto.exchange,
+        symbol: dto.symbol,
+        side: dto.side,
+        type: 'MARKET',
+        quantity: dto.quantity,
+        price: dto.price,
+      });
+
+      const adapterParams: PlaceOrderParams = {
+        symbol: dto.symbol,
+        side: dto.side,
+        type: 'MARKET',
+        quantity: dto.quantity,
+        price: dto.price,
+      };
+
+      const mainOrderResult = await this.circuitBreaker.execute(() =>
+        retry(
+          () => this.binanceAdapter.placeOrder(adapterParams),
+          {
+            retries: 3,
+            delay: 1000,
+            shouldRetry: (error) => this.isTransientError(error),
+            onRetry: () => this.metricsCollector.recordRetry(),
+          },
+        ),
       );
 
-      this.logger.logStatusUpdate({
-        orderId,
-        fromStatus: 'PREVIOUS',
-        toStatus: updatedOrder.status,
-        filledQuantity: updatedOrder.filledQuantity,
-      });
+      this.orderService.updateOrderStatus(
+        mainOrderRecord.id,
+        'FILLED' as any,
+        mainOrderResult.filledQuantity || dto.quantity,
+        mainOrderResult.averagePrice || dto.price,
+      );
 
-      // TODO: 如果需要，可在此更新本地倉位與風險狀態
+      this.metricsCollector.recordOrder(true);
 
-      return updatedOrder;
+      return {
+        success: true,
+        mode: 'LIVE',
+        mainOrder: mainOrderResult,
+        mainOrderRecord,
+      };
     } catch (error) {
+      this.metricsCollector.recordOrder(false);
       this.logger.logError({
-        action: 'PARTIAL_FILL_UPDATE_FAILED',
-        orderId,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        action: 'ORDER_FAILED',
+        userId: dto.userId,
+        error: error instanceof Error ? error.message : '',
       });
-      throw error;
+      if (error instanceof RiskCheckFailedError) throw error;
+      throw new OrderExecutionError(error instanceof Error ? error.message : 'Execution failed');
     }
   }
 
-  // ... existing methods ...
+  private isTransientError(error: any): boolean {
+    const msg = (error?.message || '').toLowerCase();
+    return ['timeout', 'econnreset', 'network', 'rate limit', '503', '429'].some(kw => msg.includes(kw));
+  }
+
+  // ... handleOrderFillUpdate and other methods ...
 }
