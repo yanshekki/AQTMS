@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import WebSocket from 'ws';
-import axios from 'axios';
 import { StructuredLoggerService } from '../../common/logger/logger.service';
+import { MarketDataService } from '../../market-data/market-data.service';
 
 export enum ConnectionState {
   DISCONNECTED = 'DISCONNECTED',
@@ -13,8 +13,19 @@ export enum ConnectionState {
 @Injectable()
 export class BinanceWebsocketClient {
   private structuredLogger = new StructuredLoggerService();
+  private ws: WebSocket | null = null;
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  private reconnectAttempts = 0;
+  private readonly baseUrl = 'wss://stream.binance.com:9443/ws';
 
-  constructor() {
+  private messageCallback?: (data: any) => void;
+  private errorCallback?: (error: Error) => void;
+  private closeCallback?: () => void;
+
+  constructor(
+    @Inject(forwardRef(() => MarketDataService))
+    private readonly marketDataService: MarketDataService,
+  ) {
     this.structuredLogger.setContext('BinanceWebsocketClient');
   }
 
@@ -45,13 +56,17 @@ export class BinanceWebsocketClient {
       });
 
       this.ws.on('message', (data: string) => {
-        if (this.messageCallback) {
-          try {
-            const parsed = JSON.parse(data);
+        try {
+          const parsed = JSON.parse(data);
+
+          // === 新增：處理價格更新 ===
+          this.handlePriceUpdate(parsed);
+
+          if (this.messageCallback) {
             this.messageCallback(parsed);
-          } catch (e) {
-            this.structuredLogger.error('Failed to parse WebSocket message');
           }
+        } catch (e) {
+          this.structuredLogger.error('Failed to parse WebSocket message');
         }
       });
 
@@ -77,5 +92,35 @@ export class BinanceWebsocketClient {
     });
   }
 
-  // ... keep other methods ...
+  /**
+   * 處理價格更新消息（miniTicker / ticker）
+   */
+  private handlePriceUpdate(parsed: any) {
+    try {
+      // miniTicker 单符号
+      if (parsed.e === '24hrMiniTicker' || parsed.e === 'miniTicker') {
+        if (parsed.s && parsed.c) {
+          this.marketDataService.updatePrice(parsed.s, parseFloat(parsed.c));
+        }
+      }
+
+      // 数组形式（!miniTicker@arr）
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item.s && item.c) {
+            this.marketDataService.updatePrice(item.s, parseFloat(item.c));
+          }
+        }
+      }
+    } catch (error) {
+      // 忽略非价格消息
+    }
+  }
+
+  private resubscribeStreams() {
+    // TODO: 根據需要自動訂閱常用交易對
+    // 例如 this.subscribeToMiniTicker(['BTCUSDT', 'ETHUSDT']);
+  }
+
+  // ... 其他方法保持不變 ...
 }
