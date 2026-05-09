@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import WebSocket from 'ws';
 import axios from 'axios';
 
+export enum ConnectionState {
+  DISCONNECTED = 'DISCONNECTED',
+  CONNECTING = 'CONNECTING',
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+}
+
 @Injectable()
 export class BinanceWebsocketClient {
   private ws: WebSocket | null = null;
@@ -11,9 +18,7 @@ export class BinanceWebsocketClient {
   private errorCallback?: (error: Error) => void;
   private closeCallback?: () => void;
 
-  private listenKey: string | null = null;
-  private keepAliveInterval: NodeJS.Timeout | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
 
@@ -29,70 +34,68 @@ export class BinanceWebsocketClient {
     this.apiKey = process.env.BINANCE_API_KEY || '';
   }
 
-  // ... existing connect() and other methods ...
+  getConnectionState(): ConnectionState {
+    return this.connectionState;
+  }
 
-  async connectUserStream(): Promise<void> {
-    if (!this.listenKey) {
-      await this.getListenKey();
+  private setState(state: ConnectionState) {
+    if (this.connectionState !== state) {
+      console.log(`[BinanceWebsocket] State changed: ${this.connectionState} -> ${state}`);
+      this.connectionState = state;
     }
+  }
 
-    const userStreamUrl = `${this.baseUrl.replace('https', 'wss').replace('/api', '')}/ws/${this.listenKey}`;
+  async connect(): Promise<void> {
+    this.setState(ConnectionState.CONNECTING);
 
-    this.userDataWs = new WebSocket(userStreamUrl);
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(this.baseUrl);
 
-    this.userDataWs.on('open', () => {
-      console.log('[BinanceWebsocket] User Data Stream connected');
-      this.startKeepAlive();
-    });
+      this.ws.on('open', () => {
+        this.setState(ConnectionState.CONNECTED);
+        this.reconnectAttempts = 0;
+        this.resubscribeStreams();
+        resolve();
+      });
 
-    this.userDataWs.on('message', (data: string) => {
-      try {
-        const parsed = JSON.parse(data);
-
-        // Auto handle listenKey expiration
-        if (parsed.e === 'listenKeyExpired') {
-          console.warn('[BinanceWebsocket] listenKey expired. Reconnecting user data stream...');
-          this.reconnectUserDataStream();
-          return;
-        }
-
+      this.ws.on('message', (data: string) => {
         if (this.messageCallback) {
-          this.messageCallback(parsed);
+          try {
+            const parsed = JSON.parse(data);
+            this.messageCallback(parsed);
+          } catch (e) {
+            console.error('[BinanceWebsocket] Failed to parse message');
+          }
         }
-      } catch (e) {
-        console.error('[BinanceWebsocket] Failed to parse user data message');
-      }
-    });
+      });
 
-    this.userDataWs.on('error', (error) => {
-      console.error('[BinanceWebsocket] User Data Stream error:', error);
-      if (this.errorCallback) this.errorCallback(error as Error);
-    });
+      this.ws.on('error', (error) => {
+        console.error('[BinanceWebsocket] Error:', error);
+        this.setState(ConnectionState.RECONNECTING);
+        if (this.errorCallback) this.errorCallback(error as Error);
+        this.scheduleReconnect();
+      });
 
-    this.userDataWs.on('close', () => {
-      console.log('[BinanceWebsocket] User Data Stream closed');
-      if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-      }
-      if (this.closeCallback) this.closeCallback();
+      this.ws.on('close', () => {
+        console.log('[BinanceWebsocket] Disconnected');
+        this.setState(ConnectionState.DISCONNECTED);
+        if (this.closeCallback) this.closeCallback();
+        this.scheduleReconnect();
+      });
+
+      // Heartbeat
+      setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.ping();
+        }
+      }, 30000);
     });
   }
 
-  private async reconnectUserDataStream() {
-    if (this.userDataWs) {
-      this.userDataWs.close();
-    }
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
-
-    this.listenKey = null;
-    await this.connectUserStream();
-  }
-
-  // ... keep other existing methods (connect, scheduleReconnect, etc.) ...
+  // ... keep scheduleReconnect, resubscribeStreams, subscribePublic, etc. ...
 
   disconnect(): void {
+    this.setState(ConnectionState.DISCONNECTED);
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
     if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
 
