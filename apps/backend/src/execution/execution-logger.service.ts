@@ -1,36 +1,20 @@
-import { Injectable } from '@nestjs/common';
-
-export interface ExecutionLog {
-  timestamp: Date;
-  level: 'info' | 'warn' | 'error';
-  action: string;
-  userId?: string;
-  orderId?: string;
-  symbol?: string;
-  side?: string;
-  quantity?: number;
-  price?: number;
-  latencyMs?: number;
-  attempt?: number;
-  message?: string;
-  error?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface LogQuery {
-  userId?: string;
-  orderId?: string;
-  symbol?: string;
-  action?: string;
-  level?: 'info' | 'warn' | 'error';
-  startTime?: Date;
-  endTime?: Date;
-  limit?: number;
-}
+import { Injectable, Inject, Optional } from '@nestjs/common';
+import { IExecutionLogRepository } from './interfaces/execution-log.repository';
+import { ExecutionLog, LogQuery } from './execution-logger.service';
 
 @Injectable()
 export class ExecutionLoggerService {
-  private logs: ExecutionLog[] = [];
+  constructor(
+    @Optional() @Inject('EXECUTION_LOG_REPOSITORY')
+    private readonly logRepository?: IExecutionLogRepository,
+  ) {}
+
+  private get repository(): IExecutionLogRepository {
+    if (!this.logRepository) {
+      throw new Error('ExecutionLogRepository not provided');
+    }
+    return this.logRepository;
+  }
 
   logPlacement(params: {
     userId: string;
@@ -92,67 +76,26 @@ export class ExecutionLoggerService {
       timestamp: new Date(),
     };
 
-    this.logs.push(logEntry);
+    this.repository.save(logEntry);
 
-    // 結構化輸出
+    // 同時輸出到 console（方便開發）
     console.log(JSON.stringify({
       ...logEntry,
       service: 'execution',
     }));
-
-    // 限制記憶體日誌數量（MVP）
-    if (this.logs.length > 10000) {
-      this.logs.shift();
-    }
   }
 
-  /**
-   * 查詢日誌（支援多條件過濾）
-   */
   getLogs(query: LogQuery = {}): ExecutionLog[] {
-    let result = this.logs;
-
-    if (query.userId) {
-      result = result.filter(log => log.userId === query.userId);
-    }
-    if (query.orderId) {
-      result = result.filter(log => log.orderId === query.orderId);
-    }
-    if (query.symbol) {
-      result = result.filter(log => log.symbol === query.symbol);
-    }
-    if (query.action) {
-      result = result.filter(log => log.action === query.action);
-    }
-    if (query.level) {
-      result = result.filter(log => log.level === query.level);
-    }
-    if (query.startTime) {
-      result = result.filter(log => log.timestamp >= query.startTime!);
-    }
-    if (query.endTime) {
-      result = result.filter(log => log.timestamp <= query.endTime!);
-    }
-
-    // 排序（由新到舊）
-    result = result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-    if (query.limit) {
-      result = result.slice(0, query.limit);
-    }
-
-    return result;
+    return this.repository.find(query) as ExecutionLog[];
   }
 
-  /**
-   * 取得簡單統計數據
-   */
   getStats() {
-    const total = this.logs.length;
-    const errors = this.logs.filter(l => l.level === 'error').length;
-    const retries = this.logs.filter(l => l.action === 'RETRY').length;
+    const logs = this.repository.find({}) as ExecutionLog[];
+    const total = logs.length;
+    const errors = logs.filter(l => l.level === 'error').length;
+    const retries = logs.filter(l => l.action === 'RETRY').length;
 
-    const latencies = this.logs
+    const latencies = logs
       .filter(l => l.latencyMs !== undefined)
       .map(l => l.latencyMs!);
 
@@ -170,6 +113,6 @@ export class ExecutionLoggerService {
   }
 
   clearLogs() {
-    this.logs = [];
+    this.repository.clear();
   }
 }
