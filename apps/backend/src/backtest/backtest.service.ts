@@ -3,137 +3,91 @@ import { IStrategy, Candle, Signal } from './interfaces/strategy.interface';
 import { MovingAverageCrossoverStrategy } from './strategies/ma-crossover.strategy';
 import { HistoricalDataService } from '../data/historical-data.service';
 
-export interface BacktestRequest {
-  symbol: string;
-  exchange?: 'BINANCE' | 'BYBIT';
-  startDate: string;
-  endDate: string;
-  strategyName: string;
-  strategyParams?: Record<string, any>;
-  initialCapital: number;
-  interval?: string;
-  feeRate?: number;
-  positionSizePercent?: number; // 每次交易使用資金比例
-}
+// ... existing interfaces
 
-export interface BacktestResult {
-  totalTrades: number;
-  winRate: number;
-  totalReturn: number;
-  maxDrawdown: number;
-  sharpeRatio: number;
-  finalCapital: number;
-  totalFees: number;
+export interface OptimizationResult {
+  bestParams: Record<string, any>;
+  bestResult: BacktestResult;
+  allResults: Array<{
+    params: Record<string, any>;
+    result: BacktestResult;
+  }>;
 }
 
 @Injectable()
 export class BacktestService {
   constructor(private readonly historicalDataService: HistoricalDataService) {}
 
-  async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
-    const exchange = request.exchange || 'BINANCE';
-    const interval = request.interval || '1h';
-    const feeRate = request.feeRate ?? 0.001;
-    const positionSizePercent = request.positionSizePercent ?? 0.95; // 預設用 95% 資金
+  // ... existing runBacktest method ...
 
-    const startTime = new Date(request.startDate).getTime();
-    const endTime = new Date(request.endDate).getTime();
+  /**
+   * 參數優化（簡單 Grid Search）
+   */
+  async optimizeParameters(
+    baseRequest: Omit<BacktestRequest, 'strategyParams'>,
+    paramRanges: Record<string, number[]>, // 例如 { shortPeriod: [5,10,15], longPeriod: [20,30,40] }
+  ): Promise<OptimizationResult> {
+    console.log('[Backtest] Starting parameter optimization...');
 
-    const candles = await this.historicalDataService.getHistoricalData(
-      exchange,
-      request.symbol,
-      interval,
-      startTime,
-      endTime,
-    );
+    const paramNames = Object.keys(paramRanges);
+    const paramValues = Object.values(paramRanges);
 
-    if (candles.length === 0) {
-      throw new Error('No historical data found');
-    }
+    // 產生所有參數組合
+    const combinations = this.generateCombinations(paramValues);
 
-    // 建立策略
-    let strategy: IStrategy;
-    if (request.strategyName === 'MA_Crossover') {
-      strategy = new MovingAverageCrossoverStrategy();
-    } else {
-      throw new Error(`Unknown strategy: ${request.strategyName}`);
-    }
+    let bestResult: BacktestResult | null = null;
+    let bestParams: Record<string, any> = {};
+    const allResults: any[] = [];
 
-    strategy.initialize(request.strategyParams);
+    for (const combo of combinations) {
+      const params: Record<string, any> = {};
+      paramNames.forEach((name, i) => {
+        params[name] = combo[i];
+      });
 
-    // 初始化回測變數
-    let capital = request.initialCapital;
-    let positionQty = 0;
-    let entryPrice = 0;
-    let trades = 0;
-    let wins = 0;
-    let totalFees = 0;
+      const request: BacktestRequest = {
+        ...baseRequest,
+        strategyParams: params,
+      };
 
-    const equityCurve: number[] = [capital];
-    let peakCapital = capital;
-    let maxDrawdown = 0;
+      const result = await this.runBacktest(request);
 
-    for (const candle of candles) {
-      const signal: Signal | null = strategy.onCandle(candle);
+      allResults.push({ params, result });
 
-      if (!signal || signal.action === 'HOLD') {
-        equityCurve.push(capital + positionQty * candle.close);
-        continue;
+      // 以 totalReturn 為主要排序指標
+      if (!bestResult || result.totalReturn > bestResult.totalReturn) {
+        bestResult = result;
+        bestParams = params;
       }
-
-      // 計算當前權益
-      const currentEquity = capital + positionQty * candle.close;
-
-      if (signal.action === 'BUY' && positionQty === 0) {
-        // 使用部分資金買入
-        const investAmount = currentEquity * positionSizePercent;
-        positionQty = investAmount / candle.close;
-        entryPrice = candle.close;
-
-        // 扣手續費
-        const fee = investAmount * feeRate;
-        capital -= fee;
-        totalFees += fee;
-
-        trades++;
-      } 
-      else if (signal.action === 'SELL' && positionQty > 0) {
-        // 賣出
-        const sellValue = positionQty * candle.close;
-        const pnl = sellValue - (positionQty * entryPrice);
-
-        capital += sellValue;
-        const fee = sellValue * feeRate;
-        capital -= fee;
-        totalFees += fee;
-
-        if (pnl > 0) wins++;
-
-        positionQty = 0;
-        trades++;
-      }
-
-      // 更新權益曲線與最大回撤
-      const newEquity = capital + positionQty * candle.close;
-      equityCurve.push(newEquity);
-
-      if (newEquity > peakCapital) peakCapital = newEquity;
-      const drawdown = (peakCapital - newEquity) / peakCapital;
-      if (drawdown > maxDrawdown) maxDrawdown = drawdown;
     }
 
-    const finalCapital = capital + positionQty * (candles[candles.length - 1]?.close || 0);
-    const winRate = trades > 0 ? wins / trades : 0;
-    const totalReturn = (finalCapital - request.initialCapital) / request.initialCapital;
+    // 排序結果（由高到低）
+    allResults.sort((a, b) => b.result.totalReturn - a.result.totalReturn);
+
+    console.log(`[Backtest] Optimization done. Best params:`, bestParams);
 
     return {
-      totalTrades: trades,
-      winRate: parseFloat(winRate.toFixed(4)),
-      totalReturn: parseFloat(totalReturn.toFixed(4)),
-      maxDrawdown: parseFloat(maxDrawdown.toFixed(4)),
-      sharpeRatio: 0, // TODO
-      finalCapital: parseFloat(finalCapital.toFixed(2)),
-      totalFees: parseFloat(totalFees.toFixed(2)),
+      bestParams,
+      bestResult: bestResult!,
+      allResults,
     };
+  }
+
+  /**
+   * 產生所有參數組合
+   */
+  private generateCombinations(arrays: number[][]): number[][] {
+    if (arrays.length === 0) return [[]];
+
+    const [first, ...rest] = arrays;
+    const restCombinations = this.generateCombinations(rest);
+
+    const result: number[][] = [];
+    for (const value of first) {
+      for (const combo of restCombinations) {
+        result.push([value, ...combo]);
+      }
+    }
+    return result;
   }
 }
