@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { BinanceWebsocketClient } from '../websocket/clients/binance-websocket.client';
 
 export interface VirtualPosition {
   symbol: string;
@@ -18,25 +19,20 @@ export class PaperTradingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly marketDataService: MarketDataService,
+    @Inject(forwardRef(() => BinanceWebsocketClient))
+    private readonly binanceWebsocketClient: BinanceWebsocketClient,
   ) {
-    this.logger.log('PaperTradingService initialized with DB persisted virtual balance');
+    this.logger.log('PaperTradingService initialized with auto price subscription');
   }
 
-  /**
-   * Get virtual balance for a specific ExchangeAccount (persisted)
-   */
   async getVirtualBalance(exchangeAccountId: string): Promise<number> {
     const account = await this.prisma.exchangeAccount.findUnique({
       where: { id: exchangeAccountId },
       select: { paperVirtualBalance: true },
     });
-
     return account?.paperVirtualBalance ?? this.DEFAULT_PAPER_BALANCE;
   }
 
-  /**
-   * Update virtual balance for a specific ExchangeAccount
-   */
   private async updateVirtualBalance(exchangeAccountId: string, newBalance: number) {
     await this.prisma.exchangeAccount.update({
       where: { id: exchangeAccountId },
@@ -44,9 +40,6 @@ export class PaperTradingService {
     });
   }
 
-  /**
-   * Place a paper order with persisted balance
-   */
   async placePaperOrder(orderData: {
     userId: string;
     exchangeAccountId: string;
@@ -65,24 +58,19 @@ export class PaperTradingService {
     const executedPrice = price * (1 + slippage);
 
     const notional = quantity * executedPrice;
-    const fee = notional * 0.001; // 0.1% taker fee
+    const fee = notional * 0.001;
 
     const costWithFee = side === 'BUY' ? notional + fee : notional - fee;
 
     if (side === 'BUY' && currentBalance < costWithFee) {
-      throw new Error(`虛擬餘額不足（需要 ${costWithFee.toFixed(2)}）`);
+      throw new Error(`虛擬餘額不足`);
     }
 
-    const newBalance = side === 'BUY' 
-      ? currentBalance - costWithFee 
-      : currentBalance + costWithFee;
-
-    // Persist new balance
+    const newBalance = side === 'BUY' ? currentBalance - costWithFee : currentBalance + costWithFee;
     await this.updateVirtualBalance(exchangeAccountId, newBalance);
 
     const orderId = 'paper-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
 
-    // Save paper trade to DB
     await this.prisma.trade.create({
       data: {
         id: orderId,
@@ -100,17 +88,17 @@ export class PaperTradingService {
       },
     });
 
-    this.logger.log(`[Paper] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} | Balance: ${newBalance.toFixed(2)}`);
+    // === 自動訂閱該 symbol 嘅實時價格 ===
+    try {
+      this.binanceWebsocketClient.subscribeToMiniTicker([symbol]);
+    } catch (e) {
+      this.logger.warn('Failed to auto-subscribe price stream');
+    }
 
-    return {
-      success: true,
-      orderId,
-      isPaper: true,
-      executedPrice,
-      fee,
-      newBalance,
-    };
+    this.logger.log(`[Paper] ${side} ${quantity} ${symbol} | Balance updated`);
+
+    return { success: true, orderId, isPaper: true, executedPrice };
   }
 
-  // ... other methods (getVirtualPositionsFromDb, calculateUnrealizedPnL, etc.) remain the same
+  // ... other methods remain ...
 }
