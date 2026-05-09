@@ -18,91 +18,70 @@ export class BinanceAdapter implements IExchangeAdapter {
       : 'https://api.binance.com';
   }
 
-  // ... existing placeOrder() implementation ...
-
-  async cancelOrder(orderId: string, symbol: string): Promise<boolean> {
-    const timestamp = Date.now();
-    const queryObj = {
-      symbol: symbol.toUpperCase(),
-      orderId,
-      timestamp,
-    };
-
-    const queryString = new URLSearchParams(queryObj).toString();
-    const signature = this.createSignature(queryString);
-
-    try {
-      await axios.delete(`${this.baseUrl}/api/v3/order`, {
-        params: {
-          ...queryObj,
-          signature,
-        },
-        headers: {
-          'X-MBX-APIKEY': this.apiKey,
-        },
-      });
-      return true;
-    } catch (error: any) {
-      console.error('[BinanceAdapter] cancelOrder error:', error.response?.data || error.message);
-      return false;
-    }
-  }
-
-  async getOrder(orderId: string, symbol: string): Promise<OrderResult | null> {
-    const timestamp = Date.now();
-    const queryObj = {
-      symbol: symbol.toUpperCase(),
-      orderId,
-      timestamp,
-    };
-
-    const queryString = new URLSearchParams(queryObj).toString();
-    const signature = this.createSignature(queryString);
-
-    try {
-      const response = await axios.get(`${this.baseUrl}/api/v3/order`, {
-        params: {
-          ...queryObj,
-          signature,
-        },
-        headers: {
-          'X-MBX-APIKEY': this.apiKey,
-        },
-      });
-
-      const data = response.data;
-
-      return {
-        orderId: data.orderId?.toString() || '',
-        exchangeOrderId: data.orderId?.toString() || '',
-        symbol: data.symbol,
-        side: data.side as OrderSide,
-        type: data.type as OrderType,
-        status: data.status,
-        quantity: parseFloat(data.origQty),
-        filledQuantity: parseFloat(data.executedQty),
-        price: data.price ? parseFloat(data.price) : undefined,
-        averagePrice: data.avgPrice ? parseFloat(data.avgPrice) : undefined,
-        timestamp: data.time || Date.now(),
-      };
-    } catch (error: any) {
-      if (error.response?.status === 400) {
-        // Order not found
-        return null;
-      }
-      console.error('[BinanceAdapter] getOrder error:', error.response?.data || error.message);
-      throw error;
-    }
-  }
+  // ... existing methods (placeOrder, cancelOrder, getOrder) ...
 
   async getPositions(): Promise<any[]> {
-    // TODO: implement futures/spot position endpoint
-    return [];
+    const timestamp = Date.now();
+    // For Futures positions
+    const queryObj = { timestamp };
+    const queryString = new URLSearchParams(queryObj).toString();
+    const signature = this.createSignature(queryString);
+
+    try {
+      const response = await axios.get(`${this.baseUrl}/fapi/v2/positionRisk`, {
+        params: {
+          ...queryObj,
+          signature,
+        },
+        headers: {
+          'X-MBX-APIKEY': this.apiKey,
+        },
+      });
+
+      return response.data.map((pos: any) => ({
+        symbol: pos.symbol,
+        positionAmt: parseFloat(pos.positionAmt),
+        entryPrice: parseFloat(pos.entryPrice),
+        unrealizedProfit: parseFloat(pos.unRealizedProfit),
+        leverage: parseInt(pos.leverage),
+      }));
+    } catch (error: any) {
+      console.error('[BinanceAdapter] getPositions error:', error.response?.data || error.message);
+      return [];
+    }
   }
 
   async getAccountBalance(): Promise<any> {
-    // TODO: implement account balance endpoint
-    return {};
+    const timestamp = Date.now();
+    const queryObj = { timestamp };
+    const queryString = new URLSearchParams(queryObj).toString();
+    const signature = this.createSignature(queryString);
+
+    try {
+      // Spot account
+      const response = await axios.get(`${this.baseUrl}/api/v3/account`, {
+        params: {
+          ...queryObj,
+          signature,
+        },
+        headers: {
+          'X-MBX-APIKEY': this.apiKey,
+        },
+      });
+
+      return {
+        balances: response.data.balances
+          .filter((b: any) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+          .map((b: any) => ({
+            asset: b.asset,
+            free: parseFloat(b.free),
+            locked: parseFloat(b.locked),
+          })),
+      };
+    } catch (error: any) {
+      console.error('[BinanceAdapter] getAccountBalance error:', error.response?.data || error.message);
+      return { balances: [] };
+    }
   }
 
   private createSignature(queryString: string): string {
