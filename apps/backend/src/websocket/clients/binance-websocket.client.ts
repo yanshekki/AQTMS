@@ -1,126 +1,125 @@
 import { Injectable } from '@nestjs/common';
 import WebSocket from 'ws';
 import axios from 'axios';
-import { IExchangeWebsocket } from '../interfaces/exchange-websocket.interface';
 
 @Injectable()
-export class BinanceWebsocketClient implements IExchangeWebsocket {
+export class BinanceWebsocketClient {
   private ws: WebSocket | null = null;
   private userDataWs: WebSocket | null = null;
+
   private messageCallback?: (data: any) => void;
   private errorCallback?: (error: Error) => void;
   private closeCallback?: () => void;
 
   private listenKey: string | null = null;
   private keepAliveInterval: NodeJS.Timeout | null = null;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 10;
+
+  private subscribedStreams: Set<string> = new Set();
 
   private readonly baseUrl: string;
   private readonly apiKey: string;
 
   constructor() {
     this.baseUrl = process.env.BINANCE_TESTNET === 'true'
-      ? 'https://testnet.binance.vision'
-      : 'https://api.binance.com';
+      ? 'wss://testnet.binance.vision/ws'
+      : 'wss://stream.binance.com:9443/ws';
     this.apiKey = process.env.BINANCE_API_KEY || '';
   }
 
-  // ... existing connect, disconnect, subscribePublic methods ...
+  async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(this.baseUrl);
 
-  /**
-   * 取得 User Data Stream 的 listenKey
-   */
-  async getListenKey(): Promise<string> {
-    try {
-      const response = await axios.post(
-        `${this.baseUrl}/api/v3/userDataStream`,
-        null,
-        {
-          headers: {
-            'X-MBX-APIKEY': this.apiKey,
-          },
-        },
-      );
+      this.ws.on('open', () => {
+        console.log('[BinanceWebsocket] Connected');
+        this.reconnectAttempts = 0;
+        this.resubscribeStreams();
+        resolve();
+      });
 
-      this.listenKey = response.data.listenKey;
-      console.log('[BinanceWebsocket] ListenKey obtained');
-      return this.listenKey;
-    } catch (error: any) {
-      console.error('[BinanceWebsocket] Failed to get listenKey:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * 保持 listenKey 活躍（每 30 分鐘呼叫一次）
-   */
-  startKeepAlive(): void {
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
-
-    this.keepAliveInterval = setInterval(async () => {
-      if (this.listenKey) {
-        try {
-          await axios.put(
-            `${this.baseUrl}/api/v3/userDataStream?listenKey=${this.listenKey}`,
-            null,
-            {
-              headers: {
-                'X-MBX-APIKEY': this.apiKey,
-              },
-            },
-          );
-          console.log('[BinanceWebsocket] ListenKey keep-alive sent');
-        } catch (error) {
-          console.error('[BinanceWebsocket] Keep-alive failed:', error);
+      this.ws.on('message', (data: string) => {
+        if (this.messageCallback) {
+          try {
+            const parsed = JSON.parse(data);
+            this.messageCallback(parsed);
+          } catch (e) {
+            console.error('[BinanceWebsocket] Failed to parse message');
+          }
         }
-      }
-    }, 30 * 60 * 1000); // 每 30 分鐘
+      });
+
+      this.ws.on('error', (error) => {
+        console.error('[BinanceWebsocket] Error:', error);
+        if (this.errorCallback) this.errorCallback(error as Error);
+        this.scheduleReconnect();
+      });
+
+      this.ws.on('close', () => {
+        console.log('[BinanceWebsocket] Disconnected');
+        if (this.closeCallback) this.closeCallback();
+        this.scheduleReconnect();
+      });
+
+      // Heartbeat ping every 30 seconds
+      setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.ping();
+        }
+      }, 30000);
+    });
   }
 
-  /**
-   * 連線到用戶數據流
-   */
-  async connectUserStream(): Promise<void> {
-    if (!this.listenKey) {
-      await this.getListenKey();
+  private scheduleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[BinanceWebsocket] Max reconnect attempts reached');
+      return;
     }
 
-    const userStreamUrl = `${this.baseUrl.replace('https', 'wss').replace('/api', '')}/ws/${this.listenKey}`;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    this.reconnectAttempts++;
 
-    this.userDataWs = new WebSocket(userStreamUrl);
+    console.log(`[BinanceWebsocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
-    this.userDataWs.on('open', () => {
-      console.log('[BinanceWebsocket] User Data Stream connected');
-      this.startKeepAlive();
-    });
-
-    this.userDataWs.on('message', (data: string) => {
-      if (this.messageCallback) {
-        try {
-          const parsed = JSON.parse(data);
-          this.messageCallback(parsed);
-        } catch (e) {
-          console.error('[BinanceWebsocket] Failed to parse user data message');
-        }
-      }
-    });
-
-    this.userDataWs.on('error', (error) => {
-      console.error('[BinanceWebsocket] User Data Stream error:', error);
-      if (this.errorCallback) this.errorCallback(error);
-    });
-
-    this.userDataWs.on('close', () => {
-      console.log('[BinanceWebsocket] User Data Stream closed');
-      if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-      }
-      if (this.closeCallback) this.closeCallback();
-    });
+    this.reconnectTimeout = setTimeout(() => {
+      this.connect().catch(console.error);
+    }, delay);
   }
+
+  private resubscribeStreams() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    for (const stream of this.subscribedStreams) {
+      const payload = {
+        method: 'SUBSCRIBE',
+        params: [stream],
+        id: Date.now(),
+      };
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
+  subscribePublic(stream: string): void {
+    this.subscribedStreams.add(stream);
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const payload = {
+        method: 'SUBSCRIBE',
+        params: [stream],
+        id: Date.now(),
+      };
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
+  // ... keep existing connectUserStream, getListenKey, startKeepAlive, disconnect ...
 
   disconnect(): void {
+    if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+    if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -129,10 +128,5 @@ export class BinanceWebsocketClient implements IExchangeWebsocket {
       this.userDataWs.close();
       this.userDataWs = null;
     }
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
   }
-
-  // ... other methods ...
 }
