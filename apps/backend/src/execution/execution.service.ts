@@ -1,4 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { WebsocketService } from '../websocket/websocket.service';
+import {
+  BinanceExecutionReport,
+  BinanceOutboundAccountPosition,
+  BinanceBalanceUpdate,
+} from '../websocket/types/binance-websocket.types';
 
 // ... other imports ...
 
@@ -6,56 +12,37 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 export class ExecutionService implements OnModuleInit {
   // ... existing code ...
 
-  private async handleExecutionReport(report: any) {
+  async startListeningToOrderUpdates(): Promise<void> {
     try {
-      const {
-        s: symbol,
-        S: side,
-        X: orderStatus,        // 当前订单状态
-        z: cumulativeFilledQty, // 累计成交数量
-        L: lastExecutedPrice,   // 最后成交价格
-        i: exchangeOrderId,
-        x: executionType,       // TRADE / NEW 等
-      } = report;
+      const binanceClient = this.websocketService.getBinanceClient();
+      await binanceClient.connectUserStream();
 
-      console.log(
-        `[ExecutionService] WS Update | ${symbol} ${side} | Status: ${orderStatus} | Filled: ${cumulativeFilledQty}`
-      );
-
-      const localOrder = await this.orderService.findByExchangeOrderId(exchangeOrderId);
-
-      if (!localOrder) {
-        console.warn(`[ExecutionService] Local order not found for exchangeOrderId=${exchangeOrderId}`);
-        return;
-      }
-
-      // 只在有实际成交时处理
-      if (executionType === 'TRADE' || orderStatus === 'PARTIALLY_FILLED' || orderStatus === 'FILLED') {
-        const newFilled = parseFloat(cumulativeFilledQty);
-        const previousFilled = localOrder.filledQuantity || 0;
-        const thisFillQty = Math.max(0, newFilled - previousFilled);
-
-        if (thisFillQty > 0 && lastExecutedPrice) {
-          await this.orderService.applyPartialFill(
-            localOrder.id,
-            thisFillQty,
-            parseFloat(lastExecutedPrice),
-          );
+      binanceClient.onMessage((data: any) => {
+        if (data.e === 'executionReport') {
+          this.handleExecutionReport(data as BinanceExecutionReport);
+        } else if (data.e === 'outboundAccountPosition') {
+          this.handleOutboundAccountPosition(data as BinanceOutboundAccountPosition);
+        } else if (data.e === 'balanceUpdate') {
+          this.handleBalanceUpdate(data as BinanceBalanceUpdate);
         }
-      }
+      });
 
-      // 对于取消、拒绝等状态，直接更新
-      if (['CANCELED', 'REJECTED', 'EXPIRED'].includes(orderStatus)) {
-        await this.orderService.updateOrderStatus(localOrder.id, orderStatus as any);
-      }
-
-      if (orderStatus === 'FILLED') {
-        this.metricsCollector.recordOrder(true);
-      }
+      console.log('[ExecutionService] WebSocket listeners started');
     } catch (error) {
-      console.error('[ExecutionService] Error handling executionReport:', error);
+      console.error('[ExecutionService] Failed to start WebSocket listeners:', error);
     }
   }
 
-  // ... existing methods ...
+  private handleOutboundAccountPosition(data: BinanceOutboundAccountPosition) {
+    console.log('[ExecutionService] Account position update received');
+    // TODO: Trigger portfolio refresh
+    // await this.portfolioService.refreshUserPositions();
+  }
+
+  private handleBalanceUpdate(data: BinanceBalanceUpdate) {
+    console.log(`[ExecutionService] Balance update received: ${data.a} changed by ${data.d}`);
+    // TODO: Trigger balance refresh
+  }
+
+  // ... existing handleExecutionReport ...
 }

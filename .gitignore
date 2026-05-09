@@ -4,8 +4,24 @@ build/
 .next/
 .turbo/
 *.tsbuildinfo
+
+# Environment files (NEVER commit these)
 .env
 .env.local
+.env.*.local
+.env.production
+.env.development
+
 coverage/
 *.log
 .DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt

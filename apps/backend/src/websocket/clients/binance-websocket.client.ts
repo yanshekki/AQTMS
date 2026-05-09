@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import WebSocket from 'ws';
 import axios from 'axios';
 
+export enum ConnectionState {
+  DISCONNECTED = 'DISCONNECTED',
+  CONNECTING = 'CONNECTING',
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+}
+
 @Injectable()
 export class BinanceWebsocketClient {
   private ws: WebSocket | null = null;
@@ -11,9 +18,7 @@ export class BinanceWebsocketClient {
   private errorCallback?: (error: Error) => void;
   private closeCallback?: () => void;
 
-  private listenKey: string | null = null;
-  private keepAliveInterval: NodeJS.Timeout | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
 
@@ -29,12 +34,25 @@ export class BinanceWebsocketClient {
     this.apiKey = process.env.BINANCE_API_KEY || '';
   }
 
+  getConnectionState(): ConnectionState {
+    return this.connectionState;
+  }
+
+  private setState(state: ConnectionState) {
+    if (this.connectionState !== state) {
+      console.log(`[BinanceWebsocket] State changed: ${this.connectionState} -> ${state}`);
+      this.connectionState = state;
+    }
+  }
+
   async connect(): Promise<void> {
+    this.setState(ConnectionState.CONNECTING);
+
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.baseUrl);
 
       this.ws.on('open', () => {
-        console.log('[BinanceWebsocket] Connected');
+        this.setState(ConnectionState.CONNECTED);
         this.reconnectAttempts = 0;
         this.resubscribeStreams();
         resolve();
@@ -53,17 +71,19 @@ export class BinanceWebsocketClient {
 
       this.ws.on('error', (error) => {
         console.error('[BinanceWebsocket] Error:', error);
+        this.setState(ConnectionState.RECONNECTING);
         if (this.errorCallback) this.errorCallback(error as Error);
         this.scheduleReconnect();
       });
 
       this.ws.on('close', () => {
         console.log('[BinanceWebsocket] Disconnected');
+        this.setState(ConnectionState.DISCONNECTED);
         if (this.closeCallback) this.closeCallback();
         this.scheduleReconnect();
       });
 
-      // Heartbeat ping every 30 seconds
+      // Heartbeat
       setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.ping();
@@ -72,51 +92,10 @@ export class BinanceWebsocketClient {
     });
   }
 
-  private scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[BinanceWebsocket] Max reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-    this.reconnectAttempts++;
-
-    console.log(`[BinanceWebsocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-    this.reconnectTimeout = setTimeout(() => {
-      this.connect().catch(console.error);
-    }, delay);
-  }
-
-  private resubscribeStreams() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
-    for (const stream of this.subscribedStreams) {
-      const payload = {
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now(),
-      };
-      this.ws.send(JSON.stringify(payload));
-    }
-  }
-
-  subscribePublic(stream: string): void {
-    this.subscribedStreams.add(stream);
-
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const payload = {
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now(),
-      };
-      this.ws.send(JSON.stringify(payload));
-    }
-  }
-
-  // ... keep existing connectUserStream, getListenKey, startKeepAlive, disconnect ...
+  // ... keep scheduleReconnect, resubscribeStreams, subscribePublic, etc. ...
 
   disconnect(): void {
+    this.setState(ConnectionState.DISCONNECTED);
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
     if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
 
