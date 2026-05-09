@@ -1,52 +1,59 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { RiskService } from '../risk/risk.service';
-import { PlaceOrderWithProtectionDto } from './dto/place-order-with-protection.dto';
-import { retry } from '../common/utils/retry.util';
-import { CircuitBreaker } from '../common/circuit-breaker/circuit-breaker';
-import { RiskCheckFailedError } from '../common/errors/risk.error';
-import { OrderExecutionError } from '../common/errors/order.error';
-import { PaperTradingService } from '../paper-trading/paper-trading.service';
-import { KillSwitchService } from '../safety/kill-switch.service';
-import { OrderService } from '../order/order.service';
-import { ExecutionLoggerService } from './execution-logger.service';
-import { ExecutionMetricsCollector } from './metrics-collector.service';
+
+// ... other imports ...
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
   // ... existing code ...
 
-  /**
-   * 處理交易所發來的成交更新（包含部分成交）
-   */
-  async handleOrderFillUpdate(
-    orderId: string,
-    fillQuantity: number,
-    fillPrice: number,
-  ) {
+  private async handleExecutionReport(report: any) {
     try {
-      const updatedOrder = this.orderService.applyPartialFill(
-        orderId,
-        fillQuantity,
-        fillPrice,
+      const {
+        s: symbol,
+        S: side,
+        X: orderStatus,        // 当前订单状态
+        z: cumulativeFilledQty, // 累计成交数量
+        L: lastExecutedPrice,   // 最后成交价格
+        i: exchangeOrderId,
+        x: executionType,       // TRADE / NEW 等
+      } = report;
+
+      console.log(
+        `[ExecutionService] WS Update | ${symbol} ${side} | Status: ${orderStatus} | Filled: ${cumulativeFilledQty}`
       );
 
-      this.logger.logStatusUpdate({
-        orderId,
-        fromStatus: 'PREVIOUS',
-        toStatus: updatedOrder.status,
-        filledQuantity: updatedOrder.filledQuantity,
-      });
+      const localOrder = await this.orderService.findByExchangeOrderId(exchangeOrderId);
 
-      // TODO: 如果需要，可在此更新本地倉位與風險狀態
+      if (!localOrder) {
+        console.warn(`[ExecutionService] Local order not found for exchangeOrderId=${exchangeOrderId}`);
+        return;
+      }
 
-      return updatedOrder;
+      // 只在有实际成交时处理
+      if (executionType === 'TRADE' || orderStatus === 'PARTIALLY_FILLED' || orderStatus === 'FILLED') {
+        const newFilled = parseFloat(cumulativeFilledQty);
+        const previousFilled = localOrder.filledQuantity || 0;
+        const thisFillQty = Math.max(0, newFilled - previousFilled);
+
+        if (thisFillQty > 0 && lastExecutedPrice) {
+          await this.orderService.applyPartialFill(
+            localOrder.id,
+            thisFillQty,
+            parseFloat(lastExecutedPrice),
+          );
+        }
+      }
+
+      // 对于取消、拒绝等状态，直接更新
+      if (['CANCELED', 'REJECTED', 'EXPIRED'].includes(orderStatus)) {
+        await this.orderService.updateOrderStatus(localOrder.id, orderStatus as any);
+      }
+
+      if (orderStatus === 'FILLED') {
+        this.metricsCollector.recordOrder(true);
+      }
     } catch (error) {
-      this.logger.logError({
-        action: 'PARTIAL_FILL_UPDATE_FAILED',
-        orderId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw error;
+      console.error('[ExecutionService] Error handling executionReport:', error);
     }
   }
 

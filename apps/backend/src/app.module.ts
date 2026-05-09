@@ -10,6 +10,8 @@ import { DataModule } from './data/data.module';
 import { BacktestModule } from './backtest/backtest.module';
 import { SafetyModule } from './safety/safety.module';
 import { OrderModule } from './order/order.module';
+import { WebsocketModule } from './websocket/websocket.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -23,7 +25,9 @@ import { OrderModule } from './order/order.module';
     DataModule,
     BacktestModule,
     SafetyModule,
-    OrderModule, // Phase 5 - Order State Management
+    OrderModule,
+    WebsocketModule,
+    HealthModule, // Health check endpoints
   ],
   controllers: [],
   providers: [],

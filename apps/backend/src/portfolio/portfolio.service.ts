@@ -4,8 +4,7 @@ import { ExchangeAccountRepository } from '../infrastructure/persistence/Exchang
 import { ExchangePositionProvider } from '../exchange/interfaces/exchange-position.provider';
 import { NotificationService } from '../notification/notification.service';
 import { KillSwitchService } from '../safety/kill-switch.service';
-
-// ... existing interfaces (Alert, etc.)
+import { DailyPnLService } from './daily-pnl.service';
 
 @Injectable()
 export class PortfolioService {
@@ -16,6 +15,7 @@ export class PortfolioService {
     private readonly positionProvider?: ExchangePositionProvider,
     private readonly notificationService?: NotificationService,
     private readonly killSwitchService?: KillSwitchService,
+    private readonly dailyPnLService?: DailyPnLService,
   ) {}
 
   async getPortfolioSummary(userId: string, telegramChatId?: string | number) {
@@ -24,15 +24,19 @@ export class PortfolioService {
     const totalValue = positions.reduce((sum, p) => sum + Math.abs(p.quantity) * p.currentPrice, 0);
     const totalUnrealizedPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
 
-    // 推送每日 PnL 給 Kill Switch（簡化版：使用未實現盈虧）
+    // 使用 DailyPnLService 更新並持久化 PnL
+    if (this.dailyPnLService) {
+      await this.dailyPnLService.updateDailyPnL(userId, totalUnrealizedPnl);
+    }
+
+    // 同時更新 Kill Switch（向後兼容）
     if (this.killSwitchService) {
-      this.killSwitchService.updateDailyPnl(totalUnrealizedPnl);
+      await this.killSwitchService.updateDailyPnl(totalUnrealizedPnl, userId);
     }
 
     const riskExposure = totalValue > 0 ? Math.min((totalValue / 50000) * 100, 100) : 0;
     const alerts = this.checkRiskAlerts(positions, totalValue, totalUnrealizedPnl);
 
-    // danger alerts 發送通知
     const dangerAlerts = alerts.filter(a => a.severity === 'danger');
     if (dangerAlerts.length > 0 && this.notificationService && telegramChatId) {
       this.notificationService.sendRiskAlert(telegramChatId, dangerAlerts);
@@ -48,5 +52,5 @@ export class PortfolioService {
     };
   }
 
-  // ... existing getPositions() and checkRiskAlerts() methods
+  // ... existing getPositions() and checkRiskAlerts() ...
 }

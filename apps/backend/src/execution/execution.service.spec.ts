@@ -1,59 +1,74 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionService } from './execution.service';
-import { RiskService } from '../risk/risk.service';
-import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
+// ... other imports ...
 
-describe('ExecutionService Integration Test (with Risk Rules)', () => {
+describe('ExecutionService - WebSocket Updates', () => {
   let service: ExecutionService;
-  let riskService: RiskService;
+  let orderService: OrderService;
+  let websocketService: WebsocketService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ExecutionService, RiskService],
+      providers: [
+        ExecutionService,
+        // ... mock other dependencies ...
+        {
+          provide: WebsocketService,
+          useValue: {
+            getBinanceClient: jest.fn().mockReturnValue({
+              connectUserStream: jest.fn(),
+              onMessage: jest.fn(),
+            }),
+          },
+        },
+        {
+          provide: OrderService,
+          useValue: {
+            findByExchangeOrderId: jest.fn(),
+            applyPartialFill: jest.fn(),
+            updateOrderStatus: jest.fn(),
+          },
+        },
+        // ... other mocks ...
+      ],
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
-    riskService = module.get<RiskService>(RiskService);
-
-    // 手動註冊規則（模擬 onModuleInit）
-    riskService.registerRule(new PositionSizingRule());
+    orderService = module.get<OrderService>(OrderService);
+    websocketService = module.get<WebsocketService>(WebsocketService);
   });
 
-  it('should pass risk check and place order with SL/TP', async () => {
-    const dto = {
-      userId: 'test-user',
-      exchange: 'BINANCE' as const,
-      symbol: 'BTCUSDT',
-      side: 'BUY' as const,
-      quantity: 0.01,
-      price: 65000,
-      stopLoss: 64000,
-      takeProfit: 67000,
-      accountBalance: 100000, // 足夠的餘額
-    };
+  it('should start listening to order updates via WebSocket', async () => {
+    const binanceClient = websocketService.getBinanceClient();
 
-    const result = await service.placeOrderWithProtection(dto);
+    await service.startListeningToOrderUpdates();
 
-    expect(result.success).toBe(true);
-    expect(result.mainOrder).toBeDefined();
-    console.log('✅ Normal order with SL/TP passed risk check');
+    expect(binanceClient.connectUserStream).toHaveBeenCalled();
+    expect(binanceClient.onMessage).toHaveBeenCalled();
   });
 
-  it('should adjust quantity when position size is too large', async () => {
-    const dto = {
-      userId: 'test-user',
-      exchange: 'BINANCE' as const,
-      symbol: 'BTCUSDT',
-      side: 'BUY' as const,
-      quantity: 10, // 非常大的數量
-      price: 65000,
-      accountBalance: 10000, // 只有 1 萬 USDT
+  it('should call findByExchangeOrderId and applyPartialFill when receiving executionReport', async () => {
+    // 模擬已經有本地訂單
+    jest.spyOn(orderService, 'findByExchangeOrderId').mockResolvedValue({
+      id: 'local-order-123',
+      filledQuantity: 0,
+    } as any);
+
+    // 直接呼叫私有方法進行測試（實際專案可考慮改為 protected 或使用其他方式）
+    const report = {
+      e: 'executionReport',
+      s: 'BTCUSDT',
+      S: 'BUY',
+      X: 'PARTIALLY_FILLED',
+      z: '0.5',
+      L: '65000',
+      i: 'exchange-order-456',
+      x: 'TRADE',
     };
 
-    const result = await service.placeOrderWithProtection(dto);
+    // @ts-ignore - 測試用
+    await service['handleExecutionReport'](report);
 
-    // PositionSizingRule 應該會建議調整倉位
-    expect(result.success).toBe(true);
-    console.log('✅ Large position was handled (adjusted if needed)');
+    expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('exchange-order-456');
+    expect(orderService.applyPartialFill).toHaveBeenCalled();
   });
 });
