@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MarketDataService } from '../market-data/market-data.service';
 
 export interface VirtualPosition {
   symbol: string;
@@ -16,8 +17,11 @@ export class PaperTradingService {
 
   private readonly DEFAULT_BALANCE = 10000;
 
-  constructor(private readonly prisma: PrismaService) {
-    this.logger.log('PaperTradingService initialized with PnL + Price Provider support');
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly marketDataService: MarketDataService,
+  ) {
+    this.logger.log('PaperTradingService initialized with MarketDataService integration');
   }
 
   getVirtualBalance(userId: string): number {
@@ -25,40 +29,47 @@ export class PaperTradingService {
   }
 
   /**
-   * 獲取 Paper 持倉 + 自動計算未實現盈虧
-   * priceProvider: 注入價格來源（可來自 WebSocket / Exchange API）
+   * 獲取 Paper 持倉 + 使用 MarketDataService 自動計算未實現盈虧
+   * 這係最方便嘅方法
    */
-  async getPaperPositionsWithPnL(
-    userId: string,
-    priceProvider: (symbol: string) => Promise<number>,
-  ): Promise<VirtualPosition[]> {
-    // 1. 從資料庫獲取持倉
+  async getPaperPositionsWithLivePnL(userId: string): Promise<VirtualPosition[]> {
     const positions = await this.getVirtualPositionsFromDb(userId);
 
     if (positions.length === 0) {
       return [];
     }
 
-    // 2. 獲取所有需要嘅價格
     const symbols = positions.map(p => p.symbol);
-    const priceMap: Record<string, number> = {};
+    const currentPrices = await this.marketDataService.getPrices(symbols);
 
-    for (const symbol of symbols) {
-      try {
-        priceMap[symbol] = await priceProvider(symbol);
-      } catch (error) {
-        this.logger.warn(`Failed to get price for ${symbol}`);
-        priceMap[symbol] = 0;
-      }
-    }
-
-    // 3. 計算未實現盈虧
-    return this.calculateUnrealizedPnL(positions, priceMap);
+    return this.calculateUnrealizedPnL(positions, currentPrices);
   }
 
   /**
-   * 從資料庫計算虛擬持倉
+   * 獲取 Paper 持倉 + 手動提供價格來源
    */
+  async getPaperPositionsWithPnL(
+    userId: string,
+    priceProvider: (symbol: string) => Promise<number>,
+  ): Promise<VirtualPosition[]> {
+    const positions = await this.getVirtualPositionsFromDb(userId);
+
+    if (positions.length === 0) {
+      return [];
+    }
+
+    const priceMap: Record<string, number> = {};
+    for (const position of positions) {
+      try {
+        priceMap[position.symbol] = await priceProvider(position.symbol);
+      } catch {
+        priceMap[position.symbol] = 0;
+      }
+    }
+
+    return this.calculateUnrealizedPnL(positions, priceMap);
+  }
+
   async getVirtualPositionsFromDb(userId: string): Promise<VirtualPosition[]> {
     const paperTrades = await this.prisma.trade.findMany({
       where: {
@@ -101,9 +112,6 @@ export class PaperTradingService {
     return result;
   }
 
-  /**
-   * 計算未實現盈虧
-   */
   calculateUnrealizedPnL(
     positions: VirtualPosition[],
     currentPrices: Record<string, number>,
@@ -116,7 +124,6 @@ export class PaperTradingService {
       }
 
       const pnl = (currentPrice - position.averagePrice) * position.quantity;
-
       return {
         ...position,
         unrealizedPnl: parseFloat(pnl.toFixed(2)),
