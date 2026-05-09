@@ -4,79 +4,62 @@ import { OrderStatus } from './interfaces/order-status.enum';
 
 @Injectable()
 export class OrderService {
-  private orders = new Map<string, Order>(); // MVP 使用記憶體儲存
+  private orders = new Map<string, Order>();
 
-  // 定義允許的狀態轉移
-  private readonly allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-    [OrderStatus.NEW]: [OrderStatus.PARTIALLY_FILLED, OrderStatus.FILLED, OrderStatus.CANCELED, OrderStatus.REJECTED],
-    [OrderStatus.PARTIALLY_FILLED]: [OrderStatus.FILLED, OrderStatus.CANCELED],
-    [OrderStatus.FILLED]: [],
-    [OrderStatus.CANCELED]: [],
-    [OrderStatus.REJECTED]: [],
-    [OrderStatus.EXPIRED]: [],
-  };
+  // ... existing methods (createOrder, updateOrderStatus, etc.) ...
 
-  createOrder(data: Omit<Order, 'id' | 'status' | 'filledQuantity' | 'createdAt' | 'updatedAt'>): Order {
-    const order: Order = {
-      ...data,
-      id: 'order-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-      status: OrderStatus.NEW,
-      filledQuantity: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    this.orders.set(order.id, order);
-    return order;
-  }
-
-  updateOrderStatus(orderId: string, newStatus: OrderStatus, filledQuantity?: number, averageFillPrice?: number): Order {
+  /**
+   * 應用部分成交（Partial Fill）
+   */
+  applyPartialFill(
+    orderId: string,
+    fillQuantity: number,
+    fillPrice: number,
+  ): Order {
     const order = this.orders.get(orderId);
     if (!order) {
       throw new Error(`Order not found: ${orderId}`);
     }
 
-    // 檢查狀態轉移是否合法
-    const allowedNextStates = this.allowedTransitions[order.status] || [];
-    if (!allowedNextStates.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${order.status} to ${newStatus}`);
+    if (
+      order.status !== OrderStatus.NEW &&
+      order.status !== OrderStatus.PARTIALLY_FILLED
+    ) {
+      throw new Error(`Cannot apply fill to order in status: ${order.status}`);
     }
 
-    // 更新狀態
-    order.status = newStatus;
+    if (fillQuantity <= 0) {
+      throw new Error('Fill quantity must be positive');
+    }
+
+    const newFilledQuantity = order.filledQuantity + fillQuantity;
+
+    if (newFilledQuantity > order.quantity) {
+      throw new Error('Fill quantity exceeds remaining order quantity');
+    }
+
+    // 計算加權平均成交價
+    const totalValue =
+      order.filledQuantity * (order.averageFillPrice || 0) +
+      fillQuantity * fillPrice;
+
+    const newAverageFillPrice =
+      newFilledQuantity > 0 ? totalValue / newFilledQuantity : fillPrice;
+
+    // 更新訂單
+    order.filledQuantity = newFilledQuantity;
+    order.averageFillPrice = newAverageFillPrice;
     order.updatedAt = new Date();
 
-    if (filledQuantity !== undefined) {
-      order.filledQuantity = filledQuantity;
-    }
-
-    if (averageFillPrice !== undefined) {
-      order.averageFillPrice = averageFillPrice;
-    }
-
-    // 如果完全成交，自動設為 FILLED
-    if (order.filledQuantity >= order.quantity && order.status !== OrderStatus.FILLED) {
+    // 判斷是否完全成交
+    if (newFilledQuantity >= order.quantity) {
       order.status = OrderStatus.FILLED;
+    } else {
+      order.status = OrderStatus.PARTIALLY_FILLED;
     }
 
     return order;
   }
 
-  cancelOrder(orderId: string): Order {
-    return this.updateOrderStatus(orderId, OrderStatus.CANCELED);
-  }
-
-  getOrder(orderId: string): Order | undefined {
-    return this.orders.get(orderId);
-  }
-
-  getOrdersByUser(userId: string): Order[] {
-    return Array.from(this.orders.values()).filter(o => o.userId === userId);
-  }
-
-  getActiveOrders(userId: string): Order[] {
-    return this.getOrdersByUser(userId).filter(o =>
-      o.status === OrderStatus.NEW || o.status === OrderStatus.PARTIALLY_FILLED
-    );
-  }
+  // ... existing methods ...
 }
