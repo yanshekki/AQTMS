@@ -3,12 +3,13 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { StructuredLoggerService } from './common/logger/logger.service';
 import helmet from 'helmet';
+import { metricsMiddleware } from './common/middleware/metrics.middleware';
+import * as promClient from 'prom-client';
 
 // Sentry
 import * as Sentry from '@sentry/nestjs';
 
 async function bootstrap() {
-  // Initialize Sentry
   if (process.env.SENTRY_DSN) {
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
@@ -24,6 +25,14 @@ async function bootstrap() {
   });
 
   app.use(helmet());
+  app.use(metricsMiddleware);
+
+  // Expose /metrics endpoint for Prometheus
+  app.getHttpAdapter().get('/metrics', async (req, res) => {
+    res.set('Content-Type', promClient.register.contentType);
+    res.end(await promClient.register.metrics());
+  });
+
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
