@@ -1,9 +1,12 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject('REDIS_CLIENT') private readonly redis?: any,
+  ) {}
 
   @Get()
   async check() {
@@ -27,6 +30,22 @@ export class HealthController {
       result.status = 'degraded';
     }
 
+    // Redis check (optional)
+    if (this.redis) {
+      try {
+        await this.redis.ping();
+        result.dependencies.redis = { status: 'ok' };
+      } catch (error) {
+        result.dependencies.redis = {
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        };
+        result.status = 'degraded';
+      }
+    } else {
+      result.dependencies.redis = { status: 'not_configured' };
+    }
+
     return result;
   }
 
@@ -47,6 +66,20 @@ export class HealthController {
         message: error instanceof Error ? error.message : 'Unknown error',
       };
       throw new Error('Database not ready');
+    }
+
+    // Redis readiness check
+    if (this.redis) {
+      try {
+        await this.redis.ping();
+        checks.redis = { status: 'ok' };
+      } catch (error) {
+        checks.redis = {
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        };
+        throw new Error('Redis not ready');
+      }
     }
 
     return {
