@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PaperOrder {
@@ -11,7 +11,7 @@ export interface PaperOrder {
   executedPrice: number;
   fee: number;
   filledQuantity: number;
-  status: 'OPEN' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED';
+  status: string;
   createdAt: Date;
 }
 
@@ -27,14 +27,13 @@ export class PaperTradingService {
   private readonly logger = new Logger(PaperTradingService.name);
 
   private virtualBalances = new Map<string, number>();
-  private virtualPositions = new Map<string, Map<string, VirtualPosition>>();
 
   private readonly DEFAULT_BALANCE = 10000;
   private readonly SLIPPAGE_BPS = 10;
   private readonly TAKER_FEE_RATE = 0.001;
 
   constructor(private readonly prisma: PrismaService) {
-    this.logger.log('PaperTradingService initialized with Prisma persistence');
+    this.logger.log('PaperTradingService initialized (positions calculated from DB)');
   }
 
   getVirtualBalance(userId: string): number {
@@ -49,7 +48,7 @@ export class PaperTradingService {
     quantity: number;
     price: number;
     fillImmediately?: boolean;
-  }): Promise<PaperOrder> {
+  }): Promise<any> {
     const { userId, exchangeAccountId, symbol, side, quantity, price, fillImmediately = true } = orderData;
 
     const slippagePercent = (Math.random() * this.SLIPPAGE_BPS + this.SLIPPAGE_BPS / 2) / 10000;
@@ -73,100 +72,81 @@ export class PaperTradingService {
 
     const orderId = 'paper-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
 
-    // 建立 Paper Order 物件
-    const order: PaperOrder = {
+    // 持久化 Paper Order
+    await this.prisma.trade.create({
+      data: {
+        id: orderId,
+        userId,
+        exchangeAccountId,
+        symbol,
+        side,
+        type: 'MARKET',
+        status: fillImmediately ? 'FILLED' : 'PENDING',
+        quantity,
+        price: executedPrice,
+        filledQuantity: fillImmediately ? quantity : 0,
+        isPaper: true,
+        idempotencyKey: orderId,
+      },
+    });
+
+    this.logger.log(`[Paper] ${side} ${quantity} ${symbol} persisted to DB`);
+
+    return {
       id: orderId,
-      userId,
-      symbol,
-      side,
-      quantity,
-      price,
-      executedPrice,
-      fee,
-      filledQuantity: fillImmediately ? quantity : 0,
+      isPaper: true,
       status: fillImmediately ? 'FILLED' : 'OPEN',
-      createdAt: new Date(),
     };
-
-    // === 持久化到 Trade table（isPaper = true）===
-    try {
-      await this.prisma.trade.create({
-        data: {
-          id: orderId,
-          userId,
-          exchangeAccountId,
-          symbol,
-          side,
-          type: 'MARKET',
-          status: order.status === 'FILLED' ? 'FILLED' : 'PENDING',
-          quantity,
-          price: executedPrice,
-          filledQuantity: order.filledQuantity,
-          isPaper: true,
-          idempotencyKey: orderId,
-        },
-      });
-    } catch (error) {
-      this.logger.error('Failed to persist paper trade', error);
-    }
-
-    if (fillImmediately) {
-      this.updateVirtualPosition(order);
-    }
-
-    this.logger.log(
-      `[Paper] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} (persisted)`,
-    );
-
-    return order;
   }
 
-  async simulatePartialFill(orderId: string, fillPercentage: number) {
-    // TODO: 之後可更新 DB 狀態
-    this.logger.warn('simulatePartialFill not fully persisted yet');
-    return null;
-  }
-
-  private updateVirtualPosition(order: PaperOrder) {
-    const userPositions = this.virtualPositions.get(order.userId) || new Map();
-    const existing = userPositions.get(order.symbol);
-
-    const filledQty = order.side === 'BUY' ? order.filledQuantity : -order.filledQuantity;
-
-    if (!existing) {
-      userPositions.set(order.symbol, {
-        symbol: order.symbol,
-        quantity: filledQty,
-        averagePrice: order.executedPrice,
-        unrealizedPnl: 0,
-      });
-    } else {
-      const totalCost = existing.averagePrice * existing.quantity + order.executedPrice * filledQty;
-      const newQuantity = existing.quantity + filledQty;
-
-      if (newQuantity === 0) {
-        userPositions.delete(order.symbol);
-      } else {
-        existing.quantity = newQuantity;
-        existing.averagePrice = totalCost / newQuantity;
-      }
-    }
-
-    this.virtualPositions.set(order.userId, userPositions);
-  }
-
-  getVirtualPositions(userId: string): VirtualPosition[] {
-    const positions = this.virtualPositions.get(userId);
-    return positions ? Array.from(positions.values()) : [];
-  }
-
-  async getPaperOrders(userId: string) {
-    // 從資料庫讀取 Paper Trades
-    return this.prisma.trade.findMany({
+  /**
+   * 從資料庫計算虛擬持倉（推薦做法）
+   */
+  async getVirtualPositionsFromDb(userId: string): Promise<VirtualPosition[]> {
+    const paperTrades = await this.prisma.trade.findMany({
       where: {
         userId,
         isPaper: true,
+        status: 'FILLED',
       },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const positionMap = new Map<string, { quantity: number; totalCost: number }>();
+
+    for (const trade of paperTrades) {
+      const key = trade.symbol;
+      const qty = trade.side === 'BUY' ? trade.filledQuantity : -trade.filledQuantity;
+      const cost = trade.filledQuantity * (trade.price || 0);
+
+      if (!positionMap.has(key)) {
+        positionMap.set(key, { quantity: 0, totalCost: 0 });
+      }
+
+      const pos = positionMap.get(key)!;
+      pos.quantity += qty;
+      pos.totalCost += cost;
+    }
+
+    const result: VirtualPosition[] = [];
+
+    for (const [symbol, pos] of positionMap.entries()) {
+      if (pos.quantity !== 0) {
+        result.push({
+          symbol,
+          quantity: pos.quantity,
+          averagePrice: pos.totalCost / pos.quantity,
+          unrealizedPnl: 0, // TODO: 可之後用最新價格計算
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async getPaperOrders(userId: string) {
+    return this.prisma.trade.findMany({
+      where: { userId, isPaper: true },
       orderBy: { createdAt: 'desc' },
     });
   }
