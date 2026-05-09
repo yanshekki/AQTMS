@@ -7,13 +7,14 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { BaseError } from '../errors/base.error';
+import * as Sentry from '@sentry/nestjs';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<any>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let errorResponse: any = {
@@ -54,6 +55,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // 處理普通 Error
       errorResponse.message = exception.message;
       errorResponse.code = 'UNHANDLED_ERROR';
+    }
+
+    // Sentry 錯誤追蹤整合（只對嚴重錯誤上報）
+    if (process.env.SENTRY_DSN) {
+      if (exception instanceof Error) {
+        Sentry.captureException(exception, {
+          tags: {
+            statusCode: status,
+            path: request.url,
+            method: request.method,
+          },
+          extra: {
+            requestBody: request.body,
+            query: request.query,
+            user: request.user || null,
+          },
+        });
+      }
     }
 
     response.status(status).json(errorResponse);
