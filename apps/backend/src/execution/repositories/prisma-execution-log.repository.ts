@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IExecutionLogRepository } from '../interfaces/execution-log.repository';
 import { ExecutionLog, LogQuery } from '../execution-logger.service';
 
-// 假設專案有 PrismaService
+// 假設你有 PrismaService
 // import { PrismaService } from '../../shared/prisma.service';
 
 @Injectable()
@@ -10,7 +10,6 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
   // constructor(private readonly prisma: PrismaService) {}
 
   async save(log: ExecutionLog): Promise<void> {
-    // TODO: 實作 Prisma create
     // await this.prisma.executionLog.create({
     //   data: {
     //     timestamp: log.timestamp,
@@ -29,11 +28,10 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
     //     metadata: log.metadata as any,
     //   },
     // });
-    console.log('[PrismaExecutionLogRepository] Log saved (TODO: implement Prisma create)');
+    console.log('[Prisma] Execution log saved (implement Prisma create when model is ready)');
   }
 
   async find(query: LogQuery = {}): Promise<ExecutionLog[]> {
-    // TODO: 實作 Prisma findMany with filters
     // const where: any = {};
     // if (query.userId) where.userId = query.userId;
     // if (query.orderId) where.orderId = query.orderId;
@@ -57,14 +55,14 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
   }
 
   async clear(): Promise<void> {
-    // TODO: await this.prisma.executionLog.deleteMany({});
-    console.log('[PrismaExecutionLogRepository] Logs cleared (TODO: implement)');
+    // await this.prisma.executionLog.deleteMany({});
+    console.log('[Prisma] Execution logs cleared (implement when model is ready)');
   }
 
   private mapToExecutionLog(dbLog: any): ExecutionLog {
     return {
       timestamp: dbLog.timestamp,
-      level: dbLog.level as any,
+      level: dbLog.level,
       action: dbLog.action,
       userId: dbLog.userId,
       orderId: dbLog.orderId,
