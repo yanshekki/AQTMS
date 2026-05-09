@@ -8,6 +8,8 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { NotificationModule } from './notification/notification.module';
 import { DataModule } from './data/data.module';
 import { BacktestModule } from './backtest/backtest.module';
+import { SafetyModule } from './safety/safety.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -19,7 +21,9 @@ import { BacktestModule } from './backtest/backtest.module';
     PortfolioModule,
     NotificationModule,
     DataModule,
-    BacktestModule, // Phase 4 - Backtesting
+    BacktestModule,
+    SafetyModule,
+    OrderModule, // Phase 5 - Order State Management
   ],
   controllers: [],
   providers: [],
