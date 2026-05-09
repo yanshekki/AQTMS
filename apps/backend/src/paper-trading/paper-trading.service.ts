@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 export interface PaperOrder {
   id: string;
@@ -8,6 +8,7 @@ export interface PaperOrder {
   quantity: number;
   price: number;           // 委託價格
   executedPrice: number;   // 實際成交價格（含滑點）
+  fee: number;             // 手續費
   status: 'FILLED' | 'OPEN' | 'CANCELLED';
   createdAt: Date;
 }
@@ -21,6 +22,8 @@ export interface VirtualPosition {
 
 @Injectable()
 export class PaperTradingService {
+  private readonly logger = new Logger(PaperTradingService.name);
+
   // 記憶體儲存（MVP）
   private virtualBalances = new Map<string, number>(); // userId -> USDT balance
   private virtualPositions = new Map<string, Map<string, VirtualPosition>>();
@@ -28,8 +31,12 @@ export class PaperTradingService {
 
   private readonly DEFAULT_BALANCE = 10000; // 預設虛擬 USDT 餘額
 
+  // 可配置參數
+  private readonly SLIPPAGE_BPS = 10; // 基點（10 = 0.10%）
+  private readonly TAKER_FEE_RATE = 0.001; // 0.1% Taker fee
+
   constructor() {
-    // 可在此初始化測試用戶的餘額
+    this.logger.log('PaperTradingService initialized (with slippage + fee simulation)');
   }
 
   /**
@@ -40,7 +47,7 @@ export class PaperTradingService {
   }
 
   /**
-   * 模擬下單（含滑點 + 餘額更新）
+   * 模擬下單（含滑點 + 手續費 + 餘額更新）
    */
   async placePaperOrder(orderData: {
     userId: string;
@@ -51,47 +58,53 @@ export class PaperTradingService {
   }): Promise<PaperOrder> {
     const { userId, symbol, side, quantity, price } = orderData;
 
-    // 簡單滑點模擬（市價單 ±0.1% ~ 0.3%）
-    const slippage = (Math.random() * 0.002 + 0.001) * (side === 'BUY' ? 1 : -1);
+    // 1. 滑點模擬（基點轉百分比）
+    const slippagePercent = (Math.random() * this.SLIPPAGE_BPS + this.SLIPPAGE_BPS / 2) / 10000;
+    const slippage = slippagePercent * (side === 'BUY' ? 1 : -1);
     const executedPrice = price * (1 + slippage);
 
-    // 計算所需金額
-    const cost = quantity * executedPrice;
+    // 2. 計算手續費（Taker）
+    const notional = quantity * executedPrice;
+    const fee = notional * this.TAKER_FEE_RATE;
 
-    // 檢查餘額（買入時）
+    // 3. 檢查餘額（買入時需包含手續費）
     let currentBalance = this.getVirtualBalance(userId);
-    if (side === 'BUY' && currentBalance < cost) {
-      throw new Error('虛擬餘額不足');
+    const costWithFee = side === 'BUY' ? notional + fee : notional - fee;
+
+    if (side === 'BUY' && currentBalance < costWithFee) {
+      throw new Error(`虛擬餘額不足（需要 ${costWithFee.toFixed(2)} USDT）`);
     }
 
-    // 更新餘額
+    // 4. 更新餘額
     if (side === 'BUY') {
-      currentBalance -= cost;
+      currentBalance -= costWithFee;
     } else {
-      currentBalance += cost;
+      currentBalance += costWithFee;
     }
     this.virtualBalances.set(userId, currentBalance);
 
-    // 建立訂單
+    // 5. 建立訂單
     const order: PaperOrder = {
-      id: 'paper-' + Date.now(),
+      id: 'paper-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
       userId,
       symbol,
       side,
       quantity,
-      price, // 委託價
+      price,
       executedPrice,
+      fee,
       status: 'FILLED',
       createdAt: new Date(),
     };
 
     this.paperOrders.push(order);
 
-    // 更新持倉
+    // 6. 更新持倉
     this.updateVirtualPosition(order);
 
-    console.log(
-      `[PaperTrading] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} (slippage: ${(slippage * 100).toFixed(2)}%)`,
+    this.logger.log(
+      `[Paper] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} ` +
+      `(slippage: ${(slippage * 100).toFixed(3)}%, fee: ${fee.toFixed(2)})`,
     );
 
     return order;
