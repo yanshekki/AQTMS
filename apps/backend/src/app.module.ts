@@ -11,6 +11,7 @@ import { BacktestModule } from './backtest/backtest.module';
 import { SafetyModule } from './safety/safety.module';
 import { OrderModule } from './order/order.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { WebsocketModule } from './websocket/websocket.module';
     BacktestModule,
     SafetyModule,
     OrderModule,
-    WebsocketModule, // WebSocket real-time updates
+    WebsocketModule,
+    HealthModule, // Health check endpoints
   ],
   controllers: [],
   providers: [],
