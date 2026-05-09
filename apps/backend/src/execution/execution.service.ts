@@ -1,39 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { WebsocketService } from '../websocket/websocket.service';
 
-// ... other imports remain the same ...
+// ... other imports ...
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
-  // ... existing properties and constructor ...
+  // ... existing code ...
 
-  async onModuleInit() {
-    // 可選自動啟動 WebSocket 監聽
-    // await this.startListeningToOrderUpdates();
-  }
-
-  /**
-   * 開始透過 WebSocket 監聽訂單更新
-   */
-  async startListeningToOrderUpdates(): Promise<void> {
-    try {
-      const binanceClient = this.websocketService.getBinanceClient();
-
-      await binanceClient.connectUserStream();
-
-      binanceClient.onMessage((data: any) => {
-        if (data.e === 'executionReport') {
-          this.handleExecutionReport(data);
-        }
-      });
-
-      console.log('[ExecutionService] WebSocket order update listener started');
-    } catch (error) {
-      console.error('[ExecutionService] Failed to start WebSocket listener:', error);
-    }
-  }
-
-  private handleExecutionReport(report: any) {
+  private async handleExecutionReport(report: any) {
     const {
       s: symbol,
       S: side,
@@ -47,12 +20,25 @@ export class ExecutionService implements OnModuleInit {
       `[ExecutionService] WS Update | ${symbol} ${side} | Status: ${orderStatus} | Filled: ${filledQuantity}`
     );
 
-    // TODO: 實作根據 exchangeOrderId 找到本地訂單並更新
-    // 例如：
-    // const localOrder = await this.findLocalOrderByExchangeId(exchangeOrderId);
-    // if (localOrder) {
-    //   await this.orderService.applyPartialFill(localOrder.id, ...);
-    // }
+    // 使用 exchangeOrderId 找到本地訂單
+    const localOrder = await this.orderService.findByExchangeOrderId(exchangeOrderId);
+
+    if (localOrder) {
+      if (orderStatus === 'PARTIALLY_FILLED' || orderStatus === 'FILLED') {
+        await this.orderService.applyPartialFill(
+          localOrder.id,
+          parseFloat(filledQuantity) - localOrder.filledQuantity, // 本次新增成交量
+          parseFloat(lastFillPrice),
+        );
+      } else {
+        await this.orderService.updateOrderStatus(
+          localOrder.id,
+          orderStatus as any,
+        );
+      }
+    } else {
+      console.warn(`[ExecutionService] Local order not found for exchangeOrderId: ${exchangeOrderId}`);
+    }
 
     if (orderStatus === 'FILLED') {
       this.metricsCollector.recordOrder(true);
