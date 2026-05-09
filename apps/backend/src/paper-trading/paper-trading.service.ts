@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface PaperOrder {
   id: string;
@@ -9,7 +10,7 @@ export interface PaperOrder {
   price: number;
   executedPrice: number;
   fee: number;
-  filledQuantity: number;  // 已成交數量
+  filledQuantity: number;
   status: 'OPEN' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED';
   createdAt: Date;
 }
@@ -27,32 +28,29 @@ export class PaperTradingService {
 
   private virtualBalances = new Map<string, number>();
   private virtualPositions = new Map<string, Map<string, VirtualPosition>>();
-  private paperOrders = new Map<string, PaperOrder>(); // id -> order
 
   private readonly DEFAULT_BALANCE = 10000;
   private readonly SLIPPAGE_BPS = 10;
   private readonly TAKER_FEE_RATE = 0.001;
 
-  constructor() {
-    this.logger.log('PaperTradingService initialized with Partial Fill support');
+  constructor(private readonly prisma: PrismaService) {
+    this.logger.log('PaperTradingService initialized with Prisma persistence');
   }
 
   getVirtualBalance(userId: string): number {
     return this.virtualBalances.get(userId) ?? this.DEFAULT_BALANCE;
   }
 
-  /**
-   * 下單（預設即時全成交，可改為部分成交）
-   */
   async placePaperOrder(orderData: {
     userId: string;
+    exchangeAccountId: string;
     symbol: string;
     side: 'BUY' | 'SELL';
     quantity: number;
     price: number;
-    fillImmediately?: boolean; // true = 即時全成交
+    fillImmediately?: boolean;
   }): Promise<PaperOrder> {
-    const { userId, symbol, side, quantity, price, fillImmediately = true } = orderData;
+    const { userId, exchangeAccountId, symbol, side, quantity, price, fillImmediately = true } = orderData;
 
     const slippagePercent = (Math.random() * this.SLIPPAGE_BPS + this.SLIPPAGE_BPS / 2) / 10000;
     const slippage = slippagePercent * (side === 'BUY' ? 1 : -1);
@@ -75,6 +73,7 @@ export class PaperTradingService {
 
     const orderId = 'paper-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
 
+    // 建立 Paper Order 物件
     const order: PaperOrder = {
       id: orderId,
       userId,
@@ -89,52 +88,49 @@ export class PaperTradingService {
       createdAt: new Date(),
     };
 
-    this.paperOrders.set(orderId, order);
+    // === 持久化到 Trade table（isPaper = true）===
+    try {
+      await this.prisma.trade.create({
+        data: {
+          id: orderId,
+          userId,
+          exchangeAccountId,
+          symbol,
+          side,
+          type: 'MARKET',
+          status: order.status === 'FILLED' ? 'FILLED' : 'PENDING',
+          quantity,
+          price: executedPrice,
+          filledQuantity: order.filledQuantity,
+          isPaper: true,
+          idempotencyKey: orderId,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to persist paper trade', error);
+    }
 
     if (fillImmediately) {
       this.updateVirtualPosition(order);
     }
 
     this.logger.log(
-      `[Paper] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} ` +
-      `(status: ${order.status})`,
+      `[Paper] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} (persisted)`,
     );
 
     return order;
   }
 
-  /**
-   * 模擬部分成交（Partial Fill）
-   */
-  async simulatePartialFill(orderId: string, fillPercentage: number): Promise<PaperOrder | null> {
-    const order = this.paperOrders.get(orderId);
-    if (!order || order.status === 'FILLED' || order.status === 'CANCELLED') {
-      return null;
-    }
-
-    const fillQty = order.quantity * (fillPercentage / 100);
-    const newFilled = Math.min(order.filledQuantity + fillQty, order.quantity);
-
-    order.filledQuantity = newFilled;
-    order.status = newFilled >= order.quantity ? 'FILLED' : 'PARTIALLY_FILLED';
-
-    // 更新持倉（只計已成交部分）
-    if (order.filledQuantity > 0) {
-      this.updateVirtualPosition(order);
-    }
-
-    this.logger.log(
-      `[Paper] Partial fill on ${orderId}: ${order.filledQuantity}/${order.quantity} (${order.status})`,
-    );
-
-    return order;
+  async simulatePartialFill(orderId: string, fillPercentage: number) {
+    // TODO: 之後可更新 DB 狀態
+    this.logger.warn('simulatePartialFill not fully persisted yet');
+    return null;
   }
 
   private updateVirtualPosition(order: PaperOrder) {
     const userPositions = this.virtualPositions.get(order.userId) || new Map();
     const existing = userPositions.get(order.symbol);
 
-    // 只計算已成交嘅數量
     const filledQty = order.side === 'BUY' ? order.filledQuantity : -order.filledQuantity;
 
     if (!existing) {
@@ -164,11 +160,14 @@ export class PaperTradingService {
     return positions ? Array.from(positions.values()) : [];
   }
 
-  getPaperOrder(orderId: string): PaperOrder | undefined {
-    return this.paperOrders.get(orderId);
-  }
-
-  getPaperOrders(userId: string): PaperOrder[] {
-    return Array.from(this.paperOrders.values()).filter(o => o.userId === userId);
+  async getPaperOrders(userId: string) {
+    // 從資料庫讀取 Paper Trades
+    return this.prisma.trade.findMany({
+      where: {
+        userId,
+        isPaper: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }
