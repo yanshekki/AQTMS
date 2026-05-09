@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional, Inject } from '@nestjs/common';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
 import { ExchangeAccountRepository } from '../infrastructure/persistence/ExchangeAccountRepository';
 import { ExchangePositionProvider } from '../exchange/interfaces/exchange-position.provider';
@@ -15,6 +15,7 @@ export class PortfolioService {
   constructor(
     private readonly paperTradingService: PaperTradingService,
     private readonly exchangeAccountRepo: ExchangeAccountRepository,
+    @Optional() @Inject('EXCHANGE_POSITION_PROVIDER')
     private readonly positionProvider?: ExchangePositionProvider,
   ) {}
 
@@ -25,8 +26,7 @@ export class PortfolioService {
     const totalUnrealizedPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
     const riskExposure = totalValue > 0 ? Math.min((totalValue / 50000) * 100, 100) : 0;
 
-    // 檢查風險警示
-    const alerts: Alert[] = this.checkRiskAlerts(positions, totalValue, totalUnrealizedPnl);
+    const alerts = this.checkRiskAlerts(positions, totalValue, totalUnrealizedPnl);
 
     return {
       totalValue: parseFloat(totalValue.toFixed(2)),
@@ -41,19 +41,19 @@ export class PortfolioService {
   private checkRiskAlerts(positions: any[], totalValue: number, totalUnrealizedPnl: number): Alert[] {
     const alerts: Alert[] = [];
 
-    // 1. 整體未實現虧損超過 5%
+    // 整體未實現虧損超過 5%
     if (totalValue > 0 && totalUnrealizedPnl < 0) {
       const lossPercent = Math.abs(totalUnrealizedPnl) / totalValue;
       if (lossPercent > 0.05) {
         alerts.push({
           type: 'PORTFOLIO_LOSS',
-          severity: lossPercent > 0.1 ? 'danger' : 'warning',
+          severity: lossPercent > 0.10 ? 'danger' : 'warning',
           message: `整體未實現虧損已達 ${(lossPercent * 100).toFixed(1)}%`,
         });
       }
     }
 
-    // 2. 單一持倉未實現虧損超過 10%
+    // 單一持倉未實現虧損超過 10%
     for (const pos of positions) {
       if (pos.unrealizedPnlPercent < -10) {
         alerts.push({
@@ -69,9 +69,47 @@ export class PortfolioService {
   }
 
   async getPositions(userId: string) {
-    // ... (保留之前實作的聚合邏輯)
     const allPositions: any[] = [];
-    // ... existing code for fetching positions ...
+    const accounts = await this.exchangeAccountRepo.findByUser(userId);
+
+    for (const account of accounts) {
+      if (account.isPaperTrading) {
+        const paperPositions = this.paperTradingService.getVirtualPositions(userId);
+        for (const p of paperPositions) {
+          allPositions.push({
+            symbol: p.symbol,
+            exchange: `${account.exchange} (Paper)`,
+            side: p.quantity > 0 ? 'BUY' : 'SELL',
+            quantity: Math.abs(p.quantity),
+            averagePrice: p.averagePrice,
+            currentPrice: p.averagePrice,
+            unrealizedPnl: p.unrealizedPnl || 0,
+            unrealizedPnlPercent: 0,
+            isPaper: true,
+          });
+        }
+      } else if (this.positionProvider) {
+        try {
+          const livePositions = await this.positionProvider.getPositions(userId);
+          for (const p of livePositions) {
+            allPositions.push({
+              symbol: p.symbol,
+              exchange: account.exchange,
+              side: p.side,
+              quantity: p.quantity,
+              averagePrice: p.entryPrice || 0,
+              currentPrice: p.entryPrice || 0,
+              unrealizedPnl: p.unrealizedPnl || 0,
+              unrealizedPnlPercent: 0,
+              isPaper: false,
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to get live positions for account ${account.id}`, error);
+        }
+      }
+    }
+
     return allPositions;
   }
 }
