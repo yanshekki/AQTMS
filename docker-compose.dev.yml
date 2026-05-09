@@ -1,0 +1,40 @@
+version: '3.8'
+
+# =============================================
+# AQTMS Docker Compose - Development
+# Optimized for local development with hot reload
+# =============================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/aqtms?schema=public
+      EXCHANGE_PROVIDER: BINANCE
+      BINANCE_TESTNET: "true"
+      DAILY_LOSS_LIMIT: 1000
+    depends_on:
+      - db
+    command: ["pnpm", "--filter", "backend", "dev"]
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aqtms
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data_dev:
