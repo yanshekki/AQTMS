@@ -48,7 +48,7 @@ AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 
 | **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層） | ✅ |
 | **評分規則** | 可配置權重編輯器（真實度/情緒/相關度/可信度）· 版本歷史 · 啟用/停用開關 · PostgreSQL 持久化 | ✅ |
 | **通知中心** | 應用內通知中心 · 已讀/未讀 · 按類型篩選 · 系統種子 · PostgreSQL 持久化 | ✅ |
-| **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS | ✅ |
+| **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS · **Graceful Shutdown** | ✅ |
 | **團隊協作** | 5 角色 · 權限白名單驗證 · 審計日誌 · CSV 導出 · 審計追蹤 | ✅ |
 | **完整文檔** | 雙語（中/英）· API 文件 · 架構文件 · 用戶指南 · 測試錢包 · 權限矩陣 | ✅ |
 
@@ -66,7 +66,7 @@ AQTMS 實行完善的**基於角色的訪問控制（RBAC）**系統，設有 5 
 | 📊 **ANALYST** | 10 個 | + AI 訊號、回測、評分規則 |
 | 👀 **VIEWER** | 3 個（`trade:read`, `exchange:read`, `user:read`） | 儀表板、交易記錄、投資組合、通知、設定 |
 
-### 權限矩陣
+### 權限矩軸
 
 | 權限 | SUPER | ADMIN | TRADER | ANALYST | VIEWER |
 |---|---|---|---|---|---|
@@ -293,7 +293,14 @@ apps/web/src/
 
 ## 🐳 部署
 
-### PM2 進程管理器（推薦）
+### Graceful Shutdown（Phase 3 新增）
+
+AQTMS 支援 **Graceful Shutdown**，適合 Docker / Kubernetes 環境：
+- 收到 `SIGTERM` / `SIGINT` 時會優雅關閉
+- WebSocket 連線會自動清理
+- 確保進行中嘅交易請求完成後先退出
+
+### PM2 Process Manager (Recommended)
 
 ```bash
 # 全局安裝 PM2
@@ -325,7 +332,7 @@ pm2:save
 npm2:startup
 ```
 
-#### PM2 進程列表
+#### PM2 Process List
 
 | Process | Port | Mode | Memory Limit |
 |---------|------|------|-------------|
