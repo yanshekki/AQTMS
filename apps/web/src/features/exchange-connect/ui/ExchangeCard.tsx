@@ -1,4 +1,4 @@
-// ── Exchange Card (with improved Paper Trading display) ──
+// ── Exchange Card (with Paper Positions display) ──
 
 import { useState } from 'react';
 import {
@@ -28,22 +28,35 @@ import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '@/app/Providers';
 import type { ExchangeAccount } from '../lib/schemas';
 
+interface PaperPosition {
+  symbol: string;
+  quantity: number;
+  averagePrice: number;
+  unrealizedPnl: number;
+}
+
 interface ExchangeCardProps {
   account: ExchangeAccount & { isPaperTrading?: boolean };
+  paperPositions?: PaperPosition[];
+  totalUnrealizedPnl?: number;
   onDelete?: (id: string) => Promise<boolean> | void;
   onTest?: (id: string) => Promise<boolean>;
   onTogglePaperTrading?: (id: string, isPaperTrading: boolean) => Promise<void>;
   isTesting?: boolean;
   isDeleting?: boolean;
+  isLoadingPositions?: boolean;
 }
 
 export function ExchangeCard({
   account,
+  paperPositions = [],
+  totalUnrealizedPnl = 0,
   onDelete,
   onTest,
   onTogglePaperTrading,
   isTesting = false,
   isDeleting = false,
+  isLoadingPositions = false,
 }: ExchangeCardProps) {
   const { mode } = useThemeMode();
   const { t } = useTranslation();
@@ -112,6 +125,16 @@ export function ExchangeCard({
     }
   };
 
+  const formatPnl = (pnl: number) => {
+    const color = pnl >= 0 ? '#22c55e' : '#ef4444';
+    const sign = pnl >= 0 ? '+' : '';
+    return (
+      <Typography component="span" sx={{ color, fontWeight: 600 }}>
+        {sign}{pnl.toFixed(2)}
+      </Typography>
+    );
+  };
+
   return (
     <>
       <Card
@@ -137,7 +160,6 @@ export function ExchangeCard({
                   size="small"
                   sx={{ bgcolor: `${color}20`, color: color, fontWeight: 600 }}
                 />
-                {/* Paper Trading Badge */}
                 {isPaperTrading && (
                   <Chip
                     label="PAPER"
@@ -205,7 +227,7 @@ export function ExchangeCard({
             />
           )}
 
-          {/* Paper Positions Summary (when enabled) */}
+          {/* Paper Positions Display */}
           {isPaperTrading && (
             <Box
               sx={{
@@ -217,14 +239,47 @@ export function ExchangeCard({
                 borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
               }}
             >
-              <Typography variant="caption" color="warning.main" fontWeight={600}>
-                📊 Paper Trading 持倉
-              </Typography>
-              <Typography variant="body2" color={dimText} sx={{ mt: 0.5, fontSize: '0.75rem' }}>
-                虛擬持倉即時計算中...
-                <br />
-                （完整持倉顯示將喺後續版本加入）
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="caption" color="warning.main" fontWeight={600}>
+                  📊 Paper Trading 持倉
+                </Typography>
+                {isLoadingPositions && <LinearProgress sx={{ width: 60, height: 2 }} />}
+              </Stack>
+
+              {paperPositions.length > 0 ? (
+                <Stack spacing={0.75}>
+                  {paperPositions.slice(0, 3).map((pos, index) => (
+                    <Stack key={index} direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" color={primaryText} fontWeight={500}>
+                        {pos.symbol}
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="caption" color={dimText}>
+                          {pos.quantity.toFixed(4)}
+                        </Typography>
+                        {formatPnl(pos.unrealizedPnl)}
+                      </Stack>
+                    </Stack>
+                  ))}
+                  {paperPositions.length > 3 && (
+                    <Typography variant="caption" color={dimText}>
+                      +{paperPositions.length - 3} more...
+                    </Typography>
+                  )}
+                  <Box sx={{ pt: 0.5, borderTop: '1px dashed', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="caption" color={dimText}>
+                        Total PnL
+                      </Typography>
+                      {formatPnl(totalUnrealizedPnl)}
+                    </Stack>
+                  </Box>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color={dimText} sx={{ fontStyle: 'italic', fontSize: '0.75rem' }}>
+                  暫無持倉
+                </Typography>
+              )}
             </Box>
           )}
 
