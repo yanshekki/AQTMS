@@ -1,35 +1,57 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { Order } from './interfaces/order.entity';
 import { OrderStatus } from './interfaces/order-status.enum';
+import { IOrderRepository } from './interfaces/order.repository';
 
 @Injectable()
 export class OrderService {
-  private orders = new Map<string, Order>();
+  constructor(
+    @Optional() @Inject('ORDER_REPOSITORY')
+    private readonly orderRepository?: IOrderRepository,
+  ) {}
 
-  // ... existing methods (createOrder, updateOrderStatus, etc.) ...
+  private get repository(): IOrderRepository {
+    if (!this.orderRepository) {
+      throw new Error('OrderRepository not provided');
+    }
+    return this.orderRepository;
+  }
 
-  /**
-   * 應用部分成交（Partial Fill）
-   */
-  applyPartialFill(
+  async createOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> {
+    return this.repository.create(data);
+  }
+
+  async updateOrderStatus(
     orderId: string,
-    fillQuantity: number,
-    fillPrice: number,
-  ): Order {
-    const order = this.orders.get(orderId);
+    newStatus: OrderStatus,
+    filledQuantity?: number,
+    averageFillPrice?: number,
+  ): Promise<Order> {
+    const order = await this.repository.findById(orderId);
     if (!order) {
       throw new Error(`Order not found: ${orderId}`);
     }
 
-    if (
-      order.status !== OrderStatus.NEW &&
-      order.status !== OrderStatus.PARTIALLY_FILLED
-    ) {
-      throw new Error(`Cannot apply fill to order in status: ${order.status}`);
+    const updateData: Partial<Order> = { status: newStatus, updatedAt: new Date() };
+
+    if (filledQuantity !== undefined) updateData.filledQuantity = filledQuantity;
+    if (averageFillPrice !== undefined) updateData.averageFillPrice = averageFillPrice;
+
+    return this.repository.update(orderId, updateData);
+  }
+
+  async applyPartialFill(
+    orderId: string,
+    fillQuantity: number,
+    fillPrice: number,
+  ): Promise<Order> {
+    const order = await this.repository.findById(orderId);
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
     }
 
-    if (fillQuantity <= 0) {
-      throw new Error('Fill quantity must be positive');
+    if (order.status !== OrderStatus.NEW && order.status !== OrderStatus.PARTIALLY_FILLED) {
+      throw new Error(`Cannot apply fill to order in status: ${order.status}`);
     }
 
     const newFilledQuantity = order.filledQuantity + fillQuantity;
@@ -38,28 +60,32 @@ export class OrderService {
       throw new Error('Fill quantity exceeds remaining order quantity');
     }
 
-    // 計算加權平均成交價
     const totalValue =
-      order.filledQuantity * (order.averageFillPrice || 0) +
-      fillQuantity * fillPrice;
+      order.filledQuantity * (order.averageFillPrice || 0) + fillQuantity * fillPrice;
 
-    const newAverageFillPrice =
-      newFilledQuantity > 0 ? totalValue / newFilledQuantity : fillPrice;
+    const newAverageFillPrice = newFilledQuantity > 0 ? totalValue / newFilledQuantity : fillPrice;
 
-    // 更新訂單
-    order.filledQuantity = newFilledQuantity;
-    order.averageFillPrice = newAverageFillPrice;
-    order.updatedAt = new Date();
+    const updateData: Partial<Order> = {
+      filledQuantity: newFilledQuantity,
+      averageFillPrice: newAverageFillPrice,
+      updatedAt: new Date(),
+      status: newFilledQuantity >= order.quantity ? OrderStatus.FILLED : OrderStatus.PARTIALLY_FILLED,
+    };
 
-    // 判斷是否完全成交
-    if (newFilledQuantity >= order.quantity) {
-      order.status = OrderStatus.FILLED;
-    } else {
-      order.status = OrderStatus.PARTIALLY_FILLED;
-    }
-
-    return order;
+    return this.repository.update(orderId, updateData);
   }
 
-  // ... existing methods ...
+  async getOrder(orderId: string): Promise<Order | undefined> {
+    const order = await this.repository.findById(orderId);
+    return order || undefined;
+  }
+
+  async getOrdersByUser(userId: string): Promise<Order[]> {
+    return this.repository.findByUser(userId);
+  }
+
+  async getActiveOrders(userId: string): Promise<Order[]> {
+    const orders = await this.repository.findByUser(userId);
+    return orders.filter(o => o.status === OrderStatus.NEW || o.status === OrderStatus.PARTIALLY_FILLED);
+  }
 }
