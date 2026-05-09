@@ -9,6 +9,7 @@ import { NotificationModule } from './notification/notification.module';
 import { DataModule } from './data/data.module';
 import { BacktestModule } from './backtest/backtest.module';
 import { SafetyModule } from './safety/safety.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { SafetyModule } from './safety/safety.module';
     NotificationModule,
     DataModule,
     BacktestModule,
-    SafetyModule, // Phase 5 - Kill Switch & Safety
+    SafetyModule,
+    OrderModule, // Phase 5 - Order State Management
   ],
   controllers: [],
   providers: [],
