@@ -22,7 +22,8 @@
 
 AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 統一交易執行**，全流程自動化。
 
-**核心價值：**\n- 🚀 全自動化：不需要人手盯盤，AI 自動判斷 + 執行
+**核心價值：**
+- 🚀 全自動化：不需要人手盯盤，AI 自動判斷 + 執行
 - 🧠 多 AI 協作：Grok 驗真 + Gemini 評分 + DeepSeek 決策 + 自動降級
 - 🏦 全資產：加密貨幣 + 港股美股 + DEX 統一交易
 - 🛡 專業風控：VaR/CVaR · Kelly · 動態倉位 · 強制平倉規則
@@ -43,7 +44,7 @@ AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 
 | **回測系統** | MA Cross + Score Threshold 策略 · Sharpe/Sortino/Calmar · TradingView 整合 · 月回報 | ✅ |
 | **資訊來源** | Telegram · X.com 即時監控 · 自動評分 + 信號觸發 → Trade Queue · 實時價格 | ✅ |
 | **實時推送** | WebSocket（Socket.io JWT）· price/signal/order/risk/position 5 事件類型 · 自動重連 | ✅ |
-| **監控告警** | Prometheus（12 metric types）+ Grafana · p95 延遲 · 交易成功率 · Queue 健康 | ✅ |
+| **監控告警** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 延遲 · Kill Switch 監控 | ✅ |
 | **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層） | ✅ |
 | **評分規則** | 可配置權重編輯器（真實度/情緒/相關度/可信度）· 版本歷史 · 啟用/停用開關 · PostgreSQL 持久化 | ✅ |
 | **通知中心** | 應用內通知中心 · 已讀/未讀 · 按類型篩選 · 系統種子 · PostgreSQL 持久化 | ✅ |
@@ -93,11 +94,11 @@ AQTMS 實行完善的**基於角色的訪問控制（RBAC）**系統，設有 5 
 
 ```
 Request
-  ↓ Rate Limiting（所有路由）           ← Phase 3 新增
+  ↓ Rate Limiting（所有路由）
   ↓ CORS（已配置）
-  ↓ Helmet（安全標頭）                 ← Phase 3 新增
-  ↓ Structured Logging + Sentry        ← Phase 3 新增
-  ↓ Prometheus Metrics（HTTP + Business） ← Phase 3 新增
+  ↓ Helmet（安全標頭）
+  ↓ Structured Logging + Sentry
+  ↓ Prometheus Metrics（HTTP + Business）
   ↓ JWT 認證 + Token 撤銷（Redis）
   ↓ Permission Middleware（RBAC）
   ↓ 權限白名單驗證
@@ -163,7 +164,7 @@ docker-compose up -d
 
 ### Backend — Hexagonal Architecture + DDD + Clean Architecture
 
-``` 
+```
 apps/backend/src/
 ├── domain/           # 純領域層（entities, value-objects, repository interfaces）
 ├── application/      # 用例層（ExecuteTradeUseCase, ProcessNewsUseCase）
