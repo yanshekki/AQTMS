@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { validationSchema } from './config/validation.schema';
 
 // ... other imports ...
@@ -14,12 +15,19 @@ import { validationSchema } from './config/validation.schema';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,   // 60 seconds
-          limit: 30,    // 30 requests per 60 seconds (default)
+          ttl: 60000,
+          limit: 30,
         },
       ],
     }),
-    // ... other modules (RiskModule, ExecutionModule, etc.) ...
+    // ... other modules ...
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    // ... other providers ...
   ],
   // ...
 })
