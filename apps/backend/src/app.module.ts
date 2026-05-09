@@ -3,8 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { validationSchema } from './config/validation.schema';
-
-// ... other imports ...
+import { DebugModule } from './debug/debug.module';
 
 @Module({
   imports: [
@@ -20,14 +19,15 @@ import { validationSchema } from './config/validation.schema';
         },
       ],
     }),
-    // ... other modules ...
+    // ... other core modules
+    ...(process.env.NODE_ENV === 'production' ? [] : [DebugModule]),
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // ... other providers ...
+    // ... other providers
   ],
   // ...
 })

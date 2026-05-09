@@ -22,6 +22,9 @@ export class BinanceWebsocketClient {
   private errorCallback?: (error: Error) => void;
   private closeCallback?: () => void;
 
+  // Track subscribed streams to avoid duplicates
+  private subscribedStreams = new Set<string>();
+
   constructor(
     @Inject(forwardRef(() => MarketDataService))
     private readonly marketDataService: MarketDataService,
@@ -58,8 +61,6 @@ export class BinanceWebsocketClient {
       this.ws.on('message', (data: string) => {
         try {
           const parsed = JSON.parse(data);
-
-          // === 新增：處理價格更新 ===
           this.handlePriceUpdate(parsed);
 
           if (this.messageCallback) {
@@ -93,18 +94,39 @@ export class BinanceWebsocketClient {
   }
 
   /**
-   * 處理價格更新消息（miniTicker / ticker）
+   * Subscribe to miniTicker for specific symbols (dynamic subscription)
    */
+  subscribeToMiniTicker(symbols: string[]) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.structuredLogger.warn('WebSocket not connected, cannot subscribe yet');
+      return;
+    }
+
+    const streams = symbols.map(s => `${s.toLowerCase()}@miniTicker`);
+
+    const newStreams = streams.filter(s => !this.subscribedStreams.has(s));
+    if (newStreams.length === 0) return;
+
+    const payload = {
+      method: 'SUBSCRIBE',
+      params: newStreams,
+      id: Date.now(),
+    };
+
+    this.ws.send(JSON.stringify(payload));
+
+    newStreams.forEach(s => this.subscribedStreams.add(s));
+    this.structuredLogger.log(`Subscribed to miniTicker: ${newStreams.join(', ')}`);
+  }
+
   private handlePriceUpdate(parsed: any) {
     try {
-      // miniTicker 单符号
       if (parsed.e === '24hrMiniTicker' || parsed.e === 'miniTicker') {
         if (parsed.s && parsed.c) {
           this.marketDataService.updatePrice(parsed.s, parseFloat(parsed.c));
         }
       }
 
-      // 数组形式（!miniTicker@arr）
       if (Array.isArray(parsed)) {
         for (const item of parsed) {
           if (item.s && item.c) {
@@ -113,14 +135,22 @@ export class BinanceWebsocketClient {
         }
       }
     } catch (error) {
-      // 忽略非价格消息
+      // ignore non-price messages
     }
   }
 
   private resubscribeStreams() {
-    // TODO: 根據需要自動訂閱常用交易對
-    // 例如 this.subscribeToMiniTicker(['BTCUSDT', 'ETHUSDT']);
+    if (this.subscribedStreams.size > 0) {
+      const streams = Array.from(this.subscribedStreams);
+      const payload = {
+        method: 'SUBSCRIBE',
+        params: streams,
+        id: Date.now(),
+      };
+      this.ws?.send(JSON.stringify(payload));
+      this.structuredLogger.log(`Resubscribed to streams: ${streams.join(', ')}`);
+    }
   }
 
-  // ... 其他方法保持不變 ...
+  // ... other existing methods ...
 }
