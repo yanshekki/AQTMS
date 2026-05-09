@@ -28,7 +28,8 @@ export class ExecutionService implements OnModuleInit {
   async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
     const overallStart = Date.now();
     let riskCheckLatency = 0;
-    let exchangeCallLatency = 0;
+    let orderCreationLatency = 0;
+    let resilienceLatency = 0;
 
     try {
       // Kill Switch 檢查
@@ -60,11 +61,29 @@ export class ExecutionService implements OnModuleInit {
         return this.paperTradingService.placePaperOrder({ /* ... */ });
       }
 
-      // Live Trading
-      const mainOrderRecord = this.orderService.createOrder({ /* ... */ });
+      // 建立訂單記錄 + 計時
+      const creationStart = Date.now();
+      const mainOrderRecord = this.orderService.createOrder({
+        userId: dto.userId,
+        exchange: dto.exchange,
+        symbol: dto.symbol,
+        side: dto.side,
+        type: 'MARKET',
+        quantity: dto.quantity,
+        price: dto.price,
+      });
+      orderCreationLatency = Date.now() - creationStart;
 
-      // 交易所呼叫 + 計時
-      const exchangeStart = Date.now();
+      this.logger.logPlacement({
+        userId: dto.userId,
+        orderId: mainOrderRecord.id,
+        symbol: dto.symbol,
+        side: dto.side,
+        quantity: dto.quantity,
+      });
+
+      // Resilience 執行 + 計時
+      const resilienceStart = Date.now();
       const mainOrderResult = await this.circuitBreaker.execute(() =>
         retry(() => this.placeMainOrder(dto), {
           retries: 3,
@@ -72,7 +91,7 @@ export class ExecutionService implements OnModuleInit {
           shouldRetry: (error) => this.isTransientError(error),
         }),
       );
-      exchangeCallLatency = Date.now() - exchangeStart;
+      resilienceLatency = Date.now() - resilienceStart;
 
       const totalLatency = Date.now() - overallStart;
 
@@ -84,10 +103,15 @@ export class ExecutionService implements OnModuleInit {
         side: dto.side,
         quantity: dto.quantity,
         latencyMs: totalLatency,
+        metadata: {
+          breakdown: {
+            riskCheck: riskCheckLatency,
+            orderCreation: orderCreationLatency,
+            resilience: resilienceLatency,
+            total: totalLatency,
+          },
+        },
       });
-
-      // 可選：單獨記錄各階段延遲（可擴充 logger 方法）
-      console.log(`[Latency] RiskCheck: ${riskCheckLatency}ms | ExchangeCall: ${exchangeCallLatency}ms | Total: ${totalLatency}ms`);
 
       this.orderService.updateOrderStatus(mainOrderRecord.id, 'FILLED' as any, dto.quantity, dto.price);
 
@@ -96,10 +120,19 @@ export class ExecutionService implements OnModuleInit {
         mode: 'LIVE',
         mainOrder: mainOrderResult,
         mainOrderRecord,
-        latency: { riskCheck: riskCheckLatency, exchangeCall: exchangeCallLatency, total: totalLatency },
+        latencyBreakdown: {
+          riskCheck: riskCheckLatency,
+          orderCreation: orderCreationLatency,
+          resilience: resilienceLatency,
+          total: totalLatency,
+        },
       };
     } catch (error) {
-      this.logger.logError({ action: 'ORDER_FAILED', userId: dto.userId, error: error instanceof Error ? error.message : '' });
+      this.logger.logError({
+        action: 'ORDER_FAILED',
+        userId: dto.userId,
+        error: error instanceof Error ? error.message : '',
+      });
       if (error instanceof RiskCheckFailedError) throw error;
       throw new OrderExecutionError(error instanceof Error ? error.message : 'Execution failed');
     }
@@ -110,5 +143,5 @@ export class ExecutionService implements OnModuleInit {
     return ['timeout', 'econnreset', 'network', 'rate limit', '503', '429'].some(kw => msg.includes(kw));
   }
 
-  // ... existing private methods ...
+  // ... existing private methods (placeMainOrder, etc.) ...
 }
