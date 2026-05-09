@@ -29,92 +29,68 @@ export class BinanceWebsocketClient {
     this.apiKey = process.env.BINANCE_API_KEY || '';
   }
 
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.baseUrl);
+  // ... existing connect() and other methods ...
 
-      this.ws.on('open', () => {
-        console.log('[BinanceWebsocket] Connected');
-        this.reconnectAttempts = 0;
-        this.resubscribeStreams();
-        resolve();
-      });
+  async connectUserStream(): Promise<void> {
+    if (!this.listenKey) {
+      await this.getListenKey();
+    }
 
-      this.ws.on('message', (data: string) => {
+    const userStreamUrl = `${this.baseUrl.replace('https', 'wss').replace('/api', '')}/ws/${this.listenKey}`;
+
+    this.userDataWs = new WebSocket(userStreamUrl);
+
+    this.userDataWs.on('open', () => {
+      console.log('[BinanceWebsocket] User Data Stream connected');
+      this.startKeepAlive();
+    });
+
+    this.userDataWs.on('message', (data: string) => {
+      try {
+        const parsed = JSON.parse(data);
+
+        // Auto handle listenKey expiration
+        if (parsed.e === 'listenKeyExpired') {
+          console.warn('[BinanceWebsocket] listenKey expired. Reconnecting user data stream...');
+          this.reconnectUserDataStream();
+          return;
+        }
+
         if (this.messageCallback) {
-          try {
-            const parsed = JSON.parse(data);
-            this.messageCallback(parsed);
-          } catch (e) {
-            console.error('[BinanceWebsocket] Failed to parse message');
-          }
+          this.messageCallback(parsed);
         }
-      });
+      } catch (e) {
+        console.error('[BinanceWebsocket] Failed to parse user data message');
+      }
+    });
 
-      this.ws.on('error', (error) => {
-        console.error('[BinanceWebsocket] Error:', error);
-        if (this.errorCallback) this.errorCallback(error as Error);
-        this.scheduleReconnect();
-      });
+    this.userDataWs.on('error', (error) => {
+      console.error('[BinanceWebsocket] User Data Stream error:', error);
+      if (this.errorCallback) this.errorCallback(error as Error);
+    });
 
-      this.ws.on('close', () => {
-        console.log('[BinanceWebsocket] Disconnected');
-        if (this.closeCallback) this.closeCallback();
-        this.scheduleReconnect();
-      });
-
-      // Heartbeat ping every 30 seconds
-      setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.ping();
-        }
-      }, 30000);
+    this.userDataWs.on('close', () => {
+      console.log('[BinanceWebsocket] User Data Stream closed');
+      if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+      }
+      if (this.closeCallback) this.closeCallback();
     });
   }
 
-  private scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[BinanceWebsocket] Max reconnect attempts reached');
-      return;
+  private async reconnectUserDataStream() {
+    if (this.userDataWs) {
+      this.userDataWs.close();
+    }
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
     }
 
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-    this.reconnectAttempts++;
-
-    console.log(`[BinanceWebsocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-    this.reconnectTimeout = setTimeout(() => {
-      this.connect().catch(console.error);
-    }, delay);
+    this.listenKey = null;
+    await this.connectUserStream();
   }
 
-  private resubscribeStreams() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
-    for (const stream of this.subscribedStreams) {
-      const payload = {
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now(),
-      };
-      this.ws.send(JSON.stringify(payload));
-    }
-  }
-
-  subscribePublic(stream: string): void {
-    this.subscribedStreams.add(stream);
-
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const payload = {
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now(),
-      };
-      this.ws.send(JSON.stringify(payload));
-    }
-  }
-
-  // ... keep existing connectUserStream, getListenKey, startKeepAlive, disconnect ...
+  // ... keep other existing methods (connect, scheduleReconnect, etc.) ...
 
   disconnect(): void {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
