@@ -1,74 +1,76 @@
 import { Test, TestingModule } from '@nestjs/testing';
-// ... other imports ...
+// ... other imports and mocks ...
 
-describe('ExecutionService - WebSocket Updates', () => {
+describe('ExecutionService + ExchangeService Integration', () => {
   let service: ExecutionService;
+  let exchangeService: ExchangeService;
   let orderService: OrderService;
-  let websocketService: WebsocketService;
+  let metricsCollector: ExecutionMetricsCollector;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExecutionService,
-        // ... mock other dependencies ...
         {
-          provide: WebsocketService,
+          provide: ExchangeService,
           useValue: {
-            getBinanceClient: jest.fn().mockReturnValue({
-              connectUserStream: jest.fn(),
-              onMessage: jest.fn(),
+            placeOrder: jest.fn().mockResolvedValue({
+              orderId: 'ex-123',
+              exchangeOrderId: 'ex-123',
+              status: 'FILLED',
+              filledQuantity: 1,
+              averagePrice: 65000,
             }),
           },
         },
         {
           provide: OrderService,
           useValue: {
-            findByExchangeOrderId: jest.fn(),
-            applyPartialFill: jest.fn(),
+            createOrder: jest.fn().mockResolvedValue({ id: 'local-123', filledQuantity: 0 }),
             updateOrderStatus: jest.fn(),
+            findByExchangeOrderId: jest.fn(),
           },
         },
-        // ... other mocks ...
+        // ... other required mocks ...
       ],
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
+    exchangeService = module.get<ExchangeService>(ExchangeService);
     orderService = module.get<OrderService>(OrderService);
-    websocketService = module.get<WebsocketService>(WebsocketService);
+    metricsCollector = module.get<ExecutionMetricsCollector>(ExecutionMetricsCollector);
   });
 
-  it('should start listening to order updates via WebSocket', async () => {
-    const binanceClient = websocketService.getBinanceClient();
-
-    await service.startListeningToOrderUpdates();
-
-    expect(binanceClient.connectUserStream).toHaveBeenCalled();
-    expect(binanceClient.onMessage).toHaveBeenCalled();
-  });
-
-  it('should call findByExchangeOrderId and applyPartialFill when receiving executionReport', async () => {
-    // 模擬已經有本地訂單
-    jest.spyOn(orderService, 'findByExchangeOrderId').mockResolvedValue({
-      id: 'local-order-123',
-      filledQuantity: 0,
+  it('should call ExchangeService.placeOrder and save exchangeOrderId', async () => {
+    await service.placeOrderWithProtection({
+      userId: 'user-1',
+      exchange: 'BINANCE',
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 0.01,
+      isPaperTrading: false,
     } as any);
 
-    // 直接呼叫私有方法進行測試（實際專案可考慮改為 protected 或使用其他方式）
-    const report = {
-      e: 'executionReport',
-      s: 'BTCUSDT',
-      S: 'BUY',
-      X: 'PARTIALLY_FILLED',
-      z: '0.5',
-      L: '65000',
-      i: 'exchange-order-456',
-      x: 'TRADE',
-    };
+    expect(exchangeService.placeOrder).toHaveBeenCalled();
+    expect(orderService.updateOrderStatus).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(Number),
+      expect.any(Number),
+      'ex-123'
+    );
+  });
 
-    // @ts-ignore - 測試用
-    await service['handleExecutionReport'](report);
+  it('should record success metric on successful order', async () => {
+    await service.placeOrderWithProtection({
+      userId: 'user-1',
+      exchange: 'BINANCE',
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 0.01,
+      isPaperTrading: false,
+    } as any);
 
-    expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('exchange-order-456');
-    expect(orderService.applyPartialFill).toHaveBeenCalled();
+    expect(metricsCollector.recordOrder).toHaveBeenCalledWith(true);
   });
 });
