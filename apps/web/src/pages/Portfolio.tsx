@@ -1,13 +1,15 @@
-// ── Portfolio Dashboard ──
+// ── Portfolio Dashboard with Risk Alerts ──
 
 import { usePortfolio } from '@/features/portfolio/model/usePortfolio';
 import { PortfolioSummary } from '@/features/portfolio/ui/PortfolioSummary';
 import { PositionTable } from '@/features/portfolio/ui/PositionTable';
-import { Container, Typography, Box, Button, Chip } from '@mui/material';
+import { Container, Typography, Box, Button, Chip, Alert, Stack } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 export function PortfolioPage() {
   const { summary, positions, isLoading, lastUpdated, refresh } = usePortfolio();
+
+  const alerts = summary?.alerts || [];
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -24,22 +26,27 @@ export function PortfolioPage() {
         </Box>
 
         <Box display="flex" alignItems="center" gap={2}>
-          <Chip 
-            label="自動刷新中" 
-            color="success" 
-            size="small" 
-            variant="outlined" 
-          />
-          <Button 
-            variant="outlined" 
-            startIcon={<RefreshIcon />} 
-            onClick={refresh} 
-            disabled={isLoading}
-          >
+          <Chip label="自動刷新中" color="success" size="small" variant="outlined" />
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refresh} disabled={isLoading}>
             手動刷新
           </Button>
         </Box>
       </Box>
+
+      {/* 風險警示橫幅 */}
+      {alerts.length > 0 && (
+        <Stack spacing={1} mb={3}>
+          {alerts.map((alert, index) => (
+            <Alert 
+              key={index} 
+              severity={alert.severity === 'danger' ? 'error' : 'warning'}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
+          ))}
+        </Stack>
+      )}
 
       {summary && (
         <PortfolioSummary
