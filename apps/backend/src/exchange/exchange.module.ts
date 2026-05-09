@@ -4,6 +4,7 @@ import { BinancePositionProvider } from './providers/binance-position.provider';
 import { BybitPositionProvider } from './providers/bybit-position.provider';
 import { ExchangePositionProvider } from './interfaces/exchange-position.provider';
 import { BinanceAdapter } from './adapters/binance.adapter';
+import { BybitAdapter } from './adapters/bybit.adapter';
 
 @Module({
   imports: [ConfigModule],
@@ -11,6 +12,7 @@ import { BinanceAdapter } from './adapters/binance.adapter';
     BinancePositionProvider,
     BybitPositionProvider,
     BinanceAdapter,
+    BybitAdapter,
     {
       provide: 'EXCHANGE_POSITION_PROVIDER',
       useFactory: (
@@ -19,15 +21,11 @@ import { BinanceAdapter } from './adapters/binance.adapter';
         bybitProvider: BybitPositionProvider,
       ) => {
         const providerType = configService.get<string>('EXCHANGE_PROVIDER', 'BINANCE');
-
-        if (providerType.toUpperCase() === 'BYBIT') {
-          return bybitProvider;
-        }
-        return binanceProvider;
+        return providerType.toUpperCase() === 'BYBIT' ? bybitProvider : binanceProvider;
       },
       inject: [ConfigService, BinancePositionProvider, BybitPositionProvider],
     },
   ],
-  exports: ['EXCHANGE_POSITION_PROVIDER', BinanceAdapter],
+  exports: ['EXCHANGE_POSITION_PROVIDER', BinanceAdapter, BybitAdapter],
 })
 export class ExchangeModule {}
