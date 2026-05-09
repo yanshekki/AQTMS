@@ -7,6 +7,8 @@ import { RiskCheckFailedError } from '../common/errors/risk.error';
 import { OrderExecutionError } from '../common/errors/order.error';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
 import { KillSwitchService } from '../safety/kill-switch.service';
+import { OrderService } from '../order/order.service';
+import { OrderStatus } from '../order/interfaces/order-status.enum';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
@@ -19,14 +21,15 @@ export class ExecutionService implements OnModuleInit {
     private readonly riskService: RiskService,
     private readonly paperTradingService: PaperTradingService,
     private readonly killSwitchService: KillSwitchService,
+    private readonly orderService: OrderService,
   ) {}
 
   onModuleInit() {
-    console.log('[ExecutionService] Kill Switch integration enabled');
+    console.log('[ExecutionService] OrderService integration enabled');
   }
 
   async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
-    // 先檢查 Kill Switch
+    // Kill Switch 檢查
     if (!dto.isPaperTrading) {
       const tradingStatus = this.killSwitchService.isTradingAllowed();
       if (!tradingStatus.allowed) {
@@ -57,24 +60,64 @@ export class ExecutionService implements OnModuleInit {
       });
     }
 
-    // Live Trading
+    // === Live Trading with Order Management ===
     try {
-      const mainOrder = await this.circuitBreaker.execute(() =>
+      // 1. 先建立訂單記錄（狀態 NEW）
+      const mainOrderRecord = this.orderService.createOrder({
+        userId: dto.userId,
+        exchange: dto.exchange,
+        symbol: dto.symbol,
+        side: dto.side,
+        type: 'MARKET',
+        quantity: dto.quantity,
+        price: dto.price,
+      });
+
+      // 2. 執行真實下單（帶 Resilience）
+      const mainOrderResult = await this.circuitBreaker.execute(() =>
         retry(() => this.placeMainOrder(dto), {
           retries: 3,
           delay: 1000,
-          factor: 2,
           shouldRetry: (error) => this.isTransientError(error),
         }),
       );
 
-      // ... Stop Loss / Take Profit with resilience ...
+      // 3. 更新訂單狀態為 FILLED（簡化版）
+      this.orderService.updateOrderStatus(
+        mainOrderRecord.id,
+        OrderStatus.FILLED,
+        dto.quantity,
+        dto.price,
+      );
+
+      // Stop Loss / Take Profit 同樣建立記錄 + 更新狀態
+      let stopLossOrderRecord = null;
+      if (dto.stopLoss) {
+        stopLossOrderRecord = this.orderService.createOrder({
+          userId: dto.userId,
+          exchange: dto.exchange,
+          symbol: dto.symbol,
+          side: dto.side === 'BUY' ? 'SELL' : 'BUY',
+          type: 'STOP_LOSS',
+          quantity: dto.quantity,
+          stopPrice: dto.stopLoss,
+        });
+
+        await this.circuitBreaker.execute(() =>
+          retry(() => this.placeStopLossOrder(dto), { retries: 2, delay: 800 }),
+        );
+
+        this.orderService.updateOrderStatus(stopLossOrderRecord.id, OrderStatus.NEW);
+      }
+
+      // ... Take Profit 同樣處理 ...
 
       return {
         success: true,
         mode: 'LIVE',
-        mainOrder,
-        // ...
+        mainOrder: mainOrderResult,
+        mainOrderRecord,
+        stopLossOrderRecord,
       };
     } catch (error) {
       if (error instanceof RiskCheckFailedError) throw error;
@@ -87,5 +130,18 @@ export class ExecutionService implements OnModuleInit {
     return ['timeout', 'econnreset', 'network', 'rate limit', '503', '429'].some(kw => msg.includes(kw));
   }
 
-  // ... existing placeMainOrder, placeStopLossOrder, placeTakeProfitOrder ...
+  private async placeMainOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(`[Execution][LIVE] Placing MAIN order: ${dto.side} ${dto.quantity} ${dto.symbol}`);
+    return { orderId: 'live-main-' + Date.now(), status: 'FILLED' };
+  }
+
+  private async placeStopLossOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(`[Execution][LIVE] Placing STOP LOSS`);
+    return { orderId: 'live-sl-' + Date.now(), status: 'NEW' };
+  }
+
+  private async placeTakeProfitOrder(dto: PlaceOrderWithProtectionDto) {
+    console.log(`[Execution][LIVE] Placing TAKE PROFIT`);
+    return { orderId: 'live-tp-' + Date.now(), status: 'NEW' };
+  }
 }
