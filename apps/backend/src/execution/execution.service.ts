@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { StructuredLoggerService } from '../common/logger/logger.service';
+import { MetricsService } from '../common/metrics/metrics.service';
 
 // ... other imports ...
 
@@ -7,42 +7,24 @@ import { StructuredLoggerService } from '../common/logger/logger.service';
 export class ExecutionService implements OnModuleInit {
   constructor(
     // ... existing dependencies ...
-    private readonly structuredLogger: StructuredLoggerService,
-  ) {
-    this.structuredLogger.setContext('ExecutionService');
-  }
+    private readonly metricsService: MetricsService,
+  ) {}
 
-  async startListeningToOrderUpdates(): Promise<void> {
+  async placeOrderWithProtection(dto: any) {
     try {
-      const binanceClient = this.websocketService.getBinanceClient();
-      await binanceClient.connectUserStream();
+      // ... existing logic ...
 
-      binanceClient.onMessage((data: any) => {
-        if (data.e === 'executionReport') {
-          this.handleExecutionReport(data as BinanceExecutionReport);
-        } else if (data.e === 'outboundAccountPosition') {
-          this.handleOutboundAccountPosition(data as BinanceOutboundAccountPosition);
-        } else if (data.e === 'balanceUpdate') {
-          this.handleBalanceUpdate(data as BinanceBalanceUpdate);
-        }
-      });
-
-      this.structuredLogger.log('WebSocket listeners started');
+      this.metricsService.recordOrderPlaced(dto.exchange, dto.symbol);
+      return { success: true, ... };
     } catch (error) {
-      this.structuredLogger.error('Failed to start WebSocket listeners', error);
+      this.metricsService.recordOrderFailed(
+        dto.exchange,
+        dto.symbol,
+        error instanceof Error ? error.message : 'unknown',
+      );
+      throw error;
     }
   }
 
-  private handleOutboundAccountPosition(data: BinanceOutboundAccountPosition) {
-    this.structuredLogger.log('Account position update received from WebSocket');
-  }
-
-  private handleBalanceUpdate(data: BinanceBalanceUpdate) {
-    this.structuredLogger.log('Balance update received from WebSocket', {
-      asset: data.a,
-      delta: data.d,
-    });
-  }
-
-  // ... existing handleExecutionReport and other methods ...
+  // ... other methods ...
 }
