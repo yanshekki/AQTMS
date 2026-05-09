@@ -42,7 +42,7 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Backtest System** | MA Cross + Score Threshold strategies · Sharpe/Sortino/Calmar · TradingView integration · Monthly returns | ✅ |
 | **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue · Live price feed | ✅ |
 | **Real-time Push** | WebSocket (Socket.io JWT) · 5 event types: price/signal/order/risk/position · Auto-reconnect | ✅ |
-| **Monitoring & Alerts** | Prometheus (HTTP + Business metrics) + Grafana · Structured Logging · Sentry Error Tracking · p95 latency · Kill Switch monitoring | ✅ |
+| **Monitoring & Alerts** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 latency · Kill Switch monitoring | ✅ |
 | **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) | ✅ |
 | **Scoring Rules** | Configurable weight editor (truth/sentiment/relevance/confidence) · Version history · Enable/Disable toggle · PostgreSQL persisted | ✅ |
 | **Notification Center** | In-app notification center · Read/Unread · Filter by type · System seeder · PostgreSQL persisted | ✅ |
@@ -257,7 +257,9 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 | Auth | JWT + EIP-191 Wallet Signature |
 | Validation | Zod (all inputs/outputs) |
 | AI | OpenAI · DeepSeek · Grok · Gemini · Ollama |
-| Monitoring | Prometheus + Prom-client (12 metric types) |
+| **Logging** | Structured JSON Logger + Sentry | ← Phase 3 新增 |
+| **Monitoring** | Prometheus + Prom-client (HTTP + Business metrics) | ← Phase 3 新增 |
+| **Error Tracking** | Sentry (Error + Performance) | ← Phase 3 新增 |
 | WebSocket | Socket.io (JWT auth + 5 event types) |
 | Security | Helmet · AES-256-GCM · Rate Limiting (all routes) · RBAC (5 roles × 16 permissions) · Token Invalidation | 
 | i18n | Accept-Language header detection (English / 繁體中文) |
