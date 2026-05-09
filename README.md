@@ -43,7 +43,7 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue · Live price feed | ✅ |
 | **Real-time Push** | WebSocket (Socket.io JWT) · 5 event types: price/signal/order/risk/position · Auto-reconnect | ✅ |
 | **Monitoring & Alerts** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 latency · Kill Switch monitoring | ✅ |
-| **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) | ✅ |
+| **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) · **Helmet + Graceful Shutdown** | ✅ |
 | **Scoring Rules** | Configurable weight editor (truth/sentiment/relevance/confidence) · Version history · Enable/Disable toggle · PostgreSQL persisted | ✅ |
 | **Notification Center** | In-app notification center · Read/Unread · Filter by type · System seeder · PostgreSQL persisted | ✅ |
 | **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS · **Graceful Shutdown** | ✅ |
@@ -200,7 +200,7 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 
 > Full API documentation: see [docs/api.md](docs/api.md)
 
-> **Note**: All sensitive endpoints（e.g. `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
+> **Note**: All sensitive endpoints（例如 `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
 
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
