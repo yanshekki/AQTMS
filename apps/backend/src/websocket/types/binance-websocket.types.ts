@@ -1,34 +1,60 @@
 export interface BinanceExecutionReport {
-  e: 'executionReport';           // Event type
-  E: number;                      // Event time
-  s: string;                      // Symbol
-  c: string;                      // Client order ID
-  S: 'BUY' | 'SELL';              // Side
-  o: string;                      // Order type
-  f: string;                      // Time in force
-  q: string;                      // Order quantity
-  p: string;                      // Order price
-  P: string;                      // Stop price
-  F: string;                      // Iceberg quantity
-  g: number;                      // Order list ID
-  C: string;                      // Original client order ID
-  x: string;                      // Execution type (NEW, CANCELED, REJECTED, TRADE, etc.)
-  X: string;                      // Order status
-  r: string;                      // Order reject reason
-  i: number;                      // Order ID
-  l: string;                      // Last executed quantity
-  z: string;                      // Cumulative filled quantity
-  L: string;                      // Last executed price
-  n: string;                      // Commission amount
-  N: string | null;               // Commission asset
-  T: number;                      // Transaction time
-  t: number;                      // Trade ID
-  I: number;                      // Ignore
-  w: boolean;                     // Is the order on the book?
-  m: boolean;                     // Is this trade the maker side?
-  M: boolean;                     // Ignore
-  O: number;                      // Order creation time
-  Z: string;                      // Cumulative quote asset transacted quantity
-  Y: string;                      // Last quote asset transacted quantity
-  Q: string;                      // Quote order quantity
+  e: 'executionReport';
+  E: number;
+  s: string;
+  c: string;
+  S: 'BUY' | 'SELL';
+  o: string;
+  f: string;
+  q: string;
+  p: string;
+  P: string;
+  F: string;
+  g: number;
+  C: string;
+  x: string;
+  X: string;
+  r: string;
+  i: number;
+  l: string;
+  z: string;
+  L: string;
+  n: string;
+  N: string | null;
+  T: number;
+  t: number;
+  I: number;
+  w: boolean;
+  m: boolean;
+  M: boolean;
+  O: number;
+  Z: string;
+  Y: string;
+  Q: string;
 }
+
+export interface BinanceOutboundAccountPosition {
+  e: 'outboundAccountPosition';
+  E: number;                    // Event Time
+  u: number;                    // Time of last account update
+  B: BinanceBalance[];
+}
+
+export interface BinanceBalance {
+  a: string;                    // Asset
+  f: string;                    // Free
+  l: string;                    // Locked
+}
+
+export interface BinanceBalanceUpdate {
+  e: 'balanceUpdate';
+  E: number;
+  a: string;                    // Asset
+  d: string;                    // Balance Delta
+  T: number;                    // Clear Time
+}
+
+export type BinanceWebSocketEvent =
+  | BinanceExecutionReport
+  | BinanceOutboundAccountPosition
+  | BinanceBalanceUpdate;
