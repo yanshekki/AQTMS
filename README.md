@@ -367,6 +367,12 @@ helm install aqtms-frontend ./infra/helm/frontend -f values-prod.yaml
 
 ## 🧪 Testing
 
+### Phase 3 Integration Tests（新增）
+- ExecutionService + ExchangeService 整合測試
+- WebSocket executionReport 處理流程測試
+- Risk Rules 單元測試
+- KillSwitchService 關鍵路徑測試
+
 ### Permission Audit Tests
 
 ```bash
