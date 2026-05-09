@@ -23,7 +23,7 @@ import { OrderModule } from './order/order.module';
     DataModule,
     BacktestModule,
     SafetyModule,
-    OrderModule, // Phase 5 - Order State Management
+    OrderModule,
   ],
   controllers: [],
   providers: [],
