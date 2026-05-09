@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { strategyRegistry } from './strategy/strategy.registry';
+import { HistoricalDataService } from '../data/historical-data.service';
 
 export interface BacktestRequest {
   strategyName: string;
@@ -8,6 +9,8 @@ export interface BacktestRequest {
   startDate: Date;
   endDate: Date;
   initialCapital: number;
+  exchange?: 'BINANCE' | 'BYBIT';
+  interval?: string;
   historicalBars?: Array<{
     timestamp: Date;
     open: number;
@@ -37,16 +40,46 @@ export interface BacktestResult {
 export class BacktestService {
   private readonly logger = new Logger(BacktestService.name);
 
+  constructor(private readonly historicalDataService: HistoricalDataService) {}
+
   async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
     this.logger.log(`Running backtest for strategy: ${request.strategyName}`);
+
+    let bars = request.historicalBars;
+
+    // Auto-fetch historical data if not provided
+    if (!bars || bars.length === 0) {
+      this.logger.log('No historical bars provided. Fetching from exchange...');
+
+      const exchange = request.exchange || 'BINANCE';
+      const interval = request.interval || '1h';
+
+      const rawBars = await this.historicalDataService.getHistoricalData(
+        exchange,
+        request.symbol,
+        interval,
+        request.startDate.getTime(),
+        request.endDate.getTime(),
+      );
+
+      bars = rawBars.map((b) => ({
+        timestamp: new Date(b.timestamp),
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        volume: b.volume,
+      }));
+    }
+
+    if (!bars || bars.length === 0) {
+      return this.getEmptyResult(request.initialCapital);
+    }
 
     const strategy = strategyRegistry.getStrategy(request.strategyName);
     strategy.initialize(request.strategyParams);
 
-    if (!request.historicalBars || request.historicalBars.length === 0) {
-      return this.getEmptyResult(request.initialCapital);
-    }
-
+    // ... rest of backtest logic (same as before) ...
     let capital = request.initialCapital;
     let position = 0;
     let entryPrice = 0;
@@ -57,7 +90,7 @@ export class BacktestService {
     let peak = capital;
     let maxDrawdown = 0;
 
-    for (const bar of request.historicalBars) {
+    for (const bar of bars) {
       const signal = strategy.onBar(bar);
 
       if (signal.signal === 'BUY' && position === 0) {
@@ -69,44 +102,32 @@ export class BacktestService {
       if (signal.signal === 'SELL' && position === 1) {
         const pnl = (bar.close - entryPrice) * position;
         capital += pnl;
-
-        trades.push({
-          type: 'SELL',
-          price: bar.close,
-          timestamp: bar.timestamp,
-          pnl,
-        });
-
+        trades.push({ type: 'SELL', price: bar.close, timestamp: bar.timestamp, pnl });
         position = 0;
       }
 
-      // Update equity and drawdown
       equityCurve.push(capital);
 
       if (capital > peak) peak = capital;
       const drawdown = ((peak - capital) / peak) * 100;
       if (drawdown > maxDrawdown) maxDrawdown = drawdown;
 
-      // Daily return for Sharpe
       if (equityCurve.length > 1) {
         const prevEquity = equityCurve[equityCurve.length - 2];
         returns.push((capital - prevEquity) / prevEquity);
       }
     }
 
-    // Close open position
-    if (position === 1 && request.historicalBars.length > 0) {
-      const lastBar = request.historicalBars[request.historicalBars.length - 1];
+    if (position === 1 && bars.length > 0) {
+      const lastBar = bars[bars.length - 1];
       const pnl = (lastBar.close - entryPrice) * position;
       capital += pnl;
       trades.push({ type: 'SELL', price: lastBar.close, timestamp: lastBar.timestamp, pnl });
     }
 
-    // Calculate metrics
     const totalReturn = ((capital - request.initialCapital) / request.initialCapital) * 100;
     const winningTrades = trades.filter((t: any) => t.pnl > 0);
     const losingTrades = trades.filter((t: any) => t.pnl < 0);
-
     const totalTradesCount = trades.length;
     const winRate = totalTradesCount > 0 ? (winningTrades.length / totalTradesCount) * 100 : 0;
 
@@ -117,7 +138,6 @@ export class BacktestService {
     const avgWin = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
     const avgLoss = losingTrades.length > 0 ? grossLoss / losingTrades.length : 0;
 
-    // Sharpe Ratio (annualized, assuming daily bars)
     const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
     const stdDev = this.calculateStdDev(returns);
     const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
