@@ -10,6 +10,7 @@ import { DataModule } from './data/data.module';
 import { BacktestModule } from './backtest/backtest.module';
 import { SafetyModule } from './safety/safety.module';
 import { OrderModule } from './order/order.module';
+import { WebsocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OrderModule } from './order/order.module';
     BacktestModule,
     SafetyModule,
     OrderModule,
+    WebsocketModule, // WebSocket real-time updates
   ],
   controllers: [],
   providers: [],
