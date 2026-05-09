@@ -369,6 +369,12 @@ helm install aqtms-frontend ./infra/helm/frontend -f values-prod.yaml
 
 ## 🧪 測試
 
+### Phase 3 Integration Tests（新增）
+- ExecutionService + ExchangeService 整合測試
+- WebSocket executionReport 處理流程測試
+- Risk Rules 單元測試
+- KillSwitchService 關鍵路徑測試
+
 ### 權限審計測試
 
 ```bash
@@ -440,7 +446,7 @@ aqtms/
 ├── prometheus.yml        # Prometheus scrape config
 ├── pnpm-workspace.yaml
 ├── turbo.json
-├── TEST_WALLETS.md       # 測試錢包地址 + 權限矩陣
+├── TEST_WALLETS.md       # 測試錢包地址 + 權限矩軸
 ├── README.md             # English
 └── README.zh.md          # 繁體中文
 ```
@@ -528,7 +534,7 @@ MIT © AQTMS
 | **開發者** | 30 分鐘 | 成功啟動項目 | `pnpm install` → `cp .env.example .env` → `prisma db push` → `pnpm dev` |
 | **投資人** | 5 分鐘 | 理解項目價值 | 閱讀 README 項目簡介 + 核心功能表 |
 | **用戶** | 10 分鐘 | 完成首次交易 | Login → Exchange Connect → 查看 AI Signals → Backtest |
-| **審計者** | 5 分鐘 | 驗證安全性 | `node test-full.cjs` → 70/70 通過 + 查看權限矩陣 |
+| **審計者** | 5 分鐘 | 驗證安全性 | `node test-full.cjs` → 70/70 通過 + 查看權限矩軸 |
 
 ---
 
