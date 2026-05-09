@@ -1,4 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { WebsocketService } from '../websocket/websocket.service';
+import { BinanceExecutionReport } from '../websocket/types/binance-websocket.types';
 
 // ... other imports ...
 
@@ -6,30 +8,29 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 export class ExecutionService implements OnModuleInit {
   // ... existing code ...
 
-  private async handleExecutionReport(report: any) {
+  private async handleExecutionReport(report: BinanceExecutionReport) {
     try {
       const {
         s: symbol,
         S: side,
-        X: orderStatus,        // 当前订单状态
-        z: cumulativeFilledQty, // 累计成交数量
-        L: lastExecutedPrice,   // 最后成交价格
+        X: orderStatus,
+        z: cumulativeFilledQty,
+        L: lastExecutedPrice,
         i: exchangeOrderId,
-        x: executionType,       // TRADE / NEW 等
+        x: executionType,
       } = report;
 
       console.log(
         `[ExecutionService] WS Update | ${symbol} ${side} | Status: ${orderStatus} | Filled: ${cumulativeFilledQty}`
       );
 
-      const localOrder = await this.orderService.findByExchangeOrderId(exchangeOrderId);
+      const localOrder = await this.orderService.findByExchangeOrderId(String(exchangeOrderId));
 
       if (!localOrder) {
         console.warn(`[ExecutionService] Local order not found for exchangeOrderId=${exchangeOrderId}`);
         return;
       }
 
-      // 只在有实际成交时处理
       if (executionType === 'TRADE' || orderStatus === 'PARTIALLY_FILLED' || orderStatus === 'FILLED') {
         const newFilled = parseFloat(cumulativeFilledQty);
         const previousFilled = localOrder.filledQuantity || 0;
@@ -44,7 +45,6 @@ export class ExecutionService implements OnModuleInit {
         }
       }
 
-      // 对于取消、拒绝等状态，直接更新
       if (['CANCELED', 'REJECTED', 'EXPIRED'].includes(orderStatus)) {
         await this.orderService.updateOrderStatus(localOrder.id, orderStatus as any);
       }
