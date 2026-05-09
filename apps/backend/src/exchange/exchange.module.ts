@@ -5,6 +5,7 @@ import { BybitPositionProvider } from './providers/bybit-position.provider';
 import { ExchangePositionProvider } from './interfaces/exchange-position.provider';
 import { BinanceAdapter } from './adapters/binance.adapter';
 import { BybitAdapter } from './adapters/bybit.adapter';
+import { ExchangeService } from './exchange.service';
 
 @Module({
   imports: [ConfigModule],
@@ -13,6 +14,7 @@ import { BybitAdapter } from './adapters/bybit.adapter';
     BybitPositionProvider,
     BinanceAdapter,
     BybitAdapter,
+    ExchangeService,
     {
       provide: 'EXCHANGE_POSITION_PROVIDER',
       useFactory: (
@@ -26,6 +28,6 @@ import { BybitAdapter } from './adapters/bybit.adapter';
       inject: [ConfigService, BinancePositionProvider, BybitPositionProvider],
     },
   ],
-  exports: ['EXCHANGE_POSITION_PROVIDER', BinanceAdapter, BybitAdapter],
+  exports: ['EXCHANGE_POSITION_PROVIDER', BinanceAdapter, BybitAdapter, ExchangeService],
 })
 export class ExchangeModule {}
