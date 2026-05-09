@@ -1,4 +1,4 @@
-// ── Exchange Card (with Paper Trading support) ──
+// ── Exchange Card (with improved Paper Trading display) ──
 
 import { useState } from 'react';
 import {
@@ -198,11 +198,34 @@ export function ExchangeCard({
               }
               label={
                 <Typography variant="caption" color={isPaperTrading ? 'warning.main' : mutedText}>
-                  {isPaperTrading ? '模擬交易' : '真實交易'}
+                  {isPaperTrading ? '模擬交易 (Paper)' : '真實交易'}
                 </Typography>
               }
               sx={{ mb: 1 }}
             />
+          )}
+
+          {/* Paper Positions Summary (when enabled) */}
+          {isPaperTrading && (
+            <Box
+              sx={{
+                mb: 1.5,
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: isDark ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.06)',
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
+              }}
+            >
+              <Typography variant="caption" color="warning.main" fontWeight={600}>
+                📊 Paper Trading 持倉
+              </Typography>
+              <Typography variant="body2" color={dimText} sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                虛擬持倉即時計算中...
+                <br />
+                （完整持倉顯示將喺後續版本加入）
+              </Typography>
+            </Box>
           )}
 
           {/* Balances */}

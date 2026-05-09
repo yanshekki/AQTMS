@@ -1,4 +1,4 @@
-// ── Exchange Connection Hook (Improved Error Handling) ──
+// ── Exchange Connection Hook (with Paper Trading toggle) ──
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -45,18 +45,30 @@ export function useExchangeConnection() {
     mutationFn: exchangeApi.testConnection,
   });
 
+  // Paper Trading Toggle
+  const togglePaperTradingMutation = useMutation({
+    mutationFn: ({ id, isPaperTrading }: { id: string; isPaperTrading: boolean }) =>
+      exchangeApi.updateSettings(id, { isPaperTrading }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['exchanges'] });
+    },
+  });
+
   const connect = async (data: ConnectExchangeForm): Promise<ExchangeAccount | undefined> => {
     try {
       const result = await connectMutation.mutateAsync(data);
       return result;
     } catch (err: any) {
-      // Convert technical error to user-friendly message
       throw new Error(getFriendlyErrorMessage(err));
     }
   };
 
   const deleteExchange = async (exchangeId: string) => {
     await deleteMutation.mutateAsync(exchangeId);
+  };
+
+  const togglePaperTrading = async (id: string, isPaperTrading: boolean) => {
+    await togglePaperTradingMutation.mutateAsync({ id, isPaperTrading });
   };
 
   const resetLastConnected = () => {
@@ -73,8 +85,8 @@ export function useExchangeConnection() {
 
     connect,
     isConnecting: connectMutation.isPending,
-    connectError: connectMutation.error instanceof Error 
-      ? getFriendlyErrorMessage(connectMutation.error) 
+    connectError: connectMutation.error instanceof Error
+      ? getFriendlyErrorMessage(connectMutation.error)
       : null,
 
     deleteExchange,
@@ -82,6 +94,10 @@ export function useExchangeConnection() {
 
     testConnection: testMutation.mutateAsync,
     isTesting: testMutation.isPending,
+
+    // Paper Trading
+    togglePaperTrading,
+    isTogglingPaperTrading: togglePaperTradingMutation.isPending,
   };
 }
 
@@ -105,6 +121,5 @@ function getFriendlyErrorMessage(error: any): string {
     return 'Testnet 連接失敗，請確認使用正確的 Testnet API Key';
   }
 
-  // Default fallback
   return message || '發生未知錯誤，請稍後再試';
 }

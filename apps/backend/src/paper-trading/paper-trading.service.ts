@@ -1,16 +1,6 @@
-import { Injectable } from '@nestjs/common';
-
-export interface PaperOrder {
-  id: string;
-  userId: string;
-  symbol: string;
-  side: 'BUY' | 'SELL';
-  quantity: number;
-  price: number;           // 委託價格
-  executedPrice: number;   // 實際成交價格（含滑點）
-  status: 'FILLED' | 'OPEN' | 'CANCELLED';
-  createdAt: Date;
-}
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { MarketDataService } from '../market-data/market-data.service';
 
 export interface VirtualPosition {
   symbol: string;
@@ -21,119 +11,130 @@ export interface VirtualPosition {
 
 @Injectable()
 export class PaperTradingService {
-  // 記憶體儲存（MVP）
-  private virtualBalances = new Map<string, number>(); // userId -> USDT balance
-  private virtualPositions = new Map<string, Map<string, VirtualPosition>>();
-  private paperOrders: PaperOrder[] = [];
+  private readonly logger = new Logger(PaperTradingService.name);
 
-  private readonly DEFAULT_BALANCE = 10000; // 預設虛擬 USDT 餘額
+  private virtualBalances = new Map<string, number>();
 
-  constructor() {
-    // 可在此初始化測試用戶的餘額
+  private readonly DEFAULT_BALANCE = 10000;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly marketDataService: MarketDataService,
+  ) {
+    this.logger.log('PaperTradingService initialized with MarketDataService integration');
   }
 
-  /**
-   * 獲取用戶虛擬餘額
-   */
   getVirtualBalance(userId: string): number {
     return this.virtualBalances.get(userId) ?? this.DEFAULT_BALANCE;
   }
 
   /**
-   * 模擬下單（含滑點 + 餘額更新）
+   * 獲取 Paper 持倉 + 使用 MarketDataService 自動計算未實現盈虧
+   * 這係最方便嘅方法
    */
-  async placePaperOrder(orderData: {
-    userId: string;
-    symbol: string;
-    side: 'BUY' | 'SELL';
-    quantity: number;
-    price: number;
-  }): Promise<PaperOrder> {
-    const { userId, symbol, side, quantity, price } = orderData;
+  async getPaperPositionsWithLivePnL(userId: string): Promise<VirtualPosition[]> {
+    const positions = await this.getVirtualPositionsFromDb(userId);
 
-    // 簡單滑點模擬（市價單 ±0.1% ~ 0.3%）
-    const slippage = (Math.random() * 0.002 + 0.001) * (side === 'BUY' ? 1 : -1);
-    const executedPrice = price * (1 + slippage);
-
-    // 計算所需金額
-    const cost = quantity * executedPrice;
-
-    // 檢查餘額（買入時）
-    let currentBalance = this.getVirtualBalance(userId);
-    if (side === 'BUY' && currentBalance < cost) {
-      throw new Error('虛擬餘額不足');
+    if (positions.length === 0) {
+      return [];
     }
 
-    // 更新餘額
-    if (side === 'BUY') {
-      currentBalance -= cost;
-    } else {
-      currentBalance += cost;
-    }
-    this.virtualBalances.set(userId, currentBalance);
+    const symbols = positions.map(p => p.symbol);
+    const currentPrices = await this.marketDataService.getPrices(symbols);
 
-    // 建立訂單
-    const order: PaperOrder = {
-      id: 'paper-' + Date.now(),
-      userId,
-      symbol,
-      side,
-      quantity,
-      price, // 委託價
-      executedPrice,
-      status: 'FILLED',
-      createdAt: new Date(),
-    };
-
-    this.paperOrders.push(order);
-
-    // 更新持倉
-    this.updateVirtualPosition(order);
-
-    console.log(
-      `[PaperTrading] ${side} ${quantity} ${symbol} @ ${executedPrice.toFixed(2)} (slippage: ${(slippage * 100).toFixed(2)}%)`,
-    );
-
-    return order;
+    return this.calculateUnrealizedPnL(positions, currentPrices);
   }
 
   /**
-   * 更新虛擬持倉
+   * 獲取 Paper 持倉 + 手動提供價格來源
    */
-  private updateVirtualPosition(order: PaperOrder) {
-    const userPositions = this.virtualPositions.get(order.userId) || new Map();
-    const existing = userPositions.get(order.symbol);
+  async getPaperPositionsWithPnL(
+    userId: string,
+    priceProvider: (symbol: string) => Promise<number>,
+  ): Promise<VirtualPosition[]> {
+    const positions = await this.getVirtualPositionsFromDb(userId);
 
-    const executedQty = order.side === 'BUY' ? order.quantity : -order.quantity;
+    if (positions.length === 0) {
+      return [];
+    }
 
-    if (!existing) {
-      userPositions.set(order.symbol, {
-        symbol: order.symbol,
-        quantity: executedQty,
-        averagePrice: order.executedPrice,
-        unrealizedPnl: 0,
-      });
-    } else {
-      const totalCost = existing.averagePrice * existing.quantity + order.executedPrice * executedQty;
-      const newQuantity = existing.quantity + executedQty;
-
-      if (newQuantity === 0) {
-        userPositions.delete(order.symbol);
-      } else {
-        existing.quantity = newQuantity;
-        existing.averagePrice = totalCost / newQuantity;
+    const priceMap: Record<string, number> = {};
+    for (const position of positions) {
+      try {
+        priceMap[position.symbol] = await priceProvider(position.symbol);
+      } catch {
+        priceMap[position.symbol] = 0;
       }
     }
 
-    this.virtualPositions.set(order.userId, userPositions);
+    return this.calculateUnrealizedPnL(positions, priceMap);
   }
 
-  getVirtualPositions(userId: string): VirtualPosition[] {
-    const positions = this.virtualPositions.get(userId);
-    return positions ? Array.from(positions.values()) : [];
+  async getVirtualPositionsFromDb(userId: string): Promise<VirtualPosition[]> {
+    const paperTrades = await this.prisma.trade.findMany({
+      where: {
+        userId,
+        isPaper: true,
+        status: 'FILLED',
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const positionMap = new Map<string, { quantity: number; totalCost: number }>();
+
+    for (const trade of paperTrades) {
+      const key = trade.symbol;
+      const qty = trade.side === 'BUY' ? trade.filledQuantity : -trade.filledQuantity;
+      const cost = trade.filledQuantity * (trade.price || 0);
+
+      if (!positionMap.has(key)) {
+        positionMap.set(key, { quantity: 0, totalCost: 0 });
+      }
+
+      const pos = positionMap.get(key)!;
+      pos.quantity += qty;
+      pos.totalCost += cost;
+    }
+
+    const result: VirtualPosition[] = [];
+
+    for (const [symbol, pos] of positionMap.entries()) {
+      if (pos.quantity !== 0) {
+        result.push({
+          symbol,
+          quantity: pos.quantity,
+          averagePrice: pos.totalCost / pos.quantity,
+          unrealizedPnl: 0,
+        });
+      }
+    }
+
+    return result;
   }
 
-  getPaperOrders(userId: string): PaperOrder[] {
-    return this.paperOrders.filter((o) => o.userId === userId);
+  calculateUnrealizedPnL(
+    positions: VirtualPosition[],
+    currentPrices: Record<string, number>,
+  ): VirtualPosition[] {
+    return positions.map((position) => {
+      const currentPrice = currentPrices[position.symbol];
+
+      if (!currentPrice || position.quantity === 0) {
+        return { ...position, unrealizedPnl: 0 };
+      }
+
+      const pnl = (currentPrice - position.averagePrice) * position.quantity;
+      return {
+        ...position,
+        unrealizedPnl: parseFloat(pnl.toFixed(2)),
+      };
+    });
+  }
+
+  async getPaperOrders(userId: string) {
+    return this.prisma.trade.findMany({
+      where: { userId, isPaper: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }
