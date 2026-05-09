@@ -6,6 +6,8 @@ import { ExchangeModule } from './exchange/exchange.module';
 import { PaperTradingModule } from './paper-trading/paper-trading.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { NotificationModule } from './notification/notification.module';
+import { DataModule } from './data/data.module';
+import { BacktestModule } from './backtest/backtest.module';
 
 @Module({
   imports: [
@@ -15,7 +17,9 @@ import { NotificationModule } from './notification/notification.module';
     ExchangeModule,
     PaperTradingModule,
     PortfolioModule,
-    NotificationModule, // Phase 3 - Risk Alerts
+    NotificationModule,
+    DataModule,
+    BacktestModule, // Phase 4 - Backtesting
   ],
   controllers: [],
   providers: [],
