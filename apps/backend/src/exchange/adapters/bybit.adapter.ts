@@ -23,7 +23,7 @@ export class BybitAdapter implements IExchangeAdapter {
     const recvWindow = '5000';
 
     const body = {
-      category: 'linear', // or 'spot'
+      category: 'linear',
       symbol: params.symbol.toUpperCase(),
       side: params.side.toUpperCase(),
       orderType: params.type.toUpperCase(),
@@ -66,25 +66,158 @@ export class BybitAdapter implements IExchangeAdapter {
   }
 
   async cancelOrder(orderId: string, symbol: string): Promise<boolean> {
-    // TODO: implement Bybit cancel order
-    console.log('[BybitAdapter] cancelOrder (TODO)');
-    return true;
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+
+    const body = {
+      category: 'linear',
+      symbol: symbol.toUpperCase(),
+      orderId: orderId,
+    };
+
+    const sign = this.createSignature(timestamp, recvWindow, JSON.stringify(body));
+
+    try {
+      const response = await axios.post(`${this.baseUrl}/v5/order/cancel`, body, {
+        headers: {
+          'X-BAPI-API-KEY': this.apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': sign,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.retCode === 0;
+    } catch (error: any) {
+      console.error('[BybitAdapter] cancelOrder error:', error.response?.data || error.message);
+      return false;
+    }
   }
 
   async getOrder(orderId: string, symbol: string): Promise<OrderResult | null> {
-    // TODO: implement Bybit get order
-    console.log('[BybitAdapter] getOrder (TODO)');
-    return null;
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+
+    const params = new URLSearchParams({
+      category: 'linear',
+      symbol: symbol.toUpperCase(),
+      orderId: orderId,
+    });
+
+    const sign = this.createSignature(timestamp, recvWindow, params.toString());
+
+    try {
+      const response = await axios.get(`${this.baseUrl}/v5/order/realtime`, {
+        params: {
+          category: 'linear',
+          symbol: symbol.toUpperCase(),
+          orderId: orderId,
+        },
+        headers: {
+          'X-BAPI-API-KEY': this.apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': sign,
+        },
+      });
+
+      if (response.data.retCode !== 0 || !response.data.result?.list?.length) {
+        return null;
+      }
+
+      const data = response.data.result.list[0];
+
+      return {
+        orderId: data.orderId,
+        exchangeOrderId: data.orderId,
+        symbol: data.symbol,
+        side: data.side as OrderSide,
+        type: data.orderType as OrderType,
+        status: data.orderStatus,
+        quantity: parseFloat(data.qty),
+        filledQuantity: parseFloat(data.cumExecQty),
+        price: data.price ? parseFloat(data.price) : undefined,
+        averagePrice: data.avgPrice ? parseFloat(data.avgPrice) : undefined,
+        timestamp: parseInt(data.createdTime),
+      };
+    } catch (error: any) {
+      console.error('[BybitAdapter] getOrder error:', error.response?.data || error.message);
+      return null;
+    }
   }
 
   async getPositions(): Promise<any[]> {
-    // TODO: implement Bybit positions
-    return [];
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+
+    const sign = this.createSignature(timestamp, recvWindow, '');
+
+    try {
+      const response = await axios.get(`${this.baseUrl}/v5/position/list`, {
+        params: {
+          category: 'linear',
+          settleCoin: 'USDT',
+        },
+        headers: {
+          'X-BAPI-API-KEY': this.apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': sign,
+        },
+      });
+
+      if (response.data.retCode !== 0) return [];
+
+      return response.data.result.list.map((pos: any) => ({
+        symbol: pos.symbol,
+        positionAmt: parseFloat(pos.size),
+        entryPrice: parseFloat(pos.avgPrice),
+        unrealizedProfit: parseFloat(pos.unrealisedPnl),
+        leverage: parseInt(pos.leverage),
+      }));
+    } catch (error: any) {
+      console.error('[BybitAdapter] getPositions error:', error.response?.data || error.message);
+      return [];
+    }
   }
 
   async getAccountBalance(): Promise<any> {
-    // TODO: implement Bybit wallet balance
-    return {};
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+
+    const sign = this.createSignature(timestamp, recvWindow, '');
+
+    try {
+      const response = await axios.get(`${this.baseUrl}/v5/account/wallet-balance`, {
+        params: {
+          accountType: 'UNIFIED',
+        },
+        headers: {
+          'X-BAPI-API-KEY': this.apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': sign,
+        },
+      });
+
+      if (response.data.retCode !== 0) return { balances: [] };
+
+      const coinList = response.data.result.list[0]?.coin || [];
+
+      return {
+        balances: coinList
+          .filter((c: any) => parseFloat(c.walletBalance) > 0)
+          .map((c: any) => ({
+            asset: c.coin,
+            free: parseFloat(c.availableToWithdraw),
+            locked: parseFloat(c.locked),
+          })),
+      };
+    } catch (error: any) {
+      console.error('[BybitAdapter] getAccountBalance error:', error.response?.data || error.message);
+      return { balances: [] };
+    }
   }
 
   private createSignature(timestamp: string, recvWindow: string, body: string): string {
