@@ -10,7 +10,7 @@ import { KillSwitchService } from '../safety/kill-switch.service';
 import { OrderService } from '../order/order.service';
 import { ExecutionLoggerService } from './execution-logger.service';
 import { ExecutionMetricsCollector } from './metrics-collector.service';
-import { BinanceAdapter } from '../exchange/adapters/binance.adapter';
+import { ExchangeService } from '../exchange/exchange.service';
 import { PlaceOrderParams } from '../exchange/interfaces/exchange.adapter';
 
 @Injectable()
@@ -27,7 +27,7 @@ export class ExecutionService implements OnModuleInit {
     private readonly orderService: OrderService,
     private readonly logger: ExecutionLoggerService,
     private readonly metricsCollector: ExecutionMetricsCollector,
-    private readonly binanceAdapter: BinanceAdapter,
+    private readonly exchangeService: ExchangeService,
   ) {}
 
   async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
@@ -62,7 +62,7 @@ export class ExecutionService implements OnModuleInit {
         });
       }
 
-      // === Real Live Trading with BinanceAdapter ===
+      // === Live Trading via unified ExchangeService ===
       const mainOrderRecord = this.orderService.createOrder({
         userId: dto.userId,
         exchange: dto.exchange,
@@ -83,7 +83,7 @@ export class ExecutionService implements OnModuleInit {
 
       const mainOrderResult = await this.circuitBreaker.execute(() =>
         retry(
-          () => this.binanceAdapter.placeOrder(adapterParams),
+          () => this.exchangeService.placeOrder(adapterParams),
           {
             retries: 3,
             delay: 1000,
