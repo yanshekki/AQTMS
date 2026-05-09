@@ -200,6 +200,8 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 
 > Full API documentation: see [docs/api.md](docs/api.md)
 
+> **Note**: All sensitive endpoints（e.g. `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
+
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
 | GET | `/health` | Public | Health check |
@@ -210,7 +212,7 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 | POST | `/auth/invalidate` | `admin:user:manage` | Invalidate all tokens for a user |
 | GET | `/api/v1/trades` | `trade:read` | List trades (user-scoped) |
 | GET | `/api/v1/trades/:id` | `trade:read` | Trade detail (user-scoped) |
-| POST | `/api/v1/trades` | `trade:execute` | Place order |
+| POST | `/api/v1/trades` | `trade:execute` | Place order (Rate Limited) |
 | DELETE | `/api/v1/trades` | `trade:cancel` | Cancel order |
 | POST | `/api/v1/exchanges/connect` | `exchange:connect` | Connect exchange (AES-256 encrypted) |
 | GET | `/api/v1/exchanges` | `exchange:read` | List exchanges (user-scoped) |
