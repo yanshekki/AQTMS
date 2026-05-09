@@ -3,11 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { validationSchema } from './config/validation.schema';
-
-// Conditional debug module (only in development)
-const debugModules = process.env.NODE_ENV === 'production' 
-  ? [] 
-  : [import('./debug/debug.module').then(m => m.DebugModule)];
+import { DebugModule } from './debug/debug.module';
 
 @Module({
   imports: [
@@ -23,8 +19,8 @@ const debugModules = process.env.NODE_ENV === 'production'
         },
       ],
     }),
-    // ... other modules
-    ...(debugModules.length > 0 ? debugModules : []),
+    // ... other core modules
+    ...(process.env.NODE_ENV === 'production' ? [] : [DebugModule]),
   ],
   providers: [
     {
