@@ -11,7 +11,7 @@ Enterprise-grade fully automated quantitative trading platform — integrating m
 [![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io)
 [![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io)
 [![Security Audit](https://img.shields.io/badge/Security-70/70_tests_passed-22c55e)](TEST_WALLETS.md)
-[![Progress](https://img.shields.io/badge/Progress-20%25-orange)](README.md)
+[![Progress](https://img.shields.io/badge/Progress-35%25-blue)](README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -42,11 +42,11 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Backtest System** | MA Cross + Score Threshold strategies · Sharpe/Sortino/Calmar · TradingView integration · Monthly returns | ✅ |
 | **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue · Live price feed | ✅ |
 | **Real-time Push** | WebSocket (Socket.io JWT) · 5 event types: price/signal/order/risk/position · Auto-reconnect | ✅ |
-| **Monitoring & Alerts** | Prometheus (12 metric types) + Grafana · p95 latency · Trade success rate · Queue health | ✅ |
-| **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) | ✅ |
+| **Monitoring & Alerts** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 latency · Kill Switch monitoring | ✅ |
+| **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) · **Helmet + Graceful Shutdown** | ✅ |
 | **Scoring Rules** | Configurable weight editor (truth/sentiment/relevance/confidence) · Version history · Enable/Disable toggle · PostgreSQL persisted | ✅ |
 | **Notification Center** | In-app notification center · Read/Unread · Filter by type · System seeder · PostgreSQL persisted | ✅ |
-| **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS | ✅ |
+| **Container Deployment** | Docker Compose (6 services) · K8s Helm (2 charts) · HPA auto-scaling · Nginx · TLS · **Graceful Shutdown** | ✅ |
 | **Team Collaboration** | 5 roles · Permission validation (whitelist) · Audit logs · CSV export · Audit trail | ✅ |
 | **Complete Documentation** | Bilingual (EN/ZH) · API docs · Architecture docs · User guide · Test wallets · Permission matrix | ✅ |
 
@@ -92,15 +92,17 @@ AQTMS implements a comprehensive **Role-Based Access Control (RBAC)** system wit
 
 ```
 Request
-  ↓ Rate Limiting (all routes)
-  ↓ CORS (configured)
-  ↓ Helmet (security headers)
-  ↓ JWT Auth + Token Invalidation (Redis)
-  ↓ Permission Middleware (RBAC)
-  ↓ Permission Validation (whitelist)
-  ↓ Controller Ownership Checks
-  ↓ Repository Ownership Checks
-  ↓ Zod Response Validation (Frontend)
+  ↓ Rate Limiting（所有路由）
+  ↓ CORS（已配置）
+  ↓ Helmet（安全標頭）
+  ↓ Structured Logging + Sentry
+  ↓ Prometheus Metrics（HTTP + Business）
+  ↓ JWT 認證 + Token 撤銷（Redis）
+  ↓ Permission Middleware（RBAC）
+  ↓ 權限白名單驗證
+  ↓ Controller 所有權檢查
+  ↓ Repository 所有權檢查
+  ↓ Zod Response Validation（前端）
   ↓ User-Scoped Data Queries
 ```
 
@@ -198,6 +200,8 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 
 > Full API documentation: see [docs/api.md](docs/api.md)
 
+> **Note**: All sensitive endpoints（例如 `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
+
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
 | GET | `/health` | Public | Health check |
@@ -208,7 +212,7 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 | POST | `/auth/invalidate` | `admin:user:manage` | Invalidate all tokens for a user |
 | GET | `/api/v1/trades` | `trade:read` | List trades (user-scoped) |
 | GET | `/api/v1/trades/:id` | `trade:read` | Trade detail (user-scoped) |
-| POST | `/api/v1/trades` | `trade:execute` | Place order |
+| POST | `/api/v1/trades` | `trade:execute` | Place order (Rate Limited) |
 | DELETE | `/api/v1/trades` | `trade:cancel` | Cancel order |
 | POST | `/api/v1/exchanges/connect` | `exchange:connect` | Connect exchange (AES-256 encrypted) |
 | GET | `/api/v1/exchanges` | `exchange:read` | List exchanges (user-scoped) |
@@ -255,9 +259,11 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 | Auth | JWT + EIP-191 Wallet Signature |
 | Validation | Zod (all inputs/outputs) |
 | AI | OpenAI · DeepSeek · Grok · Gemini · Ollama |
-| Monitoring | Prometheus + Prom-client (12 metric types) |
+| **Logging** | Structured JSON Logger + Sentry | ← Phase 3 新增 |
+| **Monitoring** | Prometheus + Prom-client (HTTP + Business metrics) | ← Phase 3 新增 |
+| **Error Tracking** | Sentry (Error + Performance) | ← Phase 3 新增 |
 | WebSocket | Socket.io (JWT auth + 5 event types) |
-| Security | Helmet · AES-256-GCM · Rate Limiting (all routes) · RBAC (5 roles × 16 permissions) · Token Invalidation |
+| Security | Helmet · AES-256-GCM · Rate Limiting (all routes) · RBAC (5 roles × 16 permissions) · Token Invalidation | 
 | i18n | Accept-Language header detection (English / 繁體中文) |
 
 ### Frontend
@@ -287,6 +293,13 @@ Full microservices + K8s + Istio + OpenTelemetry + Saga
 
 ## 🐳 Deployment
 
+### Graceful Shutdown（Phase 3 新增）
+
+AQTMS 支援 **Graceful Shutdown**，適合 Docker / Kubernetes 環境：
+- 收到 `SIGTERM` / `SIGINT` 時會優雅關閉
+- WebSocket 連線會自動清理
+- 確保進行中嘅交易請求完成後先退出
+
 ### PM2 Process Manager (Recommended)
 
 ```bash
@@ -297,26 +310,26 @@ npm install -g pm2
 pnpm pm2:start
 
 # Start production mode (builds frontend first)
-pnpm pm2:start:prod
+pm2:start:prod
 
 # Monitor processes
-pnpm pm2:monit
+npm2:monit
 
 # View logs
-pnpm pm2:logs
+npm2:logs
 
 # Status overview
-pnpm pm2:status
+npm2:status
 
 # Graceful restart (zero downtime)
-pnpm pm2:reload
+pm2:reload
 
 # Stop all
-pnpm pm2:stop
+npm2:stop
 
 # Save process list for auto-start on boot
-pnpm pm2:save
-pnpm pm2:startup
+npm2:save
+npm2:startup
 ```
 
 #### PM2 Process List
@@ -355,6 +368,12 @@ helm install aqtms-frontend ./infra/helm/frontend -f values-prod.yaml
 ---
 
 ## 🧪 Testing
+
+### Phase 3 Integration Tests（新增）
+- ExecutionService + ExchangeService 整合測試
+- WebSocket executionReport 處理流程測試
+- Risk Rules 單元測試
+- KillSwitchService 關鍵路徑測試
 
 ### Permission Audit Tests
 

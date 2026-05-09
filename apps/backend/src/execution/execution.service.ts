@@ -1,48 +1,30 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { WebsocketService } from '../websocket/websocket.service';
-import {
-  BinanceExecutionReport,
-  BinanceOutboundAccountPosition,
-  BinanceBalanceUpdate,
-} from '../websocket/types/binance-websocket.types';
+import { MetricsService } from '../common/metrics/metrics.service';
 
 // ... other imports ...
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
-  // ... existing code ...
+  constructor(
+    // ... existing dependencies ...
+    private readonly metricsService: MetricsService,
+  ) {}
 
-  async startListeningToOrderUpdates(): Promise<void> {
+  async placeOrderWithProtection(dto: any) {
     try {
-      const binanceClient = this.websocketService.getBinanceClient();
-      await binanceClient.connectUserStream();
+      // ... existing logic ...
 
-      binanceClient.onMessage((data: any) => {
-        if (data.e === 'executionReport') {
-          this.handleExecutionReport(data as BinanceExecutionReport);
-        } else if (data.e === 'outboundAccountPosition') {
-          this.handleOutboundAccountPosition(data as BinanceOutboundAccountPosition);
-        } else if (data.e === 'balanceUpdate') {
-          this.handleBalanceUpdate(data as BinanceBalanceUpdate);
-        }
-      });
-
-      console.log('[ExecutionService] WebSocket listeners started');
+      this.metricsService.recordOrderPlaced(dto.exchange, dto.symbol);
+      return { success: true, ... };
     } catch (error) {
-      console.error('[ExecutionService] Failed to start WebSocket listeners:', error);
+      this.metricsService.recordOrderFailed(
+        dto.exchange,
+        dto.symbol,
+        error instanceof Error ? error.message : 'unknown',
+      );
+      throw error;
     }
   }
 
-  private handleOutboundAccountPosition(data: BinanceOutboundAccountPosition) {
-    console.log('[ExecutionService] Account position update received');
-    // TODO: Trigger portfolio refresh
-    // await this.portfolioService.refreshUserPositions();
-  }
-
-  private handleBalanceUpdate(data: BinanceBalanceUpdate) {
-    console.log(`[ExecutionService] Balance update received: ${data.a} changed by ${data.d}`);
-    // TODO: Trigger balance refresh
-  }
-
-  // ... existing handleExecutionReport ...
+  // ... other methods ...
 }

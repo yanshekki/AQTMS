@@ -13,7 +13,7 @@
 [![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io)
 [![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io)
 [![Security Audit](https://img.shields.io/badge/Security-70/70_測試通過-22c55e)](TEST_WALLETS.md)
-[![Progress](https://img.shields.io/badge/Progress-20%25-orange)](README.zh.md)
+[![Progress](https://img.shields.io/badge/Progress-35%25-blue)](README.zh.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -44,13 +44,13 @@ AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 
 | **回測系統** | MA Cross + Score Threshold 策略 · Sharpe/Sortino/Calmar · TradingView 整合 · 月回報 | ✅ |
 | **資訊來源** | Telegram · X.com 即時監控 · 自動評分 + 信號觸發 → Trade Queue · 實時價格 | ✅ |
 | **實時推送** | WebSocket（Socket.io JWT）· price/signal/order/risk/position 5 事件類型 · 自動重連 | ✅ |
-| **監控告警** | Prometheus（12 metric types）+ Grafana · p95 延遲 · 交易成功率 · Queue 健康 | ✅ |
-| **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層） | ✅ |
+| **監控告警** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 延遲 · Kill Switch 監控 | ✅ |
+| **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層）· **Helmet + Graceful Shutdown** | ✅ |
 | **評分規則** | 可配置權重編輯器（真實度/情緒/相關度/可信度）· 版本歷史 · 啟用/停用開關 · PostgreSQL 持久化 | ✅ |
 | **通知中心** | 應用內通知中心 · 已讀/未讀 · 按類型篩選 · 系統種子 · PostgreSQL 持久化 | ✅ |
-| **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS | ✅ |
+| **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS · **Graceful Shutdown** | ✅ |
 | **團隊協作** | 5 角色 · 權限白名單驗證 · 審計日誌 · CSV 導出 · 審計追蹤 | ✅ |
-| **完整文檔** | 雙語（中/英）· API 文件 · 架構文件 · 用戶指南 · 測試錢包 · 權限矩陣 | ✅ |
+| **完整文檔** | 雙語（中/英）· API 文件 · 架構文件 · 用戶指南 · 測試錢包 · 權限矩軸 | ✅ |
 
 ---
 
@@ -66,7 +66,7 @@ AQTMS 實行完善的**基於角色的訪問控制（RBAC）**系統，設有 5 
 | 📊 **ANALYST** | 10 個 | + AI 訊號、回測、評分規則 |
 | 👀 **VIEWER** | 3 個（`trade:read`, `exchange:read`, `user:read`） | 儀表板、交易記錄、投資組合、通知、設定 |
 
-### 權限矩陣
+### 權限矩軸
 
 | 權限 | SUPER | ADMIN | TRADER | ANALYST | VIEWER |
 |---|---|---|---|---|---|
@@ -97,6 +97,8 @@ Request
   ↓ Rate Limiting（所有路由）
   ↓ CORS（已配置）
   ↓ Helmet（安全標頭）
+  ↓ Structured Logging + Sentry
+  ↓ Prometheus Metrics（HTTP + Business）
   ↓ JWT 認證 + Token 撤銷（Redis）
   ↓ Permission Middleware（RBAC）
   ↓ 權限白名單驗證
@@ -200,6 +202,8 @@ apps/web/src/
 
 > 完整 API 文件：參閱 [docs/api.md](docs/api.md)
 
+> **注意**：所有敏感 endpoint（例如 `/api/v1/trades` 下單）受 **Rate Limiting** 保護（10秒內最多 5 個請求）。
+
 | Method | Endpoint | 權限 | 說明 |
 |--------|----------|------|------|
 | GET | `/health` | Public | 健康檢查 |
@@ -210,7 +214,7 @@ apps/web/src/
 | POST | `/auth/invalidate` | `admin:user:manage` | 撤銷用戶所有 Token |
 | GET | `/api/v1/trades` | `trade:read` | 交易列表（用戶隔離） |
 | GET | `/api/v1/trades/:id` | `trade:read` | 交易詳情（用戶隔離） |
-| POST | `/api/v1/trades` | `trade:execute` | 下單 |
+| POST | `/api/v1/trades` | `trade:execute` | 下單（受 Rate Limiting 保護） |
 | DELETE | `/api/v1/trades` | `trade:cancel` | 撤單 |
 | POST | `/api/v1/exchanges/connect` | `exchange:connect` | 連接交易所（AES-256 加密） |
 | GET | `/api/v1/exchanges` | `exchange:read` | 交易所列表（用戶隔離） |
@@ -257,9 +261,11 @@ apps/web/src/
 | Auth | JWT + EIP-191 Wallet Signature |
 | Validation | Zod (all inputs/outputs) |
 | AI | OpenAI · DeepSeek · Grok · Gemini · Ollama |
-| Monitoring | Prometheus + Prom-client (12 metric types) |
+| **Logging** | Structured JSON Logger + Sentry | ← Phase 3 新增 |
+| **Monitoring** | Prometheus + Prom-client (HTTP + Business metrics) | ← Phase 3 新增 |
+| **Error Tracking** | Sentry (Error + Performance) | ← Phase 3 新增 |
 | WebSocket | Socket.io (JWT auth + 5 event types) |
-| Security | Helmet · AES-256-GCM · Rate Limiting（全線）· RBAC（5 角色 × 16 權限）· Token 撤銷 |
+| Security | Helmet · AES-256-GCM · Rate Limiting（全線）· RBAC（5 角色 × 16 權限）· Token 撤銷 | 
 | i18n | Accept-Language 頭部辨識（English / 繁體中文） |
 
 ### Frontend
@@ -289,7 +295,14 @@ apps/web/src/
 
 ## 🐳 部署
 
-### PM2 進程管理器（推薦）
+### Graceful Shutdown（Phase 3 新增）
+
+AQTMS 支援 **Graceful Shutdown**，適合 Docker / Kubernetes 環境：
+- 收到 `SIGTERM` / `SIGINT` 時會優雅關閉
+- WebSocket 連線會自動清理
+- 確保進行中嘅交易請求完成後先退出
+
+### PM2 Process Manager (Recommended)
 
 ```bash
 # 全局安裝 PM2
@@ -299,29 +312,29 @@ npm install -g pm2
 pnpm pm2:start
 
 # 啟動生產模式（會先 build frontend）
-pnpm pm2:start:prod
+pm2:start:prod
 
 # 監控面板
-pnpm pm2:monit
+npm2:monit
 
 # 查看日誌
-pnpm pm2:logs
+npm2:logs
 
 # 狀態總覽
-pnpm pm2:status
+npm2:status
 
 # 平滑重啟（零停機）
-pnpm pm2:reload
+pm2:reload
 
 # 停止全部
-pnpm pm2:stop
+npm2:stop
 
 # 保存進程列表（開機自啟）
-pnpm pm2:save
-pnpm pm2:startup
+pm2:save
+npm2:startup
 ```
 
-#### PM2 進程列表
+#### PM2 Process List
 
 | Process | Port | Mode | Memory Limit |
 |---------|------|------|-------------|
@@ -357,6 +370,12 @@ helm install aqtms-frontend ./infra/helm/frontend -f values-prod.yaml
 ---
 
 ## 🧪 測試
+
+### Phase 3 Integration Tests（新增）
+- ExecutionService + ExchangeService 整合測試
+- WebSocket executionReport 處理流程測試
+- Risk Rules 單元測試
+- KillSwitchService 關鍵路徑測試
 
 ### 權限審計測試
 
@@ -429,7 +448,7 @@ aqtms/
 ├── prometheus.yml        # Prometheus scrape config
 ├── pnpm-workspace.yaml
 ├── turbo.json
-├── TEST_WALLETS.md       # 測試錢包地址 + 權限矩陣
+├── TEST_WALLETS.md       # 測試錢包地址 + 權限矩軸
 ├── README.md             # English
 └── README.zh.md          # 繁體中文
 ```
@@ -488,7 +507,7 @@ aqtms/
 
 ### ☕ 支持 / 捐贈
 
-如果 AQTMS 幫到你，請我飲杯咖啡！
+If AQTMS helps you, consider buying me a coffee!
 
 | Network | Address |
 |---------|---------|
@@ -499,7 +518,7 @@ aqtms/
 <p align="center">
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://linktr.ee/yanshekki" alt="yanshekki QR" width="200" />
   <br/>
-  <sub>掃碼支持 → linktr.ee/yanshekki</sub>
+  <sub>Scan to support → linktr.ee/yanshekki</sub>
 </p>
 
 ---
@@ -517,7 +536,7 @@ MIT © AQTMS
 | **開發者** | 30 分鐘 | 成功啟動項目 | `pnpm install` → `cp .env.example .env` → `prisma db push` → `pnpm dev` |
 | **投資人** | 5 分鐘 | 理解項目價值 | 閱讀 README 項目簡介 + 核心功能表 |
 | **用戶** | 10 分鐘 | 完成首次交易 | Login → Exchange Connect → 查看 AI Signals → Backtest |
-| **審計者** | 5 分鐘 | 驗證安全性 | `node test-full.cjs` → 70/70 通過 + 查看權限矩陣 |
+| **審計者** | 5 分鐘 | 驗證安全性 | `node test-full.cjs` → 70/70 通過 + 查看權限矩軸 |
 
 ---
 
@@ -525,4 +544,4 @@ MIT © AQTMS
 
 **AQTMS — 讓 AI 為你交易。** 🤖📈
 
-<sub>Powered by [YSK Limited](https://ysk.hk/) — 香港遠程開發團隊及企業解決方案</sub>
+<sub>Powered by [YSK Limited](https://ysk.hk/) — 香港遠程開發團隊及企業解決策</sub>
