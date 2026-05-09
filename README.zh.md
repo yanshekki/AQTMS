@@ -259,7 +259,9 @@ apps/web/src/
 | Auth | JWT + EIP-191 Wallet Signature |
 | Validation | Zod (all inputs/outputs) |
 | AI | OpenAI · DeepSeek · Grok · Gemini · Ollama |
-| Monitoring | Prometheus + Prom-client (12 metric types) |
+| **Logging** | Structured JSON Logger + Sentry | ← Phase 3 新增 |
+| **Monitoring** | Prometheus + Prom-client (HTTP + Business metrics) | ← Phase 3 新增 |
+| **Error Tracking** | Sentry (Error + Performance) | ← Phase 3 新增 |
 | WebSocket | Socket.io (JWT auth + 5 event types) |
 | Security | Helmet · AES-256-GCM · Rate Limiting（全線）· RBAC（5 角色 × 16 權限）· Token 撤銷 | 
 | i18n | Accept-Language 頭部辨識（English / 繁體中文） |
