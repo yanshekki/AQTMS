@@ -1,16 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { WebsocketService } from '../websocket/websocket.service';
-import {
-  BinanceExecutionReport,
-  BinanceOutboundAccountPosition,
-  BinanceBalanceUpdate,
-} from '../websocket/types/binance-websocket.types';
+import { StructuredLoggerService } from '../common/logger/logger.service';
 
 // ... other imports ...
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
-  // ... existing code ...
+  constructor(
+    // ... existing dependencies ...
+    private readonly structuredLogger: StructuredLoggerService,
+  ) {
+    this.structuredLogger.setContext('ExecutionService');
+  }
 
   async startListeningToOrderUpdates(): Promise<void> {
     try {
@@ -27,22 +27,22 @@ export class ExecutionService implements OnModuleInit {
         }
       });
 
-      console.log('[ExecutionService] WebSocket listeners started');
+      this.structuredLogger.log('WebSocket listeners started');
     } catch (error) {
-      console.error('[ExecutionService] Failed to start WebSocket listeners:', error);
+      this.structuredLogger.error('Failed to start WebSocket listeners', error);
     }
   }
 
   private handleOutboundAccountPosition(data: BinanceOutboundAccountPosition) {
-    console.log('[ExecutionService] Account position update received');
-    // TODO: Trigger portfolio refresh
-    // await this.portfolioService.refreshUserPositions();
+    this.structuredLogger.log('Account position update received from WebSocket');
   }
 
   private handleBalanceUpdate(data: BinanceBalanceUpdate) {
-    console.log(`[ExecutionService] Balance update received: ${data.a} changed by ${data.d}`);
-    // TODO: Trigger balance refresh
+    this.structuredLogger.log('Balance update received from WebSocket', {
+      asset: data.a,
+      delta: data.d,
+    });
   }
 
-  // ... existing handleExecutionReport ...
+  // ... existing handleExecutionReport and other methods ...
 }
