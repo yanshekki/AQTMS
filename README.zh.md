@@ -45,7 +45,7 @@ AQTMS 從**新聞抓取 → AI 真假判斷 + 多維評分 → 策略觸發 → 
 | **資訊來源** | Telegram · X.com 即時監控 · 自動評分 + 信號觸發 → Trade Queue · 實時價格 | ✅ |
 | **實時推送** | WebSocket（Socket.io JWT）· price/signal/order/risk/position 5 事件類型 · 自動重連 | ✅ |
 | **監控告警** | Prometheus（HTTP + Business metrics）+ Grafana · Structured Logging · Sentry Error Tracking · p95 延遲 · Kill Switch 監控 | ✅ |
-| **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層） | ✅ |
+| **安全加密** | AES-256-GCM API Key 加密 · JWT Wallet 認證 · Redis Token 撤銷 · 5 角色 RBAC · 全線速率限制 · 所有權驗證（數據層）· **Helmet + Graceful Shutdown** | ✅ |
 | **評分規則** | 可配置權重編輯器（真實度/情緒/相關度/可信度）· 版本歷史 · 啟用/停用開關 · PostgreSQL 持久化 | ✅ |
 | **通知中心** | 應用內通知中心 · 已讀/未讀 · 按類型篩選 · 系統種子 · PostgreSQL 持久化 | ✅ |
 | **容器部署** | Docker Compose（6 services）· K8s Helm（2 charts）· HPA 自動擴容 · Nginx · TLS · **Graceful Shutdown** | ✅ |
@@ -507,7 +507,7 @@ aqtms/
 
 ### ☕ 支持 / 捐贈
 
-如果 AQTMS 幫到你，請我飲杯咖啡！
+If AQTMS helps you, consider buying me a coffee!
 
 | Network | Address |
 |---------|---------|
@@ -518,7 +518,7 @@ aqtms/
 <p align="center">
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://linktr.ee/yanshekki" alt="yanshekki QR" width="200" />
   <br/>
-  <sub>掃碼支持 → linktr.ee/yanshekki</sub>
+  <sub>Scan to support → linktr.ee/yanshekki</sub>
 </p>
 
 ---
