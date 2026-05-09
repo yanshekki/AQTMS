@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { BacktestService } from './backtest.service';
 import { strategyRegistry } from './strategy/strategy.registry';
 import { MovingAverageCrossStrategy } from './strategy/moving-average-cross.strategy';
+import { MeanReversionStrategy } from './strategy/mean-reversion.strategy';
 
 @Module({
   providers: [BacktestService],
@@ -9,9 +10,9 @@ import { MovingAverageCrossStrategy } from './strategy/moving-average-cross.stra
 })
 export class BacktestModule implements OnModuleInit {
   onModuleInit() {
-    // Register built-in strategies
     strategyRegistry.register('ma-cross', MovingAverageCrossStrategy);
+    strategyRegistry.register('mean-reversion', MeanReversionStrategy);
 
-    // TODO: Register more strategies here (e.g. AI Score, Mean Reversion, etc.)
+    // TODO: Register more strategies
   }
 }
