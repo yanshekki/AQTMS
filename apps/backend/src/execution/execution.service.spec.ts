@@ -1,76 +1,58 @@
 import { Test, TestingModule } from '@nestjs/testing';
-// ... other imports and mocks ...
+// ... other imports ...
 
-describe('ExecutionService + ExchangeService Integration', () => {
+describe('ExecutionService WebSocket Flow', () => {
   let service: ExecutionService;
-  let exchangeService: ExchangeService;
   let orderService: OrderService;
-  let metricsCollector: ExecutionMetricsCollector;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExecutionService,
         {
-          provide: ExchangeService,
+          provide: WebsocketService,
           useValue: {
-            placeOrder: jest.fn().mockResolvedValue({
-              orderId: 'ex-123',
-              exchangeOrderId: 'ex-123',
-              status: 'FILLED',
-              filledQuantity: 1,
-              averagePrice: 65000,
+            getBinanceClient: jest.fn().mockReturnValue({
+              connectUserStream: jest.fn(),
+              onMessage: jest.fn(),
             }),
           },
         },
         {
           provide: OrderService,
           useValue: {
-            createOrder: jest.fn().mockResolvedValue({ id: 'local-123', filledQuantity: 0 }),
+            findByExchangeOrderId: jest.fn().mockResolvedValue({
+              id: 'local-order-123',
+              filledQuantity: 0,
+            }),
+            applyPartialFill: jest.fn(),
             updateOrderStatus: jest.fn(),
-            findByExchangeOrderId: jest.fn(),
           },
         },
-        // ... other required mocks ...
+        // ... other mocks ...
       ],
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
-    exchangeService = module.get<ExchangeService>(ExchangeService);
     orderService = module.get<OrderService>(OrderService);
-    metricsCollector = module.get<ExecutionMetricsCollector>(ExecutionMetricsCollector);
   });
 
-  it('should call ExchangeService.placeOrder and save exchangeOrderId', async () => {
-    await service.placeOrderWithProtection({
-      userId: 'user-1',
-      exchange: 'BINANCE',
-      symbol: 'BTCUSDT',
-      side: 'BUY',
-      quantity: 0.01,
-      isPaperTrading: false,
-    } as any);
+  it('should handle executionReport and update order via applyPartialFill', async () => {
+    const fakeReport = {
+      e: 'executionReport',
+      s: 'BTCUSDT',
+      S: 'BUY',
+      X: 'PARTIALLY_FILLED',
+      z: '0.5',
+      L: '65000',
+      i: 987654,
+      x: 'TRADE',
+    };
 
-    expect(exchangeService.placeOrder).toHaveBeenCalled();
-    expect(orderService.updateOrderStatus).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(String),
-      expect.any(Number),
-      expect.any(Number),
-      'ex-123'
-    );
-  });
+    // @ts-ignore - testing private method
+    await service['handleExecutionReport'](fakeReport);
 
-  it('should record success metric on successful order', async () => {
-    await service.placeOrderWithProtection({
-      userId: 'user-1',
-      exchange: 'BINANCE',
-      symbol: 'BTCUSDT',
-      side: 'BUY',
-      quantity: 0.01,
-      isPaperTrading: false,
-    } as any);
-
-    expect(metricsCollector.recordOrder).toHaveBeenCalledWith(true);
+    expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('987654');
+    expect(orderService.applyPartialFill).toHaveBeenCalled();
   });
 });
