@@ -2,13 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { StructuredLoggerService } from './common/logger/logger.service';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const logger = new StructuredLoggerService();
 
   const app = await NestFactory.create(AppModule, {
-    logger, // Use structured JSON logger
+    logger,
   });
+
+  // Security headers
+  app.use(helmet());
 
   // 全域 Exception Filter
   app.useGlobalFilters(new AllExceptionsFilter());
