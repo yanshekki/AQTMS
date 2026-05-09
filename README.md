@@ -42,7 +42,7 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Backtest System** | MA Cross + Score Threshold strategies · Sharpe/Sortino/Calmar · TradingView integration · Monthly returns | ✅ |
 | **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue · Live price feed | ✅ |
 | **Real-time Push** | WebSocket (Socket.io JWT) · 5 event types: price/signal/order/risk/position · Auto-reconnect | ✅ |
-| **Monitoring & Alerts** | Prometheus (12 metric types) + Grafana · p95 latency · Trade success rate · Queue health | ✅ |
+| **Monitoring & Alerts** | Prometheus (HTTP + Business metrics) + Grafana · Structured Logging · Sentry Error Tracking · p95 latency · Kill Switch monitoring | ✅ |
 | **Security & Encryption** | AES-256-GCM API Key encryption · JWT Wallet auth · Redis Token Invalidation · 5-Role RBAC · Rate Limiting (all routes) · Ownership verification (data layer) | ✅ |
 | **Scoring Rules** | Configurable weight editor (truth/sentiment/relevance/confidence) · Version history · Enable/Disable toggle · PostgreSQL persisted | ✅ |
 | **Notification Center** | In-app notification center · Read/Unread · Filter by type · System seeder · PostgreSQL persisted | ✅ |
@@ -92,17 +92,17 @@ AQTMS implements a comprehensive **Role-Based Access Control (RBAC)** system wit
 
 ```
 Request
-  ↓ Rate Limiting (all routes)           ← Phase 3 新增
-  ↓ CORS (configured)
-  ↓ Helmet (security headers)            ← Phase 3 新增
-  ↓ Structured Logging + Sentry          ← Phase 3 新增
-  ↓ Prometheus Metrics (HTTP + Business) ← Phase 3 新增
-  ↓ JWT Auth + Token Invalidation (Redis)
-  ↓ Permission Middleware (RBAC)
-  ↓ Permission Validation (whitelist)
-  ↓ Controller Ownership Checks
-  ↓ Repository Ownership Checks
-  ↓ Zod Response Validation (Frontend)
+  ↓ Rate Limiting（所有路由）
+  ↓ CORS（已配置）
+  ↓ Helmet（安全標頭）
+  ↓ Structured Logging + Sentry
+  ↓ Prometheus Metrics（HTTP + Business）
+  ↓ JWT 認證 + Token 撤銷（Redis）
+  ↓ Permission Middleware（RBAC）
+  ↓ 權限白名單驗證
+  ↓ Controller 所有權檢查
+  ↓ Repository 所有權檢查
+  ↓ Zod Response Validation（前端）
   ↓ User-Scoped Data Queries
 ```
 
