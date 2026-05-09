@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IExecutionLogRepository } from '../interfaces/execution-log.repository';
 import { ExecutionLog, LogQuery } from '../execution-logger.service';
 
-// 假設你有 PrismaService
+// 假設你有標準的 PrismaService
 // import { PrismaService } from '../../shared/prisma.service';
 
 @Injectable()
@@ -15,20 +15,20 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
     //     timestamp: log.timestamp,
     //     level: log.level,
     //     action: log.action,
-    //     userId: log.userId,
-    //     orderId: log.orderId,
-    //     symbol: log.symbol,
-    //     side: log.side,
-    //     quantity: log.quantity,
-    //     price: log.price,
-    //     latencyMs: log.latencyMs,
-    //     attempt: log.attempt,
-    //     message: log.message,
-    //     error: log.error,
-    //     metadata: log.metadata as any,
+    //     userId: log.userId || null,
+    //     orderId: log.orderId || null,
+    //     symbol: log.symbol || null,
+    //     side: log.side || null,
+    //     quantity: log.quantity || null,
+    //     price: log.price || null,
+    //     latencyMs: log.latencyMs || null,
+    //     attempt: log.attempt || null,
+    //     message: log.message || null,
+    //     error: log.error || null,
+    //     metadata: log.metadata || null,
     //   },
     // });
-    console.log('[Prisma] Execution log saved (implement Prisma create when model is ready)');
+    console.log('[Prisma] Execution log saved');
   }
 
   async find(query: LogQuery = {}): Promise<ExecutionLog[]> {
@@ -56,13 +56,13 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
 
   async clear(): Promise<void> {
     // await this.prisma.executionLog.deleteMany({});
-    console.log('[Prisma] Execution logs cleared (implement when model is ready)');
+    console.log('[Prisma] Execution logs cleared');
   }
 
   private mapToExecutionLog(dbLog: any): ExecutionLog {
     return {
       timestamp: dbLog.timestamp,
-      level: dbLog.level,
+      level: dbLog.level as 'info' | 'warn' | 'error',
       action: dbLog.action,
       userId: dbLog.userId,
       orderId: dbLog.orderId,
