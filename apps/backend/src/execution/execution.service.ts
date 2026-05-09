@@ -1,89 +1,61 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-// ... other imports remain ...
+// ... other imports ...
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
   // ... existing code ...
 
-  async placeOrderWithProtection(dto: PlaceOrderWithProtectionDto & { isPaperTrading?: boolean }) {
+  private async handleExecutionReport(report: any) {
     try {
-      // ... existing Kill Switch + Risk Check logic ...
+      const {
+        s: symbol,
+        S: side,
+        X: orderStatus,        // 当前订单状态
+        z: cumulativeFilledQty, // 累计成交数量
+        L: lastExecutedPrice,   // 最后成交价格
+        i: exchangeOrderId,
+        x: executionType,       // TRADE / NEW 等
+      } = report;
 
-      if (dto.isPaperTrading) {
-        return this.paperTradingService.placePaperOrder({ /* ... */ });
-      }
-
-      // Create local order record first
-      const mainOrderRecord = this.orderService.createOrder({
-        userId: dto.userId,
-        exchange: dto.exchange,
-        symbol: dto.symbol,
-        side: dto.side,
-        type: 'MARKET',
-        quantity: dto.quantity,
-        price: dto.price,
-      });
-
-      const adapterParams: PlaceOrderParams = {
-        symbol: dto.symbol,
-        side: dto.side,
-        type: 'MARKET',
-        quantity: dto.quantity,
-        price: dto.price,
-      };
-
-      // Place order via exchange
-      const mainOrderResult = await this.circuitBreaker.execute(() =>
-        retry(
-          () => this.exchangeService.placeOrder(adapterParams),
-          {
-            retries: 3,
-            delay: 1000,
-            shouldRetry: (error) => this.isTransientError(error),
-            onRetry: () => this.metricsCollector.recordRetry(),
-          },
-        ),
+      console.log(
+        `[ExecutionService] WS Update | ${symbol} ${side} | Status: ${orderStatus} | Filled: ${cumulativeFilledQty}`
       );
 
-      // === 關鍵：把交易所返回的 orderId 存回本地訂單 ===
-      if (mainOrderResult.exchangeOrderId || mainOrderResult.orderId) {
-        await this.orderService.updateOrderStatus(
-          mainOrderRecord.id,
-          mainOrderRecord.status as any, // 保持原本狀態
-          undefined,
-          undefined,
-          mainOrderResult.exchangeOrderId || mainOrderResult.orderId, // 存 exchangeOrderId
-        );
+      const localOrder = await this.orderService.findByExchangeOrderId(exchangeOrderId);
+
+      if (!localOrder) {
+        console.warn(`[ExecutionService] Local order not found for exchangeOrderId=${exchangeOrderId}`);
+        return;
       }
 
-      // 更新成交狀態
-      await this.orderService.updateOrderStatus(
-        mainOrderRecord.id,
-        'FILLED' as any,
-        mainOrderResult.filledQuantity || dto.quantity,
-        mainOrderResult.averagePrice || dto.price,
-      );
+      // 只在有实际成交时处理
+      if (executionType === 'TRADE' || orderStatus === 'PARTIALLY_FILLED' || orderStatus === 'FILLED') {
+        const newFilled = parseFloat(cumulativeFilledQty);
+        const previousFilled = localOrder.filledQuantity || 0;
+        const thisFillQty = Math.max(0, newFilled - previousFilled);
 
-      this.metricsCollector.recordOrder(true);
+        if (thisFillQty > 0 && lastExecutedPrice) {
+          await this.orderService.applyPartialFill(
+            localOrder.id,
+            thisFillQty,
+            parseFloat(lastExecutedPrice),
+          );
+        }
+      }
 
-      return {
-        success: true,
-        mode: 'LIVE',
-        mainOrder: mainOrderResult,
-        mainOrderRecord,
-      };
+      // 对于取消、拒绝等状态，直接更新
+      if (['CANCELED', 'REJECTED', 'EXPIRED'].includes(orderStatus)) {
+        await this.orderService.updateOrderStatus(localOrder.id, orderStatus as any);
+      }
+
+      if (orderStatus === 'FILLED') {
+        this.metricsCollector.recordOrder(true);
+      }
     } catch (error) {
-      this.metricsCollector.recordOrder(false);
-      this.logger.logError({
-        action: 'ORDER_FAILED',
-        userId: dto.userId,
-        error: error instanceof Error ? error.message : '',
-      });
-      if (error instanceof RiskCheckFailedError) throw error;
-      throw new OrderExecutionError(error instanceof Error ? error.message : 'Execution failed');
+      console.error('[ExecutionService] Error handling executionReport:', error);
     }
   }
 
-  // ... existing handleExecutionReport and other methods ...
+  // ... existing methods ...
 }
