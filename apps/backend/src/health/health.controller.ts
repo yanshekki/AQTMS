@@ -1,18 +1,33 @@
 import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
-import { PrismaService } from '../shared/prisma.service'; // 假設你的 PrismaService 路徑
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma?: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  check() {
-    return {
+  async check() {
+    const result: any = {
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
+      dependencies: {},
     };
+
+    // Database check
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      result.dependencies.database = { status: 'ok' };
+    } catch (error) {
+      result.dependencies.database = {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+      result.status = 'degraded';
+    }
+
+    return result;
   }
 
   @Get('ready')
@@ -22,18 +37,16 @@ export class HealthController {
       timestamp: new Date().toISOString(),
     };
 
-    // 資料庫連線檢查
-    if (this.prisma) {
-      try {
-        await this.prisma.$queryRaw`SELECT 1`;
-        checks.database = { status: 'ok' };
-      } catch (error) {
-        checks.database = { status: 'error', message: error.message };
-        // 如果資料庫連線失敗，回傳 503
-        throw new Error('Database not ready');
-      }
-    } else {
-      checks.database = { status: 'not_configured' };
+    // Database readiness check
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      checks.database = { status: 'ok' };
+    } catch (error) {
+      checks.database = {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+      throw new Error('Database not ready');
     }
 
     return {
