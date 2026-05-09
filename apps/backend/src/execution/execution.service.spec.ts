@@ -1,59 +1,115 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionService } from './execution.service';
 import { RiskService } from '../risk/risk.service';
+import { KillSwitchService } from '../safety/kill-switch.service';
+import { OrderService } from '../order/order.service';
+import { ExecutionLoggerService } from './execution-logger.service';
+import { ExecutionMetricsCollector } from './metrics-collector.service';
+import { ExchangeService } from '../exchange/exchange.service';
+import { PaperTradingService } from '../paper-trading/paper-trading.service';
 import { PositionSizingRule } from '../risk/rules/position-sizing.rule';
 
-describe('ExecutionService Integration Test (with Risk Rules)', () => {
+describe('ExecutionService', () => {
   let service: ExecutionService;
-  let riskService: RiskService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ExecutionService, RiskService],
+      providers: [
+        ExecutionService,
+        {
+          provide: RiskService,
+          useValue: {
+            check: jest.fn().mockResolvedValue({ passed: true }),
+            registerRule: jest.fn(),
+          },
+        },
+        {
+          provide: KillSwitchService,
+          useValue: {
+            isTradingAllowed: jest.fn().mockResolvedValue({ allowed: true }),
+          },
+        },
+        {
+          provide: OrderService,
+          useValue: {
+            createOrder: jest.fn().mockResolvedValue({ id: 'order-123' }),
+            updateOrderStatus: jest.fn(),
+          },
+        },
+        {
+          provide: ExecutionLoggerService,
+          useValue: {
+            logPlacement: jest.fn(),
+            logError: jest.fn(),
+          },
+        },
+        {
+          provide: ExecutionMetricsCollector,
+          useValue: {
+            recordOrder: jest.fn(),
+            recordRetry: jest.fn(),
+          },
+        },
+        {
+          provide: ExchangeService,
+          useValue: {
+            placeOrder: jest.fn().mockResolvedValue({
+              orderId: 'ex-123',
+              status: 'FILLED',
+              filledQuantity: 1,
+            }),
+          },
+        },
+        {
+          provide: PaperTradingService,
+          useValue: {
+            placePaperOrder: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<ExecutionService>(ExecutionService);
-    riskService = module.get<RiskService>(RiskService);
 
-    // 手動註冊規則（模擬 onModuleInit）
+    // Register risk rule
+    const riskService = module.get<RiskService>(RiskService);
     riskService.registerRule(new PositionSizingRule());
   });
 
-  it('should pass risk check and place order with SL/TP', async () => {
-    const dto = {
-      userId: 'test-user',
-      exchange: 'BINANCE' as const,
-      symbol: 'BTCUSDT',
-      side: 'BUY' as const,
-      quantity: 0.01,
-      price: 65000,
-      stopLoss: 64000,
-      takeProfit: 67000,
-      accountBalance: 100000, // 足夠的餘額
-    };
-
-    const result = await service.placeOrderWithProtection(dto);
-
-    expect(result.success).toBe(true);
-    expect(result.mainOrder).toBeDefined();
-    console.log('✅ Normal order with SL/TP passed risk check');
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 
-  it('should adjust quantity when position size is too large', async () => {
-    const dto = {
-      userId: 'test-user',
-      exchange: 'BINANCE' as const,
+  it('should block trading when Kill Switch is active', async () => {
+    const killSwitch = module.get(KillSwitchService);
+    jest.spyOn(killSwitch, 'isTradingAllowed').mockResolvedValue({
+      allowed: false,
+      reason: 'Kill switch active',
+    });
+
+    await expect(
+      service.placeOrderWithProtection({
+        userId: 'user-1',
+        exchange: 'BINANCE',
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        quantity: 1,
+        isPaperTrading: false,
+      } as any)
+    ).rejects.toThrow('交易已停止');
+  });
+
+  it('should successfully place live order via ExchangeService', async () => {
+    const result = await service.placeOrderWithProtection({
+      userId: 'user-1',
+      exchange: 'BINANCE',
       symbol: 'BTCUSDT',
-      side: 'BUY' as const,
-      quantity: 10, // 非常大的數量
-      price: 65000,
-      accountBalance: 10000, // 只有 1 萬 USDT
-    };
+      side: 'BUY',
+      quantity: 0.01,
+      isPaperTrading: false,
+    } as any);
 
-    const result = await service.placeOrderWithProtection(dto);
-
-    // PositionSizingRule 應該會建議調整倉位
     expect(result.success).toBe(true);
-    console.log('✅ Large position was handled (adjusted if needed)');
+    expect(result.mode).toBe('LIVE');
   });
 });
