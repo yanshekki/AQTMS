@@ -1,1 +1,1 @@
-full zh md
+the full content of README.zh.md from the read
