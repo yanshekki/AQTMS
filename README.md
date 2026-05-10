@@ -9,8 +9,8 @@ Enterprise-grade fully automated quantitative trading platform — integrating m
 [![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs)](https://nestjs.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748?logo=prisma)](https://prisma.io)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)](https://redis.io)
-[![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io/)
-[![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io/)
+[![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io)
 [![Security Audit](https://img.shields.io/badge/Security-70/70_tests_passed-22c55e)](TEST_WALLETS.md)
 [![Progress](https://img.shields.io/badge/Progress-85%25-brightgreen)](README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -37,6 +37,9 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 - Paper Trading Mode: Full persistence (virtual balance in DB), slippage simulation, fee model, partial fills, real-time unrealized PnL via MarketDataService + WebSocket
 - Security & Observability: Kill Switch integration, Reconciliation Service, structured logging, Prometheus metrics, Sentry, graceful shutdown
 - Demo visualization report generation (equity curve, drawdown, price + signals + executed trades)
+- Phase 6: Strategy Registry + Plugin System (動態策略註冊與插件化架構，支援自訂策略擴展)
+- Phase 7: Real Historical Data Integration implemented in backtest demo (Binance klines API fetch + auto ATR calculation for real BTCUSDT data)
+- Phase 8: Advanced Reporting & Visualization — self-contained interactive HTML reports with Chart.js equity curve + drawdown charts, Tailwind modern UI, plus equity/trades CSV exports
 
 ---
 
@@ -71,7 +74,7 @@ AQTMS implements a comprehensive **Role-Based Access Control (RBAC)** system wit
 | 🔧 **ADMIN** | 15 permissions (no `risk:manage`) | All pages + user/audit management |
 | 💹 **TRADER** | 8 permissions | Dashboard, Exchanges, Trades, Portfolio, Risk, Notifications, Settings |
 | 📊 **ANALYST** | 10 permissions | + AI Signals, Backtest, Scoring Rules |
-| 👁️ **VIEWER** | 3 permissions (`trade:read`, `exchange:read`, `user:read`) | Dashboard, Trades, Portfolio, Notifications, Settings |
+| 👀 **VIEWER** | 3 permissions (`trade:read`, `exchange:read`, `user:read`) | Dashboard, Trades, Portfolio, Notifications, Settings |
 
 ### Permission Matrix
 
@@ -275,12 +278,11 @@ apps/backend/src/
 ```
 apps/web/src/
 ├── app/              # Providers, Router, ErrorBoundary, ProtectedRoute
-├── features/           # Business features (exchange-connect, ai-signals, data-sources, portfolio, backtest)
+├── features/         # Business features (exchange-connect, ai-signals, data-sources, portfolio, backtest)
 ├── pages/            # Pages (Dashboard, Exchanges, AISignals, Backtest, Portfolio, etc.)
 ├── components/       # Shared components (layout/Header, ui/, ExchangeCard, DetailDrawer)
 ├── shared/           # api/, lib/, hooks/, useExchangeConnection, dataSourceApi
-├── store/            # Jotai state
-└── main.ts           # Entry point (AppModule registration)
+└── store/            # Jotai state
 ```
 
 ---
@@ -363,7 +365,7 @@ pnpm pm2:monit
 pnpm pm2:logs
 
 # Status overview
-pnpm pm2:startup
+pnpm pm2:status
 
 # Graceful restart (zero downtime)
 pnpm pm2:reload
@@ -372,6 +374,7 @@ pnpm pm2:reload
 pnpm pm2:stop
 
 # Save process list for auto-start on boot
+pnpm pm2:save
 pnpm pm2:startup
 ```
 
@@ -450,7 +453,7 @@ cd apps/backend && pnpm test
 
 ```
 User (id, walletAddress, role, permissions)
-ExchangeAccount (id, userId, exchange, apiKey📭, apiSecret📭, isPaperTrading, paperVirtualBalance)
+ExchangeAccount (id, userId, exchange, apiKey🛡️, apiSecret🛡️, isPaperTrading, paperVirtualBalance)
 Trade (id, userId, symbol, side, type, status, idempotencyKey, isPaper)
 AuditLog (id, userId, action, resource, resourceId, ip)
 NewsEvent (id, source, content, compositeScore, aiAnalysis)
@@ -477,8 +480,7 @@ aqtms/
 │   └── shared-types/     # Zod schemas + TypeScript types
 ├── infra/
 │   └── helm/             # K8s Helm charts (backend + frontend)
-├── e2e/
-│   └── Playwright E2E tests
+├── e2e/                  # Playwright E2E tests
 ├── docs/                 # Architecture, API, Deployment docs
 ├── .github/
 │   └── workflows/        # CI/CD pipeline

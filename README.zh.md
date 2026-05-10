@@ -33,6 +33,8 @@ AQTMS 自動化完整流程：**資訊擷取 → AI 驗證 + 多維度評分 →
 
 **最新更新（2026 年 5 月）：**
 - Phase 5 回測引擎完成，包含策略介面、註冊表、MA Cross + Mean Reversion 範例、Binance/Bybit 歷史數據整合、先進指標（Sharpe、Max Drawdown、Profit Factor、Win Rate 等）
+- Phase 7: Real Historical Data Integration 已實作於 backtest demo（Binance klines API 拉取真實數據 + 自動 ATR 計算）
+- Phase 8: Advanced Reporting & Visualization — 自包含互動式 HTML 報告（Chart.js 權益曲線 + 回撤圖 + Tailwind 美觀 UI）及 CSV 匯出
 - 執行層強化：訂單生命週期 + 狀態機、部分成交處理、執行日誌記錄器、帶延遲追蹤的指標收集器
 - 模擬交易模式：完整持久化（資料庫中的虛擬餘額）、滑點模擬、手續費模型、部分成交、透過 MarketDataService + WebSocket 的實時未實現盈虧
 - 安全與可觀測性：Kill Switch 整合、對帳服務、結構化日誌、Prometheus 指標、Sentry、優雅關閉
@@ -153,7 +155,7 @@ Request
 - **格式化與 Lint**：ESLint + Prettier + EditorConfig。使用 Husky + lint-staged 執行 pre-commit 勾點。
 - **提交規範**：採用 Conventional Commits（例如 `feat:`、`fix:`、`refactor:`、`docs:`）。
 - **測試**：
-  - 單元測試（Jest）
+  - 單元測試（Jest)
   - 整合測試（Supertest + 測試資料庫）
   - 端對端測試（Playwright 或類似工具）
   - 關鍵路徑（風險引擎、執行、認證）最低 80% 覆蓋率
