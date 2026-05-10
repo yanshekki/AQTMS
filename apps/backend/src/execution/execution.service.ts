@@ -1,93 +1,127 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { MetricsService } from '../common/metrics/metrics.service';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { RiskService } from '../risk/risk.service';
+import { MarketDataService } from '../market-data/market-data.service';
+import { IExchangeAdapter } from '../infrastructure/adapters/exchange/exchange.adapter.interface';
+import { Order } from '../domain/entities/order.entity';
+import { OrderSide, OrderType, OrderStatus } from '../domain/value-objects/order-types';
 
-// TODO: Import your actual RiskService when ready
-// import { RiskService } from '../risk/risk.service';
+export interface ExecutionResult {
+  success: boolean;
+  order?: Order;
+  message: string;
+  isPaper: boolean;
+}
 
 @Injectable()
-export class ExecutionService implements OnModuleInit {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly metricsService: MetricsService,
-    private readonly paperTradingService: PaperTradingService,
-    // private readonly riskService: RiskService,   // ← 之後注入
-  ) {}
+export class ExecutionService {
+  private readonly logger = new Logger(ExecutionService.name);
 
-  async onModuleInit() {
-    // existing init logic
+  constructor(
+    private readonly paperTradingService: PaperTradingService,
+    private readonly riskService: RiskService,
+    private readonly marketDataService: MarketDataService,
+    @Inject('IExchangeAdapter') private readonly exchangeAdapter: IExchangeAdapter,
+  ) {
+    this.logger.log('ExecutionService initialized');
   }
 
-  /**
-   * Phase 4 improved flow:
-   * 1. Risk check first (always)
-   * 2. Then decide Real vs Paper Trading
-   */
-  async placeOrderWithProtection(dto: any) {
-    try {
-      // ============================================
-      // 1. RISK CHECK（無論真實定模擬都要做）
-      // ============================================
-      // TODO: 呼叫真正嘅 Risk 評估
-      // const riskResult = await this.riskService.evaluatePreTrade(dto);
-      // if (!riskResult.allowed) {
-      //   throw new Error(`Risk check failed: ${riskResult.reason}`);
-      // }
+  async executeOrder(params: {
+    userId: string;
+    exchangeAccountId: string;
+    symbol: string;
+    side: OrderSide;
+    type: OrderType;
+    quantity: number;
+    price?: number;
+    stopLoss?: number;
+    takeProfit?: number;
+    isPaper?: boolean;
+  }): Promise<ExecutionResult> {
+    const isPaper = params.isPaper ?? true;
 
-      // 暫時用簡單 log 代表風險檢查已通過
-      console.log(`[Execution] Risk check passed for ${dto.symbol} (Paper mode will be respected)`);
+    // Pre-execution risk check
+    const currentPrice = params.price || (await this.marketDataService.getPrice(params.symbol))?.price || 0;
+    if (currentPrice === 0) {
+      return { success: false, message: 'Unable to determine market price', isPaper };
+    }
 
-      // ============================================
-      // 2. 取得 ExchangeAccount 判斷係咪 Paper Trading
-      // ============================================
-      const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
-        where: { id: dto.exchangeAccountId },
+    const riskCheck = this.riskService.evaluateTradeRisk({
+      symbol: params.symbol,
+      quantity: params.quantity,
+      price: currentPrice,
+      accountBalance: isPaper ? await this.paperTradingService.getBalance(params.userId) : 100000, // mock real balance
+      currentPositions: isPaper ? await this.paperTradingService.getPositions(params.userId) : [],
+    });
+
+    if (!riskCheck.allowed) {
+      return {
+        success: false,
+        message: `Execution blocked by risk rules: ${riskCheck.violations.join(', ')}`,
+        isPaper,
+      };
+    }
+
+    const order = Order.create({
+      userId: params.userId,
+      exchangeAccountId: params.exchangeAccountId,
+      symbol: params.symbol,
+      side: params.side,
+      type: params.type,
+      quantity: params.quantity,
+      price: params.price,
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+      isPaper,
+    });
+
+    if (isPaper) {
+      const paperResult = await this.paperTradingService.placePaperOrder({
+        userId: params.userId,
+        symbol: params.symbol,
+        side: params.side === OrderSide.BUY ? 'BUY' : 'SELL',
+        type: params.type === OrderType.MARKET ? 'MARKET' : 'LIMIT',
+        quantity: params.quantity,
+        price: params.price,
+        stopLoss: params.stopLoss,
+        takeProfit: params.takeProfit,
       });
 
-      if (!exchangeAccount) {
-        throw new Error('Exchange account not found');
+      if (paperResult.success && paperResult.filled) {
+        order.markAsFilled(params.quantity, currentPrice);
+        this.logger.log(`Paper execution successful for order ${order.id}`);
+        return { success: true, order, message: paperResult.message, isPaper: true };
+      } else {
+        order.status = OrderStatus.REJECTED;
+        return { success: false, order, message: paperResult.message, isPaper: true };
       }
-
-      // ============================================
-      // 3. 根據模式路由
-      // ============================================
-      if (exchangeAccount.isPaperTrading) {
-        this.metricsService.recordOrderPlaced('PAPER', dto.symbol);
-
-        const paperResult = await this.paperTradingService.placePaperOrder({
-          userId: dto.userId,
-          symbol: dto.symbol,
-          side: dto.side,
-          quantity: dto.quantity,
-          price: dto.price || 0,
+    } else {
+      // Real execution via adapter
+      try {
+        const adapterResult = await this.exchangeAdapter.placeOrder({
+          exchangeAccountId: params.exchangeAccountId,
+          symbol: params.symbol,
+          side: params.side,
+          type: params.type,
+          quantity: params.quantity,
+          price: params.price,
+          stopLoss: params.stopLoss,
+          takeProfit: params.takeProfit,
         });
 
-        return {
-          success: true,
-          isPaper: true,
-          riskChecked: true,
-          ...paperResult,
-        };
+        if (adapterResult.success) {
+          order.markAsFilled(params.quantity, currentPrice); // assume immediate fill for market
+          this.logger.log(`Real execution successful via adapter for order ${order.id}`);
+          return { success: true, order, message: 'Order placed on exchange', isPaper: false };
+        } else {
+          order.status = OrderStatus.REJECTED;
+          return { success: false, order, message: adapterResult.message || 'Exchange order failed', isPaper: false };
+        }
+      } catch (error) {
+        this.logger.error(`Real execution error: ${error.message}`);
+        order.status = OrderStatus.REJECTED;
+        return { success: false, order, message: error.message, isPaper: false };
       }
-
-      // Real trading path
-      this.metricsService.recordOrderPlaced(dto.exchange || 'REAL', dto.symbol);
-
-      // TODO: 真正嘅交易所下單邏輯
-      return {
-        success: true,
-        isPaper: false,
-        riskChecked: true,
-        // ... real order result
-      };
-    } catch (error) {
-      this.metricsService.recordOrderFailed(
-        dto.exchange || 'UNKNOWN',
-        dto.symbol,
-        error instanceof Error ? error.message : 'unknown',
-      );
-      throw error;
     }
   }
 }
