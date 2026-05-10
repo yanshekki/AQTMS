@@ -5,6 +5,7 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { IExchangeAdapter } from '../infrastructure/adapters/exchange/exchange.adapter.interface';
 import { Order } from '../domain/entities/order.entity';
 import { OrderSide, OrderType, OrderStatus } from '../domain/value-objects/order-types';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface ExecutionResult {
   success: boolean;
@@ -22,6 +23,7 @@ export class ExecutionService {
     private readonly riskService: RiskService,
     private readonly marketDataService: MarketDataService,
     @Inject('IExchangeAdapter') private readonly exchangeAdapter: IExchangeAdapter,
+    private readonly prisma: PrismaService,
   ) {
     this.logger.log('ExecutionService initialized');
   }
@@ -55,6 +57,12 @@ export class ExecutionService {
     });
 
     if (!riskCheck.allowed) {
+      await this.logExecution(params.userId, undefined, 'EXECUTION_RISK_BLOCKED', {
+        symbol: params.symbol,
+        quantity: params.quantity,
+        price: currentPrice,
+        violations: riskCheck.violations,
+      });
       return {
         success: false,
         message: `Execution blocked by risk rules: ${riskCheck.violations.join(', ')}`,
@@ -90,9 +98,21 @@ export class ExecutionService {
       if (paperResult.success && paperResult.filled) {
         order.markAsFilled(params.quantity, currentPrice);
         this.logger.log(`Paper execution successful for order ${order.id}`);
+        await this.logExecution(params.userId, order.id, 'PLACE_ORDER_PAPER_SUCCESS', {
+          symbol: params.symbol,
+          quantity: params.quantity,
+          price: currentPrice,
+          result: paperResult,
+        });
         return { success: true, order, message: paperResult.message, isPaper: true };
       } else {
         order.status = OrderStatus.REJECTED;
+        await this.logExecution(params.userId, order.id, 'PLACE_ORDER_PAPER_REJECTED', {
+          symbol: params.symbol,
+          quantity: params.quantity,
+          price: currentPrice,
+          result: paperResult,
+        });
         return { success: false, order, message: paperResult.message, isPaper: true };
       }
     } else {
@@ -112,9 +132,21 @@ export class ExecutionService {
         if (adapterResult.success) {
           order.markAsFilled(params.quantity, currentPrice); // assume immediate fill for market
           this.logger.log(`Real execution successful via adapter for order ${order.id}`);
+          await this.logExecution(params.userId, order.id, 'PLACE_ORDER_REAL_SUCCESS', {
+            symbol: params.symbol,
+            quantity: params.quantity,
+            price: currentPrice,
+            result: adapterResult,
+          });
           return { success: true, order, message: 'Order placed on exchange', isPaper: false };
         } else {
           order.status = OrderStatus.REJECTED;
+          await this.logExecution(params.userId, order.id, 'PLACE_ORDER_REAL_REJECTED', {
+            symbol: params.symbol,
+            quantity: params.quantity,
+            price: currentPrice,
+            result: adapterResult,
+          });
           return { success: false, order, message: adapterResult.message || 'Exchange order failed', isPaper: false };
         }
       } catch (error) {
@@ -122,6 +154,28 @@ export class ExecutionService {
         order.status = OrderStatus.REJECTED;
         return { success: false, order, message: error.message, isPaper: false };
       }
+    }
+  }
+
+  private async logExecution(
+    userId: string,
+    orderId: string | undefined,
+    action: string,
+    details: any,
+  ): Promise<void> {
+    try {
+      await this.prisma.executionLog.create({
+        data: {
+          userId,
+          orderId: orderId || null,
+          action,
+          details: details as any, // Json
+          timestamp: new Date(),
+        },
+      });
+      this.logger.debug(`Logged execution action: ${action} for order ${orderId}`);
+    } catch (error) {
+      this.logger.error(`Failed to log execution: ${error.message}`);
     }
   }
 }
