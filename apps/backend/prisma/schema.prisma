@@ -12,19 +12,6 @@ datasource db {
 
 // Core Models for AQTMS (expand in later phases)
 
-model User {
-  id            String   @id @default(cuid())
-  walletAddress String   @unique
-  role          String   @default("VIEWER") // SUPER_ADMIN | ADMIN | TRADER | ANALYST | VIEWER
-  permissions   String[] @default([])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations (add later)
-  // trades      Trade[]
-  // etc.
-}
-
 model ExchangeAccount {
   id          String   @id @default(cuid())
   userId      String
@@ -35,6 +22,8 @@ model ExchangeAccount {
   paperVirtualBalance Float  @default(10000)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
@@ -53,8 +42,102 @@ model Trade {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
   @@index([userId])
   @@index([exchangeAccountId])
 }
 
-// Add more models: NewsEvent, BacktestReport, ScoringRule, Notification, ExecutionLog, PortfolioSnapshot etc. in later steps
+// Expanded models for AQTMS (Step 4+)
+
+model NewsEvent {
+  id          String   @id @default(cuid())
+  source      String   // TELEGRAM | X | NEWS_API etc.
+  content     String   @db.Text
+  symbol      String?
+  score       Float?
+  aiAnalysis  String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BacktestReport {
+  id          String   @id @default(cuid())
+  userId      String
+  strategy    String
+  symbol      String
+  params      Json
+  metrics     Json     // { sharpe, totalReturn, maxDrawdown, winRate, ... }
+  equityCurve Json?    // array of {time, value}
+  trades      Json?    // executed trades in backtest
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model ExecutionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  orderId   String?
+  action    String   // PLACE_ORDER | CANCEL_ORDER | FILL | RISK_CHECK etc.
+  details   Json
+  timestamp DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model PortfolioSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  totalValue Float
+  positions  Json     // [{symbol, quantity, avgPrice, currentPrice, pnl}]
+  timestamp  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model ScoringRule {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  weights   Json     // { truth: 0.3, sentiment: 0.4, ... }
+  threshold Float
+  action    String   // BUY | SELL | HOLD
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  role          String   @default("VIEWER")
+  permissions   String[] @default([])
+  nonce         String?  // for EIP-191 auth
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  exchangeAccounts   ExchangeAccount[]
+  trades             Trade[]
+  backtestReports    BacktestReport[]
+  executionLogs      ExecutionLog[]
+  portfolioSnapshots PortfolioSnapshot[]
+  scoringRules       ScoringRule[]
+  notifications      Notification[]
+}
