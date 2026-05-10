@@ -1,201 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// Core Models for AQTMS (expand in later phases)
+
 model User {
-  id                String             @id @default(uuid())
-  walletAddress     String             @unique
-  nonce             String
-  role              String             @default("VIEWER")
-  permissions       String             @default("[]") @db.VarChar(2000)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  exchangeAccounts  ExchangeAccount[]
-  trades            Trade[]
-  auditLogs         AuditLog[]
-  dataSources       DataSource[]
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  role          String   @default("VIEWER") // SUPER_ADMIN | ADMIN | TRADER | ANALYST | VIEWER
+  permissions   String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations (add later)
+  // trades      Trade[]
+  // etc.
 }
 
 model ExchangeAccount {
-  id                  String        @id @default(uuid())
-  userId              String
-  exchange            String
-  name                String
-  apiKey              String
-  apiSecret           String
-  testnet             Boolean       @default(false)
-  isPaperTrading      Boolean       @default(false)   // Phase 4: Paper Trading Mode
-  paperVirtualBalance Float         @default(10000)   // Phase 4: Persisted virtual balance for Paper Trading
-  status              String        @default("DISCONNECTED")
-  testPassed          Boolean       @default(false)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  user                User          @relation(fields: [userId], references: [id])
-  trades              Trade[]
+  id          String   @id @default(cuid())
+  userId      String
+  exchange    String   // BINANCE | BYBIT | etc.
+  apiKey      String   // encrypted with AES-256-GCM
+  apiSecret   String   // encrypted
+  isPaperTrading Boolean @default(true)
+  paperVirtualBalance Float  @default(10000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([userId, exchange, name])
   @@index([userId])
 }
 
 model Trade {
-  id                  String        @id @default(uuid())
-  userId              String
-  exchangeAccountId   String
-  exchangeOrderId     String?
-  symbol              String
-  side                String
-  type                String
-  status              String        @default("PENDING")
-  quantity            Float
-  price               Float?
-  stopPrice           Float?
-  timeInForce         String        @default("GTC")
-  filledQuantity      Float         @default(0)
-  idempotencyKey      String        @unique
-  errorMessage        String?
-  isPaper             Boolean       @default(false)   // Phase 4: mark as paper trade
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  user                User          @relation(fields: [userId], references: [id])
-  exchangeAccount     ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+  id              String   @id @default(cuid())
+  userId          String
+  exchangeAccountId String
+  symbol          String
+  side            String   // BUY | SELL
+  type            String   // MARKET | LIMIT
+  quantity        Float
+  price           Float?
+  status          String   @default("PENDING") // PENDING | FILLED | PARTIALLY_FILLED | CANCELLED
+  isPaper         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([userId])
   @@index([exchangeAccountId])
-  @@index([symbol])
-  @@index([status])
-  @@index([idempotencyKey])
 }
 
-model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String
-  action     String
-  resource   String
-  resourceId String?
-  details    String?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model NewsEvent {
-  id            String   @id @default(uuid())
-  source        String
-  sourceId      String
-  channelName   String?
-  authorName    String?
-  content       String   @db.Text
-  url           String?
-  language      String   @default("en")
-  isProcessed   Boolean  @default(false)
-  isFake        Boolean?
-  truthScore    Float?
-  sentimentScore Float?
-  relevanceScore Float?
-  compositeScore Float?
-  aiAnalysis    String?  @db.Text
-  createdAt     DateTime @default(now())
-  processedAt   DateTime?
-
-  @@unique([source, sourceId])
-  @@index([compositeScore])
-  @@index([isProcessed])
-  @@index([createdAt])
-}
-
-model DataSource {
-  id            String   @id @default(uuid())
-  userId        String
-  type          String   // TELEGRAM, X, RSS, ONCHAIN
-  name          String
-  config        String   @db.Text  // JSON (encrypted sensitive fields)
-  status        String   @default("PENDING") // PENDING, CONNECTED, ERROR, DISABLED
-  lastError     String?
-  lastFetchedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@unique([userId, type, name])
-  @@index([userId])
-  @@index([type])
-  @@index([status])
-}
-
-model BacktestReport {
-  id                  String   @id @default(uuid())
-  userId              String
-  symbol              String
-  startDate           DateTime
-  endDate             DateTime
-  initialCapital      Float
-  finalCapital        Float
-  totalReturn         Float
-  totalPnL            Float
-  totalTrades         Int
-  winningTrades       Int
-  losingTrades        Int
-  winRate             Float
-  avgWin              Float
-  avgLoss             Float
-  profitFactor        Float
-  maxDrawdown         Float
-  maxDrawdownDuration Int
-  sharpeRatio         Float
-  sortinoRatio        Float
-  calmarRatio         Float
-  totalFees           Float
-  equityCurve         String   @db.LongText
-  drawdownCurve       String   @db.LongText
-  monthlyReturns      String   @db.LongText
-  trades              String   @db.LongText
-  parameters          String   @db.LongText
-  createdAt           DateTime @default(now())
-
-  @@index([userId])
-  @@index([symbol])
-  @@index([createdAt])
-}
-
-model ScoringRule {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  status    String   @default("Active")
-  version   String   @default("v1")
-  weights   String
-  threshold Float    @default(80)
-  action    String   @default("ALERT")
-  enabled   Boolean  @default(true)
-  versions  String   @db.LongText
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-model Notification {
-  id          String   @id @default(uuid())
-  userId      String
-  type        String
-  title       String
-  message     String   @db.Text
-  read        Boolean  @default(false)
-  targetRoute String
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@index([userId, read])
-  @@index([createdAt])
-}
+// Add more models: NewsEvent, BacktestReport, ScoringRule, Notification, ExecutionLog, PortfolioSnapshot etc. in later steps

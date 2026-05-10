@@ -1,32 +1,26 @@
 {
   "name": "aqtms",
+  "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.33.2",
+  "description": "Enterprise-grade fully automated quantitative trading platform — integrating multiple exchanges (CEX + DEX), multiple AI models, multiple data sources, and professional risk control for intelligent unattended trading.",
   "scripts": {
-    "dev": "turbo dev",
     "build": "turbo build",
+    "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
-    "pm2:start": "pm2 start ecosystem.config.cjs",
-    "pm2:start:prod": "pnpm build && pm2 start ecosystem.config.cjs --env production",
-    "pm2:stop": "pm2 stop ecosystem.config.cjs",
-    "pm2:restart": "pm2 restart ecosystem.config.cjs",
-    "pm2:reload": "pm2 reload ecosystem.config.cjs",
-    "pm2:delete": "pm2 delete ecosystem.config.cjs",
-    "pm2:logs": "pm2 logs",
-    "pm2:status": "pm2 status",
-    "pm2:monit": "pm2 monit",
-    "pm2:save": "pm2 save",
-    "pm2:startup": "pm2 startup"
+    "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "pm2": "^7.0.1",
-    "prettier": "^3.5.0",
-    "serve": "^14.2.6",
-    "turbo": "^2.4.0",
-    "typescript": "^5.4.0"
+    "turbo": "^2.0.3",
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "pnpm@9.6.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
   }
 }
