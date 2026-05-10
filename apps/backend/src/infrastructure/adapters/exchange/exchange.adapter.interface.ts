@@ -9,6 +9,7 @@ export interface PlaceOrderParams {
   price?: number;
   stopLoss?: number;
   takeProfit?: number;
+  isPaper?: boolean;
 }
 
 export interface PlaceOrderResult {
@@ -16,6 +17,18 @@ export interface PlaceOrderResult {
   exchangeOrderId?: string;
   message?: string;
   filledPrice?: number;
+  status?: string;
+  filledQuantity?: number;
+  remainingQuantity?: number;
+}
+
+export interface OrderStatusResult {
+  exchangeOrderId: string;
+  status: 'open' | 'closed' | 'canceled' | 'partially_filled' | string;
+  filledQuantity: number;
+  remainingQuantity: number;
+  averagePrice?: number;
+  lastUpdate: Date;
 }
 
 export interface IExchangeAdapter {
@@ -23,5 +36,6 @@ export interface IExchangeAdapter {
   cancelOrder(exchangeAccountId: string, exchangeOrderId: string): Promise<boolean>;
   getBalance(exchangeAccountId: string): Promise<number>;
   getPositions(exchangeAccountId: string): Promise<any[]>;
-  // Future: getOrderStatus, subscribeToFills etc.
+  getOrderStatus(exchangeAccountId: string, exchangeOrderId: string): Promise<OrderStatusResult | null>;
+  getOpenOrders(exchangeAccountId: string, symbol?: string): Promise<any[]>;
 }
