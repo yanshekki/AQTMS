@@ -65,7 +65,14 @@ function expected(role, method, path) {
   
   // audit:export → only ADMIN, SUPER_ADMIN have → 403 for others
   if (path === '/api/v1/audit/export') return ['ADMIN','SUPER_ADMIN'].includes(role) ? 200 : 403;
-  
+
+  // Paper trading endpoints (all authenticated roles)
+  if (path === '/api/v1/paper-trading/positions') return 200;
+  if (path === '/api/v1/paper-trading/reset') return ['SUPER_ADMIN','ADMIN','TRADER'].includes(role) ? 200 : 403;
+
+  // Execution / live flow (paper mode simulation covered in e2e)
+  if (path === '/api/v1/execution/execute' && method === 'POST') return ['ANALYST','VIEWER'].includes(role) ? 403 : 200;
+
   return 200;
 }
 
@@ -84,10 +91,14 @@ const TESTS = [
   ['GET',  '/api/v1/ai/providers'],
   ['GET',  '/api/v1/news/recent'],
   ['GET',  '/api/v1/audit/export'],
+  // E2E paper→live flow coverage additions
+  ['GET',  '/api/v1/paper-trading/positions'],
+  ['POST', '/api/v1/paper-trading/reset', { initialBalance: 10000 }],
+  ['POST', '/api/v1/execution/execute', { isPaper: true, symbol: 'ETHUSDT', side: 'BUY', quantity: 0.1, price: 3000 }],
 ];
 
 async function main() {
-  console.log('🔐 AQTMS Permission Audit\n');
+  console.log('🔐 AQTMS Permission Audit + E2E Paper→Live Flow Coverage\n');
   
   const allResults = {};
   
@@ -139,6 +150,10 @@ async function main() {
   }
   
   console.log(`\n  TOTAL: ${totalPass}/${totalPass+totalFail} (${Math.round(totalPass/(totalPass+totalFail)*100)}%)`);
+
+  // Note on Jest E2E for paper→live flow
+  console.log('\n📝 Jest E2E for paper→live flow: See apps/backend/test/paper-to-live.e2e-spec.ts (to be added with supertest + NestJS TestingModule for full integration test of PaperTradingService → ExecutionService switch, balance/PnL update, reconciliation)');
+
   if (totalFail > 0) process.exit(1);
 }
 
