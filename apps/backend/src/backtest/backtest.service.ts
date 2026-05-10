@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { strategyRegistry } from './strategy.registry';
 import { HistoricalDataService } from '../data/historical-data.service';
+import { Candle, Signal } from './interfaces/strategy.interface';
 
 export interface BacktestRequest {
   strategyName: string;
@@ -9,14 +10,7 @@ export interface BacktestRequest {
   startDate: Date;
   endDate: Date;
   initialCapital: number;
-  historicalBars?: Array<{
-    timestamp: Date;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume?: number;
-  }>;
+  historicalBars?: Candle[];
   exchange?: 'BINANCE' | 'BYBIT';
   interval?: string;
 }
@@ -45,10 +39,10 @@ export class BacktestService {
   async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
     this.logger.log(`Running backtest for strategy: ${request.strategyName}`);
 
-    let bars = request.historicalBars;
+    let bars: Candle[] = request.historicalBars || [];
 
     // Auto-fetch historical data if not provided
-    if (!bars || bars.length === 0) {
+    if (bars.length === 0) {
       this.logger.log('No historical bars provided. Fetching from exchange...');
       const exchange = request.exchange || 'BINANCE';
       const interval = request.interval || '1h';
@@ -60,16 +54,16 @@ export class BacktestService {
         request.endDate.getTime(),
       );
       bars = rawBars.map((b: any) => ({
-        timestamp: new Date(b.timestamp),
+        timestamp: b.timestamp,
         open: b.open,
         high: b.high,
         low: b.low,
         close: b.close,
-        volume: b.volume,
+        volume: b.volume || 0,
       }));
     }
 
-    if (!bars || bars.length === 0) {
+    if (bars.length === 0) {
       return this.getEmptyResult(request.initialCapital);
     }
 
@@ -89,18 +83,21 @@ export class BacktestService {
     let maxDrawdown = 0;
 
     for (const bar of bars) {
-      const signal = strategy.onBar(bar);
+      const sig: Signal | null = strategy.onCandle(bar);
+      if (!sig) continue;
 
-      if (signal.signal === 'BUY' && position === 0) {
+      const action = sig.action;
+
+      if (action === 'BUY' && position === 0) {
         position = 1;
         entryPrice = bar.close;
-        trades.push({ type: 'BUY', price: bar.close, timestamp: bar.timestamp });
+        trades.push({ type: 'BUY', price: bar.close, timestamp: new Date(bar.timestamp) });
       }
 
-      if (signal.signal === 'SELL' && position === 1) {
+      if (action === 'SELL' && position === 1) {
         const pnl = (bar.close - entryPrice) * position;
         capital += pnl;
-        trades.push({ type: 'SELL', price: bar.close, timestamp: bar.timestamp, pnl });
+        trades.push({ type: 'SELL', price: bar.close, timestamp: new Date(bar.timestamp), pnl });
         position = 0;
       }
 
@@ -121,7 +118,7 @@ export class BacktestService {
       const lastBar = bars[bars.length - 1];
       const pnl = (lastBar.close - entryPrice) * position;
       capital += pnl;
-      trades.push({ type: 'SELL', price: lastBar.close, timestamp: lastBar.timestamp, pnl });
+      trades.push({ type: 'SELL', price: lastBar.close, timestamp: new Date(lastBar.timestamp), pnl });
     }
 
     // Calculate performance metrics
