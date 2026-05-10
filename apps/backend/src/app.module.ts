@@ -15,6 +15,7 @@ import { OrderModule } from './orders/order.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { SafetyModule } from './safety/safety.module';
 import { PortfolioSnapshotProcessor } from './queues/processors/portfolio-snapshot.processor';
+import { QUEUE_NAMES } from './queues/jobs';
 
 @Module({
   imports: [
@@ -29,9 +30,10 @@ import { PortfolioSnapshotProcessor } from './queues/processors/portfolio-snapsh
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
     }),
-    BullModule.registerQueue({
-      name: 'portfolio-snapshots',
-    }),
+    BullModule.registerQueue({ name: 'portfolio-snapshots' }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.NEWS_PROCESS }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.AI_SCORING }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.TRADE_EXECUTE }),
     PrismaModule,
     AuthModule,
     RiskModule,
