@@ -6,6 +6,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RiskModule } from './risk/risk.module';
 import { MarketDataModule } from './market-data/market-data.module';
+import { ExecutionModule } from './execution/execution.module';
+import { PaperTradingModule } from './paper-trading/paper-trading.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { MarketDataModule } from './market-data/market-data.module';
     AuthModule,
     RiskModule,
     MarketDataModule,
+    PaperTradingModule,
+    ExecutionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
