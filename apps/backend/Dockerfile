@@ -1,4 +1,4 @@
-# ── AQTMS Backend Dockerfile ──
+# ── AQTMS Backend Dockerfile (HARDENED for production) ──
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -14,6 +14,9 @@ RUN cd apps/backend && npx prisma generate
 RUN cd apps/backend && npx tsc --outDir dist 2>/dev/null || true
 
 FROM node:22-alpine AS runner
+
+# Security hardening
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10 --activate
@@ -26,8 +29,14 @@ COPY --from=builder /app/apps/backend/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/.npmrc ./.npmrc
 
+# Harden: non-root, minimal perms
+USER appuser
+
 ENV NODE_ENV=production
 EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })" || exit 1
 
 # Startup: apply migrations then start server
 CMD sh -c "cd /app && npx prisma db push --skip-generate 2>/dev/null || true && node dist/main.js"
