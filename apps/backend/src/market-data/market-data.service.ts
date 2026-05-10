@@ -1,108 +1,83 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
-interface PriceData {
+export interface MarketPrice {
+  symbol: string;
   price: number;
-  updatedAt: Date;
+  timestamp: Date;
+  volume?: number;
 }
 
-/**
- * MarketDataService
- *
- * Central service for latest market prices.
- * Designed to be fed by WebSocket clients (Binance, Bybit, etc.)
- * and consumed by PaperTradingService for real-time PnL calculation.
- */
 @Injectable()
-export class MarketDataService {
+export class MarketDataService implements OnModuleInit {
   private readonly logger = new Logger(MarketDataService.name);
+  private prices: Map<string, MarketPrice> = new Map();
+  private subscribers: Map<string, ((price: MarketPrice) => void)[]> = new Map();
 
-  // symbol -> { price, updatedAt }
-  private priceCache = new Map<string, PriceData>();
-
-  // Symbols we are interested in tracking
-  private subscribedSymbols = new Set<string>();
-
-  constructor() {
-    this.logger.log('MarketDataService initialized (ready for WebSocket price feed)');
+  async onModuleInit() {
+    this.logger.log('MarketDataService initialized (mock mode)');
+    // TODO: Connect to Binance/Bybit WebSocket for real-time data
+    // Example: use ccxt or native ws for live prices
+    this.startMockPriceUpdates();
   }
 
-  /**
-   * Subscribe to price updates for specific symbols
-   */
-  subscribeToSymbols(symbols: string[]) {
-    symbols.forEach((symbol) => {
-      this.subscribedSymbols.add(symbol.toUpperCase());
-    });
-    this.logger.log(`Subscribed to price updates: ${symbols.join(', ')}`);
+  private startMockPriceUpdates() {
+    // Simulate price updates for demo
+    setInterval(() => {
+      const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+      symbols.forEach((symbol) => {
+        const current = this.prices.get(symbol) || { symbol, price: 50000, timestamp: new Date() };
+        const newPrice = current.price * (1 + (Math.random() - 0.5) * 0.002); // ±0.1% random walk
+        const updated: MarketPrice = {
+          symbol,
+          price: parseFloat(newPrice.toFixed(2)),
+          timestamp: new Date(),
+          volume: Math.random() * 1000,
+        };
+        this.prices.set(symbol, updated);
+        this.notifySubscribers(symbol, updated);
+      });
+    }, 5000); // every 5s
   }
 
-  /**
-   * Get latest price for a symbol
-   */
-  async getLatestPrice(symbol: string): Promise<number> {
-    const cached = this.priceCache.get(symbol.toUpperCase());
+  async getPrice(symbol: string): Promise<MarketPrice | null> {
+    // TODO: fetch from exchange API if not in cache or stale
+    return this.prices.get(symbol) || null;
+  }
 
-    if (cached) {
-      const ageMs = Date.now() - cached.updatedAt.getTime();
-      // Consider price fresh if updated within last 10 seconds
-      if (ageMs < 10_000) {
-        return cached.price;
+  async getPrices(symbols: string[]): Promise<MarketPrice[]> {
+    return symbols
+      .map((s) => this.prices.get(s))
+      .filter((p): p is MarketPrice => !!p);
+  }
+
+  subscribe(symbol: string, callback: (price: MarketPrice) => void): () => void {
+    if (!this.subscribers.has(symbol)) {
+      this.subscribers.set(symbol, []);
+    }
+    this.subscribers.get(symbol)!.push(callback);
+
+    // Return unsubscribe function
+    return () => {
+      const subs = this.subscribers.get(symbol);
+      if (subs) {
+        const idx = subs.indexOf(callback);
+        if (idx > -1) subs.splice(idx, 1);
       }
-    }
-
-    return 0; // Not available or stale
+    };
   }
 
-  /**
-   * Update price from external source (WebSocket recommended)
-   */
-  updatePrice(symbol: string, price: number) {
-    const normalizedSymbol = symbol.toUpperCase();
-
-    this.priceCache.set(normalizedSymbol, {
-      price,
-      updatedAt: new Date(),
+  private notifySubscribers(symbol: string, price: MarketPrice) {
+    const subs = this.subscribers.get(symbol) || [];
+    subs.forEach((cb) => {
+      try {
+        cb(price);
+      } catch (e) {
+        this.logger.error(`Subscriber error for ${symbol}`, e);
+      }
     });
-
-    // Optional: log only for subscribed symbols
-    if (this.subscribedSymbols.has(normalizedSymbol)) {
-      this.logger.debug(`Price updated: ${normalizedSymbol} = ${price}`);
-    }
   }
 
-  /**
-   * Batch get prices
-   */
-  async getPrices(symbols: string[]): Promise<Record<string, number>> {
-    const result: Record<string, number> = {};
-
-    for (const symbol of symbols) {
-      result[symbol] = await this.getLatestPrice(symbol);
-    }
-
-    return result;
-  }
-
-  /**
-   * Get all cached prices (useful for debugging)
-   */
-  getAllCachedPrices(): Record<string, number> {
-    const result: Record<string, number> = {};
-
-    for (const [symbol, data] of this.priceCache.entries()) {
-      result[symbol] = data.price;
-    }
-
-    return result;
-  }
-
-  /**
-   * Check if we have fresh price for a symbol
-   */
-  hasFreshPrice(symbol: string, maxAgeMs = 10000): boolean {
-    const cached = this.priceCache.get(symbol.toUpperCase());
-    if (!cached) return false;
-
-    return Date.now() - cached.updatedAt.getTime() < maxAgeMs;
-  }
+  // TODO: Implement real WebSocket connection (Binance, Bybit)
+  // TODO: Add historical candles fetch via REST
+  // TODO: Integrate with backtest_engine for historical data
 }
