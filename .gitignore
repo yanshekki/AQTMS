@@ -1,27 +1,44 @@
+# Dependencies
 node_modules/
+__pycache__/
+*.pyc
+
+# Build outputs
 dist/
 build/
-.next/
-.turbo/
+*.js.map
+
+# Generated reports and data
+*_report.png
+*_trades.csv
+browsed_files/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.log
+
+# TypeScript
 *.tsbuildinfo
 
-# Environment files (NEVER commit these)
-.env
-.env.local
-.env.*.local
-.env.production
-.env.development
+# Turborepo
+.turbo/
 
-coverage/
-*.log
-.DS_Store
+# Monorepo apps
+apps/*/dist/
+apps/*/node_modules/
+apps/*/.env
+apps/*/.env.local
+
+# Prisma
+**/prisma/migrations/
+**/prisma/dev.db
 
 # IDE
-.idea/
-.vscode/
-
-# Secrets
-secrets/
-*.pem
-*.key
-*.crt
+.cursor/
+.windsurf/
