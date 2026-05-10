@@ -24,6 +24,8 @@ model ExchangeAccount {
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+  orders Order[]
+  positions Position[]
 
   @@index([userId])
 }
@@ -47,6 +49,69 @@ model Trade {
 
   @@index([userId])
   @@index([exchangeAccountId])
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  userId            String
+  exchangeAccountId String
+  symbol            String
+  side              String   // BUY | SELL
+  type              String   // MARKET | LIMIT | STOP_LOSS | TAKE_PROFIT
+  quantity          Float
+  price             Float?
+  stopLoss          Float?
+  takeProfit        Float?
+  status            String   @default("PENDING") // PENDING | FILLED | PARTIALLY_FILLED | CANCELLED | REJECTED
+  isPaper           Boolean  @default(true)
+  filledQuantity    Float    @default(0)
+  avgFillPrice      Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+}
+
+model Position {
+  id                String   @id @default(cuid())
+  userId            String
+  exchangeAccountId String
+  symbol            String
+  quantity          Float    @default(0)
+  avgPrice          Float    @default(0)
+  unrealizedPnl     Float    @default(0)
+  realizedPnl       Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+  @@unique([exchangeAccountId, symbol])
+}
+
+model Signal {
+  id          String   @id @default(cuid())
+  userId      String?
+  source      String   // e.g. AI_MODEL, TELEGRAM, X_TWITTER, NEWS_API
+  symbol      String
+  action      String   // BUY | SELL | HOLD
+  score       Float
+  confidence  Float?
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([timestamp])
 }
 
 // Expanded models for AQTMS (Step 4+)
@@ -124,6 +189,7 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id])
 }
 
+// Update User with relations
 model User {
   id            String   @id @default(cuid())
   walletAddress String   @unique
@@ -135,6 +201,9 @@ model User {
 
   exchangeAccounts   ExchangeAccount[]
   trades             Trade[]
+  orders             Order[]
+  positions          Position[]
+  signals            Signal[]
   backtestReports    BacktestReport[]
   executionLogs      ExecutionLog[]
   portfolioSnapshots PortfolioSnapshot[]
