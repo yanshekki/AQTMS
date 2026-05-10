@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PaperTradingService } from './paper-trading.service';
-import { PaperTradingController } from './paper-trading.controller';
 import { MarketDataModule } from '../market-data/market-data.module';
-import { PrismaModule } from '../prisma/prisma.module';
+import { RiskModule } from '../risk/risk.module';
 
 @Module({
-  imports: [PrismaModule, MarketDataModule],
-  controllers: [PaperTradingController],
+  imports: [MarketDataModule, RiskModule],
   providers: [PaperTradingService],
   exports: [PaperTradingService],
 })

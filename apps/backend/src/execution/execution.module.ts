@@ -1,30 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ExecutionService } from './execution.service';
-import { ExecutionLoggerService } from './execution-logger.service';
-import { ExecutionController } from './execution.controller';
-import { ExecutionMetricsCollector } from './metrics-collector.service';
-import { InMemoryExecutionLogRepository } from './repositories/in-memory-execution-log.repository';
-import { PrismaExecutionLogRepository } from './repositories/prisma-execution-log.repository';
-import { IExecutionLogRepository } from './interfaces/execution-log.repository';
+import { PaperTradingModule } from '../paper-trading/paper-trading.module';
 import { RiskModule } from '../risk/risk.module';
+import { MarketDataModule } from '../market-data/market-data.module';
+import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-exchange.adapter';
 
 @Module({
-  imports: [RiskModule],
-  controllers: [ExecutionController],
+  imports: [PaperTradingModule, RiskModule, MarketDataModule],
   providers: [
     ExecutionService,
-    ExecutionLoggerService,
-    ExecutionMetricsCollector,
     {
-      provide: 'EXECUTION_LOG_REPOSITORY',
-      useFactory: () => {
-        const storageType = process.env.EXECUTION_LOG_STORAGE || 'memory';
-        return storageType === 'prisma'
-          ? new PrismaExecutionLogRepository()
-          : new InMemoryExecutionLogRepository();
-      },
+      provide: 'IExchangeAdapter',
+      useClass: CcxtExchangeAdapter,
     },
   ],
-  exports: [ExecutionService, ExecutionLoggerService, ExecutionMetricsCollector],
+  exports: [ExecutionService],
 })
 export class ExecutionModule {}
