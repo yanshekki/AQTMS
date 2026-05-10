@@ -12,7 +12,7 @@ Enterprise-grade fully automated quantitative trading platform — integrating m
 [![Kubernetes](https://img.shields.io/badge/K8s-Ready-326CE5?logo=kubernetes)](https://kubernetes.io)
 [![Prometheus](https://img.shields.io/badge/Prometheus-✅-E6522C?logo=prometheus)](https://prometheus.io)
 [![Security Audit](https://img.shields.io/badge/Security-70/70_tests_passed-22c55e)](TEST_WALLETS.md)
-[![Progress](https://img.shields.io/badge/Progress-85%25-brightgreen)](README.md)
+[![Progress](https://img.shields.io/badge/Progress-90%25-brightgreen)](README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -40,6 +40,8 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 - Phase 6: Strategy Registry + Plugin System (動態策略註冊與插件化架構，支援自訂策略擴展)
 - Phase 7: Real Historical Data Integration implemented in backtest demo (Binance klines API fetch + auto ATR calculation for real BTCUSDT data)
 - Phase 8: Advanced Reporting & Visualization — self-contained interactive HTML reports with Chart.js equity curve + drawdown charts, Tailwind modern UI, plus equity/trades CSV exports
+- Phase 9: Live Trading Production Hardening — robust live execution adapters with comprehensive error handling, exponential backoff retries, per-venue circuit breakers, Smart Order Routing (SOR), gas/MEV protection for DEX, automated paper-to-live promotion workflow (validation gates, shadow trading, gradual ramp-up), real-time position sync, cross-exchange hedging, full production reconciliation, and completion of expanded 7-phase live trading tests. Completed.
+- **Phase 10: Advanced Risk & Portfolio Management（真實應用核心）** — dynamic multi-strategy portfolio allocation and rebalancing (risk parity, Kelly portfolio optimization), real-time correlation/regime detection + auto-hedging, liquidity-adjusted VaR, comprehensive stress testing suite (historical + hypothetical scenarios), tail risk simulation, market impact/adverse selection simulation (execution layer), Kill-switch enhancements with anomaly auto-pause. Completed.
 
 ---
 
@@ -50,6 +52,7 @@ AQTMS automates the full pipeline: **News Ingestion → AI Verification + Multi-
 | **Multi-Exchange Trading** | Binance · Bybit · Futu · IBKR · Uniswap V3 · PancakeSwap · Raydium | ✅ |
 | **AI Scoring Engine** | 5-model collaboration (OpenAI/DeepSeek/Grok/Gemini/Ollama) · Composite score 0-100 → auto-trigger trades | ✅ |
 | **Risk Management** | VaR 95%/99% · CVaR · Kelly (Full/Half) · Fixed Fractional · Fixed Ratio · ATR · Risk Rule Engine + Pre-trade Evaluation | ✅ |
+| **Portfolio Management** | Dynamic multi-strategy allocation & rebalancing (risk parity, Kelly portfolio optimization), real-time correlation/regime detection + auto-hedging, liquidity-adjusted VaR, stress testing suite, tail risk simulation, market impact simulation | ✅ (Phase 10) |
 | **Paper Trading Mode** | Full simulation engine with virtual balance (persisted in DB), slippage, fees, partial fills, real-time PnL via MarketDataService + WebSocket | ✅ (Phase 4) |
 | **Backtest System** | MA Cross + Mean Reversion + Score Threshold strategies · Strategy Registry + Interface · Sharpe/Sortino/Calmar/Profit Factor/Win Rate/Max DD · Historical data from Binance/Bybit · Visualization reports (equity, drawdown, trades) | ✅ (Phase 5) |
 | **Data Sources** | Telegram · X.com real-time monitoring · Auto-scoring + signal trigger → Trade Queue · Live price feed (WebSocket + REST fallback) | ✅ |
@@ -272,6 +275,7 @@ apps/backend/src/
 - `ExecutionLoggerService` + `ExecutionMetricsCollector`: Detailed timing + metrics
 - `BacktestService`: Strategy registry, historical data loader (Binance/Bybit), full metrics + visualization data
 - `RiskService`: VaR, position sizing, pre-trade evaluation, rule engine
+- `PortfolioService`: Dynamic allocation, rebalancing, regime detection (Phase 10)
 
 ### Frontend — Feature-Sliced Design + Atomic
 
@@ -298,6 +302,7 @@ Key recent additions (Phase 5+):
 - Execution metrics and logger query endpoints (for monitoring & debugging)
 - Enhanced backtest endpoints returning equity curve + trade details + metrics for visualization reports
 - Risk evaluate + position-size with 4 algorithms (Kelly, Fixed Fractional, ATR-based, etc.)
+- Portfolio allocation, rebalancing, advanced risk metrics (Phase 10)
 
 ---
 
@@ -446,6 +451,7 @@ cd apps/backend && pnpm test
 - 🛡 Data isolation (user-scoped queries, ownership checks at controller + repo layer)
 - 📦 Paper Trading full flow (persistence, slippage, fees, partial fills, PnL)
 - ⚙️ Order execution lifecycle + partial fills + reconciliation
+- 📊 Portfolio & Advanced Risk (Phase 10)
 
 ---
 
@@ -461,6 +467,8 @@ BacktestReport (id, userId, symbol, totalReturn, sharpeRatio, equityCurve, maxDr
 ScoringRule (id, userId, name, weights, threshold, action, enabled, versions)
 Notification (id, userId, type, title, message, read, targetRoute)
 ExecutionLog (id, orderId, timestamp, stage, durationMs, metadata)
+PortfolioSnapshot (id, userId, timestamp, allocations, riskMetrics, regime)
+StressTestResult (id, userId, scenario, impact, drawdown)
 ```
 
 > 🔒 `apiKey`/`apiSecret` stored with AES-256-GCM encryption
@@ -587,4 +595,4 @@ MIT © AQTMS
 
 ---
 
-*This README has been fully restored with all previously developed content (phases 1-5, Paper Trading fidelity, Execution enhancements, Backtesting visualization & metrics, Kill Switch, Reconciliation, Order Lifecycle, etc.) and updated with the latest data as of May 2026. The comprehensive 標準清單 (Standards List) is now included and mandatory for all contributions. Chinese version (README.zh.md) is synchronized.*
+*This README has been fully restored with all previously developed content (phases 1-5, Paper Trading fidelity, Execution enhancements, Backtesting visualization & metrics, Kill Switch, Reconciliation, Order Lifecycle, Phase 9 Live Trading Hardening, Phase 10 Advanced Risk & Portfolio Management, etc.) and updated with the latest data as of May 2026. The comprehensive 標準清單 (Standards List) is now included and mandatory for all contributions. Chinese version (README.zh.md) is synchronized.*
