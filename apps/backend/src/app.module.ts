@@ -15,6 +15,9 @@ import { OrderModule } from './orders/order.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { SafetyModule } from './safety/safety.module';
 import { PortfolioSnapshotProcessor } from './queues/processors/portfolio-snapshot.processor';
+import { TradeProcessor } from './queues/processors/trade.processor';
+import { NewsProcessor } from './queues/processors/news.processor';
+import { AiScoringProcessor } from './queues/processors/ai.processor';
 import { QUEUE_NAMES } from './queues/jobs';
 
 @Module({
@@ -46,6 +49,6 @@ import { QUEUE_NAMES } from './queues/jobs';
     SafetyModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PortfolioSnapshotProcessor],
+  providers: [AppService, PortfolioSnapshotProcessor, TradeProcessor, NewsProcessor, AiScoringProcessor],
 })
 export class AppModule {}
