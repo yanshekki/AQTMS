@@ -7,7 +7,7 @@ import { RiskService } from '../risk/risk.service';
 @Injectable()
 export class StrategyRunnerService {
   private readonly logger = new Logger(StrategyRunnerService.name);
-  private activeStrategies = new Map<string, boolean>(); // strategyId -> isRunning
+  private activeStrategies = new Map<string, { isRunning: boolean; lastRun?: Date }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -21,11 +21,10 @@ export class StrategyRunnerService {
       return { success: false, message: 'Strategy not found' };
     }
 
-    this.activeStrategies.set(strategyId, true);
-    this.logger.log(`Strategy ${strategy.name} deployed and running (Paper: ${isPaper})`);
+    this.activeStrategies.set(strategyId, { isRunning: true });
+    this.logger.log(`Strategy ${strategy.name} (${strategy.type}) deployed and running (Paper: ${isPaper})`);
 
-    // In production, this would start a dedicated BullMQ job or persistent runner
-    return { success: true, message: `Strategy ${strategy.name} is now active and running.` };
+    return { success: true, message: `Strategy ${strategy.name} is now active.` };
   }
 
   async stopStrategy(strategyId: string): Promise<{ success: boolean; message: string }> {
@@ -34,34 +33,41 @@ export class StrategyRunnerService {
     return { success: true, message: 'Strategy stopped successfully.' };
   }
 
-  // Scheduled runner - runs every minute for active strategies
+  isStrategyActive(strategyId: string): boolean {
+    return this.activeStrategies.has(strategyId);
+  }
+
+  // Real scheduled runner - every minute
   @Cron(CronExpression.EVERY_MINUTE)
   async runActiveStrategies() {
     if (this.activeStrategies.size === 0) return;
 
     this.logger.debug(`Running ${this.activeStrategies.size} active strategies...`);
 
-    for (const [strategyId, isActive] of this.activeStrategies.entries()) {
-      if (!isActive) continue;
+    for (const [strategyId, state] of this.activeStrategies.entries()) {
+      if (!state.isRunning) continue;
 
       try {
-        // Demo logic: Simple momentum check (replace with real strategy logic)
-        const shouldTrade = Math.random() > 0.7; // 30% chance to trigger (demo only)
+        const strategy = await this.prisma.strategy.findUnique({ where: { id: strategyId } });
+        if (!strategy) continue;
 
-        if (shouldTrade) {
+        const params = JSON.parse(strategy.params || '{}');
+        const shouldExecute = await this.evaluateStrategy(strategy.type, params, strategy.symbol || 'BTCUSDT');
+
+        if (shouldExecute) {
           const orderData = {
-            symbol: 'BTCUSDT',
+            symbol: strategy.symbol || 'BTCUSDT',
             side: 'BUY',
             type: 'MARKET',
-            quantity: 0.001,
-            isPaper: true, // Always start in paper mode for safety
-            userId: 'demo-user',
+            quantity: params.quantity || 0.001,
+            isPaper: true,
+            userId: strategy.userId || 'demo-user',
             exchangeAccountId: 'demo-paper',
           };
 
           if (this.executionService) {
             await this.executionService.executeOrder(orderData);
-            this.logger.log(`Strategy ${strategyId} auto-executed order`);
+            this.logger.log(`Strategy ${strategy.name} executed order for ${orderData.symbol}`);
           }
         }
       } catch (error) {
@@ -70,7 +76,44 @@ export class StrategyRunnerService {
     }
   }
 
-  isStrategyActive(strategyId: string): boolean {
-    return this.activeStrategies.has(strategyId);
+  private async evaluateStrategy(strategyType: string, params: any, symbol: string): Promise<boolean> {
+    const recentPrices = await this.getRecentPrices(symbol, 30);
+    if (recentPrices.length < 15) return false;
+
+    if (strategyType === 'sma_crossover') {
+      const shortPeriod = params.shortPeriod || 5;
+      const longPeriod = params.longPeriod || 20;
+
+      const shortSMA = this.calculateSMA(recentPrices, shortPeriod);
+      const longSMA = this.calculateSMA(recentPrices, longPeriod);
+      const lastPrice = recentPrices[recentPrices.length - 1];
+
+      // Bullish crossover signal
+      return lastPrice > shortSMA && shortSMA > longSMA;
+    }
+
+    if (strategyType === 'mean_reversion') {
+      const mean = this.calculateSMA(recentPrices, 15);
+      const lastPrice = recentPrices[recentPrices.length - 1];
+      const deviation = Math.abs(lastPrice - mean) / mean;
+      return deviation > (params.threshold || 0.025);
+    }
+
+    // Fallback demo logic
+    return Math.random() > 0.78;
+  }
+
+  private calculateSMA(prices: number[], period: number): number {
+    if (prices.length < period) return prices[prices.length - 1] || 0;
+    const slice = prices.slice(-period);
+    return slice.reduce((sum, p) => sum + p, 0) / slice.length;
+  }
+
+  private async getRecentPrices(symbol: string, limit: number): Promise<number[]> {
+    // TODO: Replace with real MarketDataService call
+    const basePrice = 60000 + (Math.random() - 0.5) * 2500;
+    return Array.from({ length: limit }, (_, i) =>
+      basePrice + Math.sin(i / 4) * 280 + (Math.random() - 0.5) * 120
+    );
   }
 }
