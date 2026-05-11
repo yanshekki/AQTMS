@@ -7,6 +7,7 @@ import { ExchangeAccountRepository } from '../../../infrastructure/persistence/E
 import { BinanceAdapter } from '../../../infrastructure/adapters/exchanges/BinanceAdapter';
 import { BybitAdapter } from '../../../infrastructure/adapters/exchanges/BybitAdapter';
 import { logger } from '../../../shared/logger';
+import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
 export class ExchangeController {
   constructor(private readonly exchangeRepo: ExchangeAccountRepository) {}
@@ -20,12 +21,11 @@ export class ExchangeController {
       }
 
       const { exchange, name, apiKey, apiSecret, testnet } = parseResult.data;
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      // Create with encryption
       const account = await this.exchangeRepo.create({
-        userId,
+        userId: user.userId,
         exchange: exchange.toUpperCase(),
         name,
         apiKey,
@@ -33,8 +33,7 @@ export class ExchangeController {
         testnet,
       });
 
-      // Test connection in background
-      queueConnectionTest(account.id, userId, this.exchangeRepo, exchange, apiKey, apiSecret, testnet);
+      queueConnectionTest(account.id, user.userId, this.exchangeRepo, exchange, apiKey, apiSecret, testnet);
 
       res.status(201).json({
         success: true,
@@ -48,10 +47,10 @@ export class ExchangeController {
 
   listByUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      const accounts = await this.exchangeRepo.findByUser(userId);
+      const accounts = await this.exchangeRepo.findByUser(user.userId);
 
       res.status(200).json({
         success: true,
@@ -70,15 +69,13 @@ export class ExchangeController {
   getBalances = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const id = String(req.params.id ?? '');
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      // Verify ownership before returning data
       const account = await this.exchangeRepo.findById(id);
       if (!account) throw new NotFoundError('Exchange account not found');
-      if (account.userId !== userId) throw new ForbiddenError('You can only access your own exchange accounts');
+      if (account.userId !== user.userId) throw new ForbiddenError('You can only access your own exchange accounts');
 
-      // TODO: Retrieve adapter from registry, fetch real balances
       res.status(200).json({
         success: true,
         data: { exchange: account.exchange, balances: [], updatedAt: new Date().toISOString() },
@@ -92,13 +89,12 @@ export class ExchangeController {
   getPositions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const id = String(req.params.id ?? '');
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      // Verify ownership before returning data
       const account = await this.exchangeRepo.findById(id);
       if (!account) throw new NotFoundError('Exchange account not found');
-      if (account.userId !== userId) throw new ForbiddenError('You can only access your own exchange accounts');
+      if (account.userId !== user.userId) throw new ForbiddenError('You can only access your own exchange accounts');
 
       res.status(200).json({
         success: true,
@@ -115,11 +111,10 @@ export class ExchangeController {
       const id = String(req.params.id ?? '');
       if (!id) throw new ValidationError('Exchange ID required');
 
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      // Ownership check enforced by repository
-      const creds = await this.exchangeRepo.getDecryptedCredentials(id, userId);
+      const creds = await this.exchangeRepo.getDecryptedCredentials(id, user.userId);
       if (!creds) throw new NotFoundError('Exchange account not found');
 
       let success = false;
@@ -132,7 +127,7 @@ export class ExchangeController {
       }
 
       const status = success ? 'CONNECTED' : 'ERROR';
-      await this.exchangeRepo.updateStatus(id, userId, status, success);
+      await this.exchangeRepo.updateStatus(id, user.userId, status, success);
 
       res.status(200).json({
         success: true,
@@ -149,7 +144,6 @@ export class ExchangeController {
       const id = String(req.params.id ?? '');
       if (!id) throw new ValidationError('Exchange ID required');
 
-      // Ownership check: only the account owner can delete
       const account = await this.exchangeRepo.findById(id);
       if (!account) throw new NotFoundError('Exchange account not found');
       if (account.userId !== req.user?.userId) {
@@ -164,7 +158,6 @@ export class ExchangeController {
   };
 }
 
-// ── Background connection test ──
 async function queueConnectionTest(
   id: string,
   userId: string,
