@@ -14,6 +14,7 @@ import { WebsocketModule } from './websocket/websocket.module';
 import { OrderModule } from './orders/order.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { SafetyModule } from './safety/safety.module';
+import { StrategyRunnerModule } from './strategy-runner/strategy-runner.module';
 import { PortfolioSnapshotProcessor } from './queues/processors/portfolio-snapshot.processor';
 import { TradeProcessor } from './queues/processors/trade.processor';
 import { NewsProcessor } from './queues/processors/news.processor';
@@ -47,6 +48,7 @@ import { QUEUE_NAMES } from './queues/jobs';
     OrderModule,
     PortfolioModule,
     SafetyModule,
+    StrategyRunnerModule,
   ],
   controllers: [AppController],
   providers: [AppService, PortfolioSnapshotProcessor, TradeProcessor, NewsProcessor, AiScoringProcessor],
