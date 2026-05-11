@@ -6,22 +6,14 @@ import type { Request, Response, NextFunction } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../../../shared/errors';
 import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
-// Extend Express Request to include authenticated user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
-  }
-}
-
 export function permission(requiredPermissions: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    if (!req.user) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
 
-    const userPermissions = req.user.permissions ?? [];
+    const userPermissions = user.permissions ?? [];
     const hasAllPermissions = requiredPermissions.every((perm) =>
       userPermissions.includes(perm),
     );
@@ -40,11 +32,12 @@ export function permission(requiredPermissions: string[]) {
 
 export function permissionAny(requiredPermissions: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    if (!req.user) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
       throw new UnauthorizedError('Authentication required');
     }
 
-    const userPermissions = req.user.permissions ?? [];
+    const userPermissions = user.permissions ?? [];
     const hasAnyPermission = requiredPermissions.some((perm) => {
       if (perm.endsWith('*')) {
         const prefix = perm.slice(0, -1);
