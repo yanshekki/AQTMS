@@ -1,5 +1,6 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
 import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-exchange.adapter';
+import { WebsocketGateway } from '../websocket/websocket.gateway';
 
 @Injectable()
 export class MarketDataService {
@@ -7,10 +8,14 @@ export class MarketDataService {
 
   // Simple in-memory cache (TTL based)
   private cache = new Map<string, { data: any; expiresAt: number }>();
-  private readonly CACHE_TTL_MS = 10_000; // 10 seconds cache for prices
+  private readonly CACHE_TTL_MS = 5_000; // 5 seconds for real-time feel
+
+  // Active price streaming intervals per symbol
+  private priceStreams = new Map<string, NodeJS.Timeout>();
 
   constructor(
     @Optional() private readonly ccxtAdapter?: CcxtExchangeAdapter,
+    @Optional() @Inject(forwardRef(() => WebsocketGateway)) private readonly websocketGateway?: WebsocketGateway,
   ) {}
 
   private getCacheKey(method: string, symbol: string, exchange: string, extra?: string): string {
@@ -41,13 +46,54 @@ export class MarketDataService {
       } catch (error) {
         lastError = error;
         if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 300; // exponential backoff
+          const delay = Math.pow(2, attempt) * 300;
           this.logger.warn(`Retry attempt ${attempt} after ${delay}ms`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
     throw lastError;
+  }
+
+  /**
+   * Start real-time price streaming for a symbol (pushes via WebSocket)
+   */
+  async startPriceStreaming(symbol: string, exchange: string = 'binance', intervalMs: number = 3000) {
+    const streamKey = `${exchange}:${symbol}`;
+
+    if (this.priceStreams.has(streamKey)) {
+      this.logger.warn(`Price streaming already active for ${symbol}`);
+      return;
+    }
+
+    this.logger.log(`Starting real-time price streaming for ${symbol} on ${exchange}`);
+
+    const interval = setInterval(async () => {
+      try {
+        const price = await this.getPrice(symbol, exchange);
+        if (price > 0 && this.websocketGateway) {
+          this.websocketGateway.pushPriceUpdate(symbol, price, Date.now());
+        }
+      } catch (error) {
+        this.logger.error(`Error in price stream for ${symbol}: ${error.message}`);
+      }
+    }, intervalMs);
+
+    this.priceStreams.set(streamKey, interval);
+  }
+
+  /**
+   * Stop real-time price streaming for a symbol
+   */
+  stopPriceStreaming(symbol: string, exchange: string = 'binance') {
+    const streamKey = `${exchange}:${symbol}`;
+    const interval = this.priceStreams.get(streamKey);
+
+    if (interval) {
+      clearInterval(interval);
+      this.priceStreams.delete(streamKey);
+      this.logger.log(`Stopped price streaming for ${symbol}`);
+    }
   }
 
   /**
@@ -84,7 +130,7 @@ export class MarketDataService {
   }
 
   /**
-   * Get current price for a symbol
+   * Get current price for a symbol (with cache)
    */
   async getPrice(symbol: string, exchange: string = 'binance'): Promise<number> {
     const cacheKey = this.getCacheKey('price', symbol, exchange);
@@ -151,5 +197,13 @@ export class MarketDataService {
       this.logger.error(`Failed to get real ticker: ${error.message}`);
       throw error;
     }
+  }
+
+  onModuleDestroy() {
+    // Clean up all active streams on shutdown
+    for (const [key, interval] of this.priceStreams.entries()) {
+      clearInterval(interval);
+    }
+    this.priceStreams.clear();
   }
 }
