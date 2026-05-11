@@ -13,6 +13,8 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1000
   fsGroup: 2000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
 
 resources:
   requests:
@@ -46,15 +48,13 @@ env:
   NODE_ENV: production
   LOG_LEVEL: info
   CORS_ORIGIN: "*"
-  # Testnet / Live mode control
-  ENABLE_TESTNET: "true"
-  # Feature flags for testing
+  ENABLE_TESTNET: "false"   # Set to true only in staging
   ENABLE_PAPER_TRADING: "true"
   ENABLE_KILL_SWITCH: "true"
 
 secret:
   enabled: true
-  existingSecret: aqtms-backend-secrets
+  existingSecret: aqtms-backend-secrets   # Recommended: manage via External Secrets Operator or SealedSecrets
   keys:
     - JWT_SECRET
     - ENCRYPTION_SECRET
@@ -64,6 +64,7 @@ secret:
     - BINANCE_API_SECRET
     - BYBIT_API_KEY
     - BYBIT_API_SECRET
+    - TELEGRAM_BOT_TOKEN
 
 ingress:
   enabled: true
@@ -76,10 +77,11 @@ ingress:
 monitoring:
   enabled: true
   serviceMonitor: true
+  prometheusRule: true
 
-# For testnet vs live configuration
 config:
   testnet:
-    enabled: true
-    binanceTestnet: true
-    bybitTestnet: true
+    enabled: false
+  production:
+    enableResourceQuotas: true
+    enableNetworkPolicies: true
