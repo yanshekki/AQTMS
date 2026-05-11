@@ -53,6 +53,7 @@ Key alerts include:
 - HighRiskExposure (Warning)
 - StrategyExecutionFailure (Critical)
 - WebSocketConnectionDown (Warning)
+- HighDatabaseLatency (Warning)
 
 ## 4. Common Operations
 
