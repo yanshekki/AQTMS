@@ -10,6 +10,7 @@ import {
   TradeResponseDtoSchema,
 } from '../dto';
 import { ValidationError } from '../../../shared/errors';
+import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
 export class TradeController {
   constructor(
@@ -25,10 +26,10 @@ export class TradeController {
         parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      const trade = await this.executeTradeUseCase.execute(parseResult.data, userId);
+      const trade = await this.executeTradeUseCase.execute(parseResult.data, user.userId);
       const responseDto = TradeResponseDtoSchema.parse(trade);
 
       res.status(201).json({
@@ -49,10 +50,10 @@ export class TradeController {
         parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
-      const userId = req.user?.userId;
-      if (!userId) throw new ValidationError('User not authenticated');
+      const user = req.user as AuthenticatedUser | undefined;
+      if (!user?.userId) throw new ValidationError('User not authenticated');
 
-      const trade = await this.cancelTradeUseCase.execute(parseResult.data, userId);
+      const trade = await this.cancelTradeUseCase.execute(parseResult.data, user.userId);
       const responseDto = TradeResponseDtoSchema.parse(trade);
 
       res.status(200).json({
