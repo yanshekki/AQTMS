@@ -8,6 +8,7 @@ import { withRetry } from '../common/utils/retry.util';
 import { CircuitBreaker } from '../common/utils/circuit-breaker';
 import { NotificationService } from '../notification/notification.service';
 import { WebsocketGateway } from '../websocket/websocket.gateway';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class ExecutionService {
@@ -22,6 +23,7 @@ export class ExecutionService {
     @Optional() private readonly ccxtAdapter?: CcxtExchangeAdapter,
     @Optional() private readonly notificationService?: NotificationService,
     @Optional() @Inject(forwardRef(() => WebsocketGateway)) private readonly websocketGateway?: WebsocketGateway,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
   async executeOrder(orderData: any, authenticatedUserId?: string): Promise<any> {
@@ -31,6 +33,9 @@ export class ExecutionService {
 
     const riskResult = await this.riskService.evaluateRisk(orderData);
     if (!riskResult.passed) {
+      if (this.auditService) {
+        this.auditService.logEvent('ORDER_RISK_REJECTED', userId, { symbol: orderData.symbol, reasons: riskResult.reasons });
+      }
       throw new BadRequestException({ message: 'Risk check failed', reasons: riskResult.reasons });
     }
 
@@ -42,6 +47,9 @@ export class ExecutionService {
       if (isKillSwitchActive) {
         if (this.notificationService) {
           await this.notificationService.notifyKillSwitchActivated(userId, 'Order blocked');
+        }
+        if (this.auditService) {
+          this.auditService.logEvent('ORDER_BLOCKED_KILL_SWITCH', userId, { symbol: orderData.symbol });
         }
         throw new BadRequestException({ message: 'Kill Switch is active' });
       }
@@ -55,6 +63,16 @@ export class ExecutionService {
     } else {
       result = await this.executeRealOrder(orderData, isTestnet ? 'TESTNET' : 'LIVE', userId);
       await this.syncPositionAfterExecution(result, orderData, userId);
+    }
+
+    // Audit successful order
+    if (this.auditService) {
+      this.auditService.logEvent('ORDER_EXECUTED', userId, {
+        symbol: orderData.symbol,
+        side: orderData.side,
+        quantity: orderData.quantity,
+        mode: isPaper ? 'PAPER' : isTestnet ? 'TESTNET' : 'LIVE',
+      });
     }
 
     // Push real-time updates via WebSocket
