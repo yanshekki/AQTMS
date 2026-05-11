@@ -1,4 +1,4 @@
-// ── Backtest Page (Responsive + Theme-aware) ──
+// ── Backtest Page (Professional + Real-time Ready) ──
 
 import { useState } from 'react';
 import {
@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { useThemeMode } from '@/app/Providers';
 import { TradingViewChart } from '@/features/chart';
 import type { ChartCandle, ChartMarker, TimeFrame } from '@/features/chart';
+import { useRealTimePrice } from '@/hooks/useRealTimePrice';
 
 const BacktestResponseSchema = z.object({
   success: z.literal(true),
@@ -54,6 +55,9 @@ export function BacktestPage() {
   const [chartMarkers, setChartMarkers] = useState<ChartMarker[]>([]);
   const [chartTimeframe, setChartTimeframe] = useState<TimeFrame>('1H');
 
+  // Real-time price for the selected symbol
+  const { prices: realTimePrices, isConnected } = useRealTimePrice([symbol]);
+
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
   const cardBg = isDark ? 'rgba(17,24,39,0.7)' : 'rgba(255,255,255,0.7)';
@@ -88,7 +92,7 @@ export function BacktestPage() {
         const markers: ChartMarker[] = response.data.trades.map((tr) => ({
           time: Math.floor(new Date(tr.timestamp).getTime() / 1000),
           position: tr.side === 'BUY' ? 'belowBar' : 'aboveBar',
-          color: tr.side === 'BUY' ? '#22c55e' : '#ef4444',
+          color: tr.side === 'BUY' ? '#22c55e' : '#ef444e',
           shape: tr.side === 'BUY' ? 'arrowUp' : 'arrowDown',
           text: tr.side === 'BUY' ? 'BUY' : 'SELL',
           size: 2,
@@ -146,10 +150,10 @@ export function BacktestPage() {
             <>
               <Grid container spacing={1.5} mb={2}>
                 {[
-                  { label: t('backtest.metrics.totalReturn'), value: `${result.totalReturn}%`, color: result.totalReturn >= 0 ? '#22c55e' : '#ef4444' },
+                  { label: t('backtest.metrics.totalReturn'), value: `${result.totalReturn}%`, color: result.totalReturn >= 0 ? '#22c55e' : '#ef444e' },
                   { label: t('backtest.metrics.winRate'), value: `${result.winRate}%`, color: result.winRate >= 50 ? '#22c55e' : '#f59e0b' },
                   { label: t('backtest.metrics.sharpe'), value: result.sharpeRatio.toFixed(2), color: result.sharpeRatio >= 1 ? '#22c55e' : '#f59e0b' },
-                  { label: t('backtest.metrics.maxDD'), value: `${result.maxDrawdown}%`, color: result.maxDrawdown <= 20 ? '#22c55e' : '#ef4444' },
+                  { label: t('backtest.metrics.maxDD'), value: `${result.maxDrawdown}%`, color: result.maxDrawdown <= 20 ? '#22c55e' : '#ef444e' },
                   { label: t('backtest.metrics.profitFactor'), value: result.profitFactor === Infinity ? '∞' : result.profitFactor.toFixed(2), color: '#3b82f6' },
                   { label: t('backtest.metrics.trades'), value: result.totalTrades.toString(), color: mutedText },
                 ].map((m) => (
@@ -223,7 +227,7 @@ export function BacktestPage() {
                       <XAxis dataKey="time" tick={false} />
                       <YAxis stroke={mutedText} fontSize={11} domain={[0, 'auto']} reversed />
                       <Tooltip formatter={(v) => [`${Number(v).toFixed(2)}%`, t('backtest.charts.drawdown')]} />
-                      <Line type="monotone" dataKey="drawdown" stroke="#ef4444" fill="#ef444420" dot={false} strokeWidth={1.5} />
+                      <Line type="monotone" dataKey="drawdown" stroke="#ef444e" fill="#ef444e20" dot={false} strokeWidth={1.5} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -236,17 +240,17 @@ export function BacktestPage() {
                       <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.time')}</TableCell>
                       <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.side')}</TableCell>
                       <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.price')}</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{t('backtest.tableHeaders.pnl')}</TableCell>
-                      <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor, display: { xs: 'none', sm: 'table-cell' } }}>{t('backtest.tableHeaders.reason')}</TableCell>
+                      <TableCell sx={{ color: (tr.pnl ?? 0) >= 0 ? '#22c55e' : '#ef444e', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.pnl !== null ? `$${tr.pnl.toFixed(2)}` : '—'}</TableCell>
+                      <TableCell sx={{ color: mutedText, fontSize: '0.65rem', borderColor, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>{tr.reason}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {result.trades.slice(-20).reverse().map((tr, i) => (
                       <TableRow key={i} hover>
                         <TableCell sx={{ color: mutedText, fontSize: '0.7rem', borderColor }}>{new Date(tr.timestamp).toLocaleDateString()}</TableCell>
-                        <TableCell sx={{ color: tr.side === 'BUY' ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.side}</TableCell>
+                        <TableCell sx={{ color: tr.side === 'BUY' ? '#22c55e' : '#ef444e', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.side}</TableCell>
                         <TableCell sx={{ color: primaryText, fontSize: '0.7rem', borderColor }}>${tr.price.toFixed(2)}</TableCell>
-                        <TableCell sx={{ color: (tr.pnl ?? 0) >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.pnl !== null ? `$${tr.pnl.toFixed(2)}` : '—'}</TableCell>
+                        <TableCell sx={{ color: (tr.pnl ?? 0) >= 0 ? '#22c55e' : '#ef444e', fontSize: '0.7rem', borderColor, fontWeight: 600 }}>{tr.pnl !== null ? `$${tr.pnl.toFixed(2)}` : '—'}</TableCell>
                         <TableCell sx={{ color: mutedText, fontSize: '0.65rem', borderColor, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>{tr.reason}</TableCell>
                       </TableRow>
                     ))}
