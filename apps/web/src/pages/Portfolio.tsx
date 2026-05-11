@@ -1,4 +1,4 @@
-// ── Portfolio Dashboard (Professional Dark Theme + Real-time) ──
+// ── Portfolio Dashboard (Professional + Real-time Ready) ──
 
 import { usePortfolio } from '@/features/portfolio/model/usePortfolio';
 import { PortfolioSummary } from '@/features/portfolio/ui/PortfolioSummary';
@@ -44,7 +44,7 @@ export function PortfolioPage() {
         </Box>
 
         <Box display="flex" alignItems="center" gap={2}>
-          <Chip label="自動刷新中" color="success" size="small" variant="outlined" />
+          <Chip label="實時更新中" color="success" size="small" variant="outlined" />
           <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refresh} disabled={isLoading}>
             手動刷新
           </Button>
