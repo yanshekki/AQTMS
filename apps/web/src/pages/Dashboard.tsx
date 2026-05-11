@@ -1,13 +1,13 @@
-// Professional Trading Terminal - Phase A
+// Professional Trading Terminal with UX Optimizations - Phase D
 
 import React, { useState } from 'react';
 import {
   Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress,
-  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, ToggleButton, ToggleButtonGroup
+  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar } from 'recharts';
 
 interface OrderForm {
   symbol: string;
@@ -35,22 +35,31 @@ export default function Dashboard() {
     trailingOffset: 50,
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   // Portfolio Summary
-  const { data: summary, isLoading: isLoadingSummary } = useQuery({
+  const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary } = useQuery({
     queryKey: ['portfolio-summary'],
-    queryFn: async () => (await axios.get('/api/portfolio/summary')).data,
+    queryFn: async () => {
+      const res = await axios.get('/api/portfolio/summary');
+      setLastUpdated(new Date());
+      return res.data;
+    },
     refetchInterval: 15000,
   });
 
   // Live Positions
-  const { data: positions = [], isLoading: isLoadingPositions } = useQuery({
+  const { data: positions = [], isLoading: isLoadingPositions, refetch: refetchPositions } = useQuery({
     queryKey: ['positions'],
-    queryFn: async () => (await axios.get('/api/portfolio/positions')).data,
+    queryFn: async () => {
+      const res = await axios.get('/api/portfolio/positions');
+      setLastUpdated(new Date());
+      return res.data;
+    },
     refetchInterval: 10000,
   });
 
-  // Price History for Chart
+  // Price History
   const { data: priceData = [] } = useQuery({
     queryKey: ['price-history', orderForm.symbol],
     queryFn: async () => {
@@ -70,12 +79,12 @@ export default function Dashboard() {
     refetchInterval: 4000,
   });
 
-  // Real Depth Data (prepare for real API)
+  // Depth Data
   const { data: depthData = [] } = useQuery({
     queryKey: ['depth', orderForm.symbol],
     queryFn: async () => {
       try {
-        const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}&limit=20`);
+        const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}`);
         return res.data || generateMockDepth(currentPrice);
       } catch {
         return generateMockDepth(currentPrice);
@@ -97,14 +106,12 @@ export default function Dashboard() {
     ];
   }
 
-  // Portfolio Performance Data
   const performanceData = [
     { time: '09:00', pnl: 120 }, { time: '10:00', pnl: 280 }, { time: '11:00', pnl: 195 },
     { time: '12:00', pnl: 420 }, { time: '13:00', pnl: 380 }, { time: '14:00', pnl: 610 },
     { time: '15:00', pnl: 540 },
   ];
 
-  // Place Order
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
     onSuccess: () => {
@@ -114,7 +121,7 @@ export default function Dashboard() {
       setOrderForm(prev => ({ ...prev, quantity: 0.001, price: 0, stopLoss: 0, takeProfit: 0 }));
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || error.message || 'Order failed';
+      const message = error.response?.data?.message || error.message || 'Order failed. Please try again.';
       setSnackbar({ open: true, message, severity: 'error' });
     },
   });
@@ -133,7 +140,7 @@ export default function Dashboard() {
       exchangeAccountId: currentMode === 'PAPER' ? 'demo-paper' : 'demo-testnet',
     };
 
-    if (orderForm.type === 'LIMIT') orderData.price = orderForm.price;
+    if (['LIMIT', 'STOP'].includes(orderForm.type)) orderData.price = orderForm.price;
     if (orderForm.stopLoss > 0) orderData.stopLoss = orderForm.stopLoss;
     if (orderForm.takeProfit > 0) orderData.takeProfit = orderForm.takeProfit;
     if (orderForm.type === 'TRAILING_STOP') orderData.trailingOffset = orderForm.trailingOffset;
@@ -145,13 +152,29 @@ export default function Dashboard() {
     setOrderForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleManualRefresh = () => {
+    refetchSummary();
+    refetchPositions();
+    setLastUpdated(new Date());
+  };
+
   if (isLoadingSummary || isLoadingPositions) return <LinearProgress />;
 
   const totalUnrealizedPnl = positions.reduce((sum: number, p: any) => sum + (p.unrealizedPnl || 0), 0);
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Trading Terminal</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h4">Trading Terminal</Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography variant="caption" color="text.secondary">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </Typography>
+          <Button variant="outlined" size="small" onClick={handleManualRefresh}>
+            Refresh
+          </Button>
+        </Stack>
+      </Stack>
 
       {/* Mode Selector */}
       <Card sx={{ mb: 3 }}>
@@ -168,44 +191,35 @@ export default function Dashboard() {
       </Card>
 
       <Grid container spacing={3}>
-        {/* Quick Order Panel with Advanced Types */}
+        {/* Quick Order Panel */}
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>Quick Order</Typography>
-
               <Stack spacing={2}>
                 <TextField label="Symbol" value={orderForm.symbol} onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())} fullWidth />
-
                 <TextField select label="Side" value={orderForm.side} onChange={(e) => handleInputChange('side', e.target.value)} fullWidth>
                   <MenuItem value="BUY">BUY</MenuItem>
                   <MenuItem value="SELL">SELL</MenuItem>
                 </TextField>
-
                 <TextField select label="Order Type" value={orderForm.type} onChange={(e) => handleInputChange('type', e.target.value)} fullWidth>
                   <MenuItem value="MARKET">MARKET</MenuItem>
                   <MenuItem value="LIMIT">LIMIT</MenuItem>
                   <MenuItem value="STOP">STOP LOSS</MenuItem>
                   <MenuItem value="TRAILING_STOP">TRAILING STOP</MenuItem>
                 </TextField>
-
                 <TextField label="Quantity" type="number" value={orderForm.quantity} onChange={(e) => handleInputChange('quantity', parseFloat(e.target.value))} fullWidth inputProps={{ step: 0.001 }} />
-
-                {(orderForm.type === 'LIMIT' || orderForm.type === 'STOP') && (
+                {['LIMIT', 'STOP'].includes(orderForm.type) && (
                   <TextField label={orderForm.type === 'LIMIT' ? 'Limit Price' : 'Stop Price'} type="number" value={orderForm.price} onChange={(e) => handleInputChange('price', parseFloat(e.target.value))} fullWidth />
                 )}
-
                 {orderForm.type === 'TRAILING_STOP' && (
                   <TextField label="Trailing Offset (USD)" type="number" value={orderForm.trailingOffset} onChange={(e) => handleInputChange('trailingOffset', parseFloat(e.target.value))} fullWidth />
                 )}
-
                 <TextField label="Stop Loss (optional)" type="number" value={orderForm.stopLoss} onChange={(e) => handleInputChange('stopLoss', parseFloat(e.target.value))} fullWidth />
                 <TextField label="Take Profit (optional)" type="number" value={orderForm.takeProfit} onChange={(e) => handleInputChange('takeProfit', parseFloat(e.target.value))} fullWidth />
-
                 <Typography variant="body2" color="text.secondary">Current Price: {currentPrice ? `$${currentPrice}` : 'Loading...'}</Typography>
-
                 <Button variant="contained" color={orderForm.side === 'BUY' ? 'success' : 'error'} size="large" onClick={handlePlaceOrder} disabled={placeOrder.isPending}>
-                  {placeOrder.isPending ? 'Placing Order...' : `${orderForm.side} ${orderForm.symbol}`}
+                  {placeOrder.isPending ? 'Placing...' : `${orderForm.side} ${orderForm.symbol}`}
                 </Button>
               </Stack>
             </CardContent>
@@ -249,11 +263,11 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Professional Price Chart */}
+        {/* Price Chart */}
         <Grid item xs={12} md={7}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol} (Real-time)</Typography>
+              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol}</Typography>
               <Box sx={{ height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={priceData}>
@@ -265,16 +279,15 @@ export default function Dashboard() {
                   </LineChart>
                 </ResponsiveContainer>
               </Box>
-              <Typography variant="caption" color="text.secondary">Updates every ~8 seconds • Ready for TradingView Lightweight Charts integration</Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Market Depth Chart */}
+        {/* Market Depth */}
         <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Market Depth (Bids / Asks)</Typography>
+              <Typography variant="h6" gutterBottom>Market Depth</Typography>
               <Box sx={{ height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={depthData}>
@@ -287,7 +300,6 @@ export default function Dashboard() {
                   </ComposedChart>
                 </ResponsiveContainer>
               </Box>
-              <Typography variant="caption" color="text.secondary">Connected to /api/market-data/depth (falls back to simulation)</Typography>
             </CardContent>
           </Card>
         </Grid>
