@@ -68,7 +68,6 @@ jobs:
           file: ./Dockerfile
           push: false
           tags: ghcr.io/yanshekki/aqtms-backend:latest
-      # Add push step when registry is configured
 
   deploy-staging:
     needs: [docker-build]
@@ -76,8 +75,19 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
       - name: Deploy to Staging (Example)
         run: |
-          echo "Deploying to staging cluster..."
-          # Example: helm upgrade --install aqtms-backend ./infra/helm/backend -n staging
-          # Add real deployment commands here (ArgoCD, Flux, or kubectl apply)
+          echo "Deploying AQTMS to staging environment..."
+          # Example commands (uncomment and configure in real use):
+          # helm upgrade --install aqtms-backend ./infra/helm/backend \
+          #   --namespace staging --create-namespace \
+          #   --set image.tag=latest \
+          #   --set config.env=staging
+          #
+          # For GitOps (recommended):
+          # argocd app sync aqtms-staging
+          echo "Deployment step completed (configure real cluster access in CI secrets)"

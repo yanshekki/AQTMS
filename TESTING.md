@@ -1,45 +1,32 @@
-# AQTMS Testing Guide (Updated Phase E)
+# AQTMS Testing & Deployment Guide (Updated Phase D)
 
 ## Quick Start for New Traders
 
-1. **Connect Wallet** (Frontend)
-   - Go to Dashboard
-   - Click "Connect Wallet" (EIP-191 signature)
-   - Get JWT token automatically
-
-2. **Add Exchange Account**
-   - Go to Exchanges page
-   - Connect Binance/Bybit (Testnet recommended first)
-   - Toggle Paper Trading mode
-
-3. **First Paper Trade**
-   - Go to Dashboard (Trading Terminal)
-   - Select PAPER mode
-   - Place a small MARKET BUY order
-   - Check Live Positions table for real-time PnL
-
-4. **Run Backtest**
-   - Go to Strategies page
-   - Create or select a strategy
-   - Click "Run Backtest"
-   - Review advanced metrics (Sharpe, Sortino, Expectancy)
-
-5. **Deploy Strategy (Simulated)**
-   - On Strategies page, click "Deploy Live"
-   - Monitor via Performance Tracking tab
+1. Connect Wallet → Get JWT
+2. Add Exchange (Testnet first)
+3. Use Dashboard Trading Terminal for quick orders
+4. Create & Backtest strategies on Strategies page
+5. Deploy strategy (now runs automatically via StrategyRunner)
 
 ## E2E Test Coverage
 - Paper order placement
+- Trading terminal flow
+- Strategy deployment
 - Environment validation
-- Strategy backtest flow
-- Position synchronization
-- Kill Switch enforcement
+- Kill Switch & Risk checks
 
-Run all E2E:
+Run E2E:
 ```bash
 cd apps/backend
 pnpm test:e2e
 ```
 
-## Recommended Test Flow
-Paper Trading → Testnet small size → Full Live (with Kill Switch active)
+## CI/CD Pipeline
+- Automatic lint, type check, build, and E2E on every push/PR
+- Docker image build on main
+- Deployment job example included (configure real cluster in CI secrets)
+
+## Recommended Production Flow
+Paper Trading → Testnet validation → Small live trades (with Kill Switch enabled)
+
+For full deployment instructions, see DEPLOYMENT_OPTIMIZATION.md
