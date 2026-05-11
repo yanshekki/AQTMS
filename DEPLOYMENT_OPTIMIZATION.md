@@ -1,28 +1,33 @@
-# AQTMS Production Deployment Optimization (Phase D - Observability)
+# AQTMS Production Deployment Optimization (Phase C - Full Observability)
 
-## Grafana Dashboard
-- Added example dashboard: `infra/grafana/aqtms-overview-dashboard.json`
-- Covers: Backend health, Kill Switch, Execution latency, Reconciliation issues, Active positions
+## Grafana Dashboards
+- Basic overview: `infra/grafana/aqtms-overview-dashboard.json`
+- Full observability (metrics + logs + traces): `infra/grafana/aqtms-full-observability-dashboard.json`
 
-## Enhanced Alerting
-- Added more Prometheus alerts:
-  - High memory usage
-  - High CPU usage
-  - Existing: BackendDown, KillSwitchActive, HighExecutionLatency, ReconciliationDiscrepancies
+## Loki (Logs)
+1. Install Loki + Promtail via Helm
+2. Configure Promtail to scrape backend logs
+3. Add Loki datasource in Grafana
+4. Use LogQL queries in dashboards
 
-## Distributed Tracing (Recommended)
-For production observability, add OpenTelemetry:
-
-```yaml
-# Example env vars for backend
-OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
-OTEL_SERVICE_NAME: aqtms-backend
+## Distributed Tracing (Tempo / Jaeger)
+### Backend Configuration
+Add to your backend `.env` or Helm values:
+```env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+OTEL_SERVICE_NAME=aqtms-backend
+OTEL_TRACES_SAMPLER=always_on
 ```
 
-Integrate `@opentelemetry/auto-instrumentations-node` in NestJS for automatic tracing of HTTP, Prisma, Redis, etc.
+### Recommended Setup
+- Use OpenTelemetry Collector as sidecar or daemonset
+- Export traces to Tempo (Grafana) or Jaeger
+- Instrument NestJS with `@opentelemetry/auto-instrumentations-node`
 
-## Recommended Stack
-- Prometheus + Grafana (metrics + dashboards)
-- Loki + Promtail (logs)
-- Tempo or Jaeger (tracing)
-- Alertmanager (alert routing)
+## Full Observability Stack Recommendation
+- **Metrics**: Prometheus + Grafana
+- **Logs**: Loki + Promtail
+- **Traces**: Tempo (or Jaeger)
+- **Alerting**: Alertmanager + PagerDuty / Slack
+
+This gives you complete visibility into trading execution, risk decisions, and system health.
