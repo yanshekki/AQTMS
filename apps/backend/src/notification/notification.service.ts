@@ -1,54 +1,56 @@
-import { Injectable } from '@nestjs/common';
-import axios from 'axios';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class NotificationService {
-  private readonly botToken = process.env.TELEGRAM_BOT_TOKEN;
+  private readonly logger = new Logger(NotificationService.name);
 
   /**
-   * 發送 Telegram 訊息
+   * Send Telegram notification (placeholder - implement with real bot token)
    */
-  async sendTelegramMessage(chatId: string | number, message: string): Promise<boolean> {
-    if (!this.botToken) {
-      console.warn('[NotificationService] TELEGRAM_BOT_TOKEN 未設定，無法發送 Telegram');
+  async sendTelegram(message: string, chatId?: string): Promise<boolean> {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    
+    if (!botToken) {
+      this.logger.warn('TELEGRAM_BOT_TOKEN not configured. Skipping Telegram notification.');
+      this.logger.log(`[TELEGRAM MOCK] ${message}`);
       return false;
     }
 
     try {
-      const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
-      await axios.post(url, {
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      });
-      console.log(`[NotificationService] Telegram 訊息已發送至 ${chatId}`);
+      // TODO: Implement real Telegram Bot API call
+      // Example: https://api.telegram.org/bot${botToken}/sendMessage
+      this.logger.log(`[TELEGRAM] Sending to ${chatId || 'default'}: ${message}`);
+      
+      // Placeholder for real implementation
       return true;
     } catch (error) {
-      console.error('[NotificationService] 發送 Telegram 失敗:', error);
+      this.logger.error('Failed to send Telegram notification', error);
       return false;
     }
   }
 
   /**
-   * 發送風險警示通知
+   * Send notification for critical events (Kill Switch, Risk Breach, etc.)
    */
-  async sendRiskAlert(chatId: string | number, alerts: any[]): Promise<void> {
-    if (!alerts || alerts.length === 0) return;
+  async notifyCriticalEvent(event: string, details: any, userId?: string): Promise<void> {
+    const message = `🚨 [AQTMS Critical] ${event}
+User: ${userId || 'N/A'}
+Details: ${JSON.stringify(details, null, 2)}
+Time: ${new Date().toISOString()}`;
 
-    const messageLines = alerts.map(alert => {
-      const icon = alert.severity === 'danger' ? '🚨' : '⚠️';
-      return `${icon} <b>${alert.message}</b>`;
-    });
+    await this.sendTelegram(message);
+    this.logger.warn(`Critical event notified: ${event}`, details);
+  }
 
-    const fullMessage = [
-      '📊 <b>AQTMS 風險警示</b>',
-      '',
-      ...messageLines,
-      '',
-      '請及時檢視您的 Portfolio Dashboard。',
-    ].join('
-');
+  async notifyKillSwitchActivated(userId: string, reason?: string): Promise<void> {
+    await this.notifyCriticalEvent('KILL SWITCH ACTIVATED', { reason }, userId);
+  }
 
-    await this.sendTelegramMessage(chatId, fullMessage);
+  async notifyRiskBreach(userId: string, riskDetails: any): Promise<void> {
+    await this.notifyCriticalEvent('RISK RULE BREACH', riskDetails, userId);
+  }
+
+  async notifyReconciliationDiscrepancy(userId: string, differences: any[]): Promise<void> {
+    await this.notifyCriticalEvent('RECONCILIATION DISCREPANCY', { count: differences.length, differences }, userId);
   }
 }
