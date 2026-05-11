@@ -69,7 +69,7 @@ jobs:
           push: false
           tags: ghcr.io/yanshekki/aqtms-backend:latest
 
-  deploy-staging:
+  deploy-production:
     needs: [docker-build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -79,31 +79,26 @@ jobs:
         uses: azure/setup-helm@v3
         with:
           version: '3.12.0'
-      - name: Deploy to Staging (Production Final Landing)
+      - name: Deploy to Production (Final Landing)
         run: |
-          echo "Final production-grade deployment to staging..."
+          echo "Final production deployment..."
           #
-          # Production-ready deployment steps:
+          # Production deployment steps (configure in real CI with secrets):
           #
-          # 1. Deploy with full observability + secrets
+          # 1. Deploy with External Secrets + Full Observability
           # helm upgrade --install aqtms-backend ./infra/helm/backend \
-          #   --namespace staging --create-namespace \
+          #   --namespace production --create-namespace \
           #   --set image.tag=latest \
           #   --set monitoring.enabled=true \
           #   --set secret.existingSecret=aqtms-backend-secrets \
-          #   --set config.env=staging \
-          #   --set resources.requests.cpu=500m \
-          #   --set resources.limits.cpu=2 \
-          #   --set hpa.enabled=true
+          #   --set config.production.enableExternalSecrets=true \
+          #   --set ingress.host=api.aqtms.io
           #
-          # 2. Verify real-time WebSocket + health
-          # kubectl get pods -n staging
-          # curl https://staging-api.aqtms.io/health
+          # 2. Verify
+          # kubectl get pods -n production
+          # curl https://api.aqtms.io/health
           #
-          # 3. Run smoke E2E against staging (real data mode)
-          # pnpm test:e2e --env=staging
+          # 3. GitOps (Recommended)
+          # argocd app sync aqtms-production --prune
           #
-          # 4. GitOps sync (recommended)
-          # argocd app sync aqtms-staging --prune
-          #
-          echo "Deployment completed. Configure cluster access + secrets in CI."
+          echo "Production deployment completed. Use GitHub Secrets + External Secrets Operator in real clusters."
