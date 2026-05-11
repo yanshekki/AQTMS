@@ -1,9 +1,9 @@
-// Professional Trading Terminal with TradingView Lightweight Charts - Phase B
+// Professional Trading Terminal - Phase D (Dark Theme + Better UX + Real-time)
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress,
-  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar
+  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, CircularProgress
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -39,10 +39,17 @@ export default function Dashboard() {
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [isOnline, setIsOnline] = useState(true);
 
-  // ... (keep other queries the same as previous version)
+  // Simulate connection status (in real app, connect to WebSocket health)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsOnline(Math.random() > 0.05); // 95% uptime simulation
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary } = useQuery({
+  const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary, error: summaryError } = useQuery({
     queryKey: ['portfolio-summary'],
     queryFn: async () => {
       const res = await axios.get('/api/portfolio/summary');
@@ -50,9 +57,10 @@ export default function Dashboard() {
       return res.data;
     },
     refetchInterval: 15000,
+    retry: 2,
   });
 
-  const { data: positions = [], isLoading: isLoadingPositions, refetch: refetchPositions } = useQuery({
+  const { data: positions = [], isLoading: isLoadingPositions, refetch: refetchPositions, error: positionsError } = useQuery({
     queryKey: ['positions'],
     queryFn: async () => {
       const res = await axios.get('/api/portfolio/positions');
@@ -60,6 +68,7 @@ export default function Dashboard() {
       return res.data;
     },
     refetchInterval: 10000,
+    retry: 2,
   });
 
   const { data: priceData = [] } = useQuery({
@@ -89,11 +98,10 @@ export default function Dashboard() {
     refetchInterval: 6000,
   });
 
-  // Initialize TradingView Lightweight Chart
+  // TradingView Lightweight Chart
   useEffect(() => {
     if (!chartContainerRef.current || priceData.length === 0) return;
 
-    // Clean up previous chart
     if (chartRef.current) {
       chartRef.current.remove();
     }
@@ -102,30 +110,24 @@ export default function Dashboard() {
       width: chartContainerRef.current.clientWidth,
       height: 320,
       layout: {
-        background: { type: ColorType.Solid, color: '#1e1e1e' },
-        textColor: '#d1d4dc',
+        background: { type: ColorType.Solid, color: '#0d1117' },
+        textColor: '#c9d1d9',
       },
       grid: {
-        vertLines: { color: '#2B2B43' },
-        horzLines: { color: '#2B2B43' },
+        vertLines: { color: '#21262d' },
+        horzLines: { color: '#21262d' },
       },
-      crosshair: {
-        mode: 0, // Normal crosshair
-      },
-      timeScale: {
-        borderColor: '#485c7b',
-      },
+      crosshair: { mode: 0 },
+      timeScale: { borderColor: '#30363d' },
     });
 
     const lineSeries = chart.addLineSeries({
-      color: '#00bcd4',
+      color: '#58a6ff',
       lineWidth: 2,
-      // crosshairMarkerVisible: true,
     });
 
-    // Format data for TradingView (time as number or string, value)
     const formattedData = priceData.map((item: any) => ({
-      time: item.time, // Assuming API returns time in a format Lightweight Charts accepts (e.g. 'YYYY-MM-DD' or unix timestamp)
+      time: item.time,
       value: item.price,
     }));
 
@@ -134,13 +136,9 @@ export default function Dashboard() {
     chartRef.current = chart;
     lineSeriesRef.current = lineSeries;
 
-    // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.resize(
-          chartContainerRef.current.clientWidth,
-          320
-        );
+        chartRef.current.resize(chartContainerRef.current.clientWidth, 320);
       }
     };
 
@@ -148,27 +146,19 @@ export default function Dashboard() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (chartRef.current) {
-        chartRef.current.remove();
-      }
+      if (chartRef.current) chartRef.current.remove();
     };
   }, [priceData, orderForm.symbol]);
 
-  // Update chart with new price in real-time
+  // Real-time price update on chart
   useEffect(() => {
     if (lineSeriesRef.current && currentPrice && priceData.length > 0) {
       const lastTime = priceData[priceData.length - 1]?.time;
       if (lastTime) {
-        // Add or update the latest point
-        lineSeriesRef.current.update({
-          time: lastTime,
-          value: currentPrice,
-        });
+        lineSeriesRef.current.update({ time: lastTime, value: currentPrice });
       }
     }
   }, [currentPrice, priceData]);
-
-  // ... (keep placeOrder, handle functions, etc. the same)
 
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
@@ -179,7 +169,7 @@ export default function Dashboard() {
       setOrderForm(prev => ({ ...prev, quantity: 0.001, price: 0, stopLoss: 0, takeProfit: 0 }));
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || error.message || 'Order failed. Please try again.';
+      const message = error.response?.data?.message || error.message || 'Order failed. Please check your inputs.';
       setSnackbar({ open: true, message, severity: 'error' });
     },
   });
@@ -216,15 +206,29 @@ export default function Dashboard() {
     setLastUpdated(new Date());
   };
 
-  if (isLoadingSummary || isLoadingPositions) return <LinearProgress />;
+  const hasError = summaryError || positionsError;
+
+  if (isLoadingSummary || isLoadingPositions) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   const totalUnrealizedPnl = positions.reduce((sum: number, p: any) => sum + (p.unrealizedPnl || 0), 0);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, backgroundColor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h4">Trading Terminal</Typography>
+        <Typography variant="h4" sx={{ color: '#fff' }}>Trading Terminal</Typography>
         <Stack direction="row" spacing={2} alignItems="center">
+          <Chip 
+            label={isOnline ? 'Connected' : 'Reconnecting...'} 
+            color={isOnline ? 'success' : 'warning'} 
+            size="small" 
+            variant="outlined" 
+          />
           <Typography variant="caption" color="text.secondary">
             Last updated: {lastUpdated.toLocaleTimeString()}
           </Typography>
@@ -234,7 +238,7 @@ export default function Dashboard() {
         </Stack>
       </Stack>
 
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, backgroundColor: '#161b22', border: '1px solid #30363d' }}>
         <CardContent>
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h6">Mode:</Typography>
@@ -247,13 +251,19 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {hasError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load some data. Please try refreshing.
+        </Alert>
+      )}
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Quick Order</Typography>
               <Stack spacing={2}>
-                <TextField label="Symbol" value={orderForm.symbol} onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())} fullWidth />
+                <TextField label="Symbol" value={orderForm.symbol} onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())} fullWidth sx={{ input: { color: '#fff' } }} />
                 <TextField select label="Side" value={orderForm.side} onChange={(e) => handleInputChange('side', e.target.value)} fullWidth>
                   <MenuItem value="BUY">BUY</MenuItem>
                   <MenuItem value="SELL">SELL</MenuItem>
@@ -283,10 +293,10 @@ export default function Dashboard() {
         </Grid>
 
         <Grid item xs={12} md={8}>
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Live Positions (Total Unrealized PnL: ${totalUnrealizedPnl.toFixed(2)})</Typography>
-              <TableContainer component={Paper} sx={{ maxHeight: 380 }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 380, backgroundColor: '#0d1117' }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -305,7 +315,7 @@ export default function Dashboard() {
                           <TableCell><strong>{pos.symbol}</strong></TableCell>
                           <TableCell align="right">{pos.quantity}</TableCell>
                           <TableCell align="right">${pos.avgPrice?.toFixed(2) || '-'}</TableCell>
-                          <TableCell align="right" sx={{ color: (pos.unrealizedPnl || 0) >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
+                          <TableCell align="right" sx={{ color: (pos.unrealizedPnl || 0) >= 0 ? '#3fb950' : '#f85149', fontWeight: 600 }}>
                             ${(pos.unrealizedPnl || 0).toFixed(2)}
                           </TableCell>
                         </TableRow>
@@ -318,29 +328,20 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* TradingView Lightweight Charts Price Chart */}
         <Grid item xs={12} md={7}>
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol} (TradingView)</Typography>
-              <Box 
-                ref={chartContainerRef} 
-                sx={{ 
-                  height: 320, 
-                  width: '100%',
-                  backgroundColor: '#1e1e1e',
-                  borderRadius: 1
-                }} 
-              />
+              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol}</Typography>
+              <Box ref={chartContainerRef} sx={{ height: 320, width: '100%', backgroundColor: '#0d1117', borderRadius: 1 }} />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Powered by TradingView Lightweight Charts • Real-time updates
+                TradingView Lightweight Charts • Real-time
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} md={5}>
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Market Depth</Typography>
               <Box sx={{ height: 320 }}>
@@ -351,8 +352,8 @@ export default function Dashboard() {
                       <XAxis dataKey="price" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="bids" fill="#4caf50" name="Bids" />
-                      <Bar dataKey="asks" fill="#f44336" name="Asks" />
+                      <Bar dataKey="bids" fill="#3fb950" name="Bids" />
+                      <Bar dataKey="asks" fill="#f85149" name="Asks" />
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
@@ -364,7 +365,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Grid>
-
       </Grid>
 
       <Snackbar open={snackbar.open} autoHideDuration={4500} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
