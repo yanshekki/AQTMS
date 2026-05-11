@@ -57,6 +57,7 @@ export function BacktestPage() {
 
   // Real-time price for the selected symbol
   const { prices: realTimePrices, isConnected } = useRealTimePrice([symbol]);
+  const currentPrice = realTimePrices[symbol];
 
   const primaryText = isDark ? '#f3f4f6' : '#0f172a';
   const mutedText = isDark ? '#9ca3af' : '#64748b';
@@ -167,6 +168,12 @@ export function BacktestPage() {
                   </Grid>
                 ))}
               </Grid>
+
+              {currentPrice && (
+                <Typography variant="body2" sx={{ color: '#00f0ff', mb: 1 }}>
+                  Current Price: ${currentPrice} {isConnected ? '🟢' : '🔴'}
+                </Typography>
+              )}
 
               {chartData.length > 0 && (
                 <Card sx={{ bgcolor: cardBgAlt, border: 1, borderColor, mb: 2, borderRadius: 3 }}>
