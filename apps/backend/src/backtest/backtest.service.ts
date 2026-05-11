@@ -3,39 +3,23 @@ import { strategyRegistry } from './strategy.registry';
 import { HistoricalDataService } from '../data/historical-data.service';
 import { Candle, Signal } from './interfaces/strategy.interface';
 
-export interface BacktestRequest {
+// ... (keep existing interfaces)
+
+export interface OptimizationRequest {
   strategyName: string;
-  strategyParams: Record<string, any>;
   symbol: string;
   startDate: Date;
   endDate: Date;
   initialCapital: number;
-  historicalBars?: Candle[];
-  exchange?: 'BINANCE' | 'BYBIT';
-  interval?: string;
+  paramRanges: Record<string, number[]>; // e.g. { shortPeriod: [5,10,15], longPeriod: [20,30,50] }
   feeRate?: number;
   slippageRate?: number;
 }
 
-export interface BacktestResult {
-  success: boolean;
-  totalReturn: number;
-  netReturn: number;
-  totalTrades: number;
-  winRate: number;
-  profitFactor: number;
-  maxDrawdown: number;
-  sharpeRatio: number;
-  sortinoRatio: number;      // New
-  expectancy: number;        // New
-  maxConsecutiveWins: number; // New
-  maxConsecutiveLosses: number; // New
-  avgWin: number;
-  avgLoss: number;
-  finalCapital: number;
-  totalFees: number;
-  equityCurve: number[];
-  trades: any[];
+export interface OptimizationResult {
+  bestParams: Record<string, number>;
+  bestMetrics: any;
+  allResults: Array<{ params: Record<string, number>; metrics: any }>;
 }
 
 @Injectable()
@@ -44,59 +28,72 @@ export class BacktestService {
 
   constructor(private readonly historicalDataService: HistoricalDataService) {}
 
-  async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
-    // ... (existing logic with fees and slippage)
-    // For brevity, I'll assume the core loop is similar to previous enhancement
+  // Existing runBacktest method remains...
 
-    // After the main loop calculations...
+  async optimizeParameters(request: OptimizationRequest): Promise<OptimizationResult> {
+    this.logger.log(`Running parameter optimization for ${request.strategyName}`);
 
-    // Calculate advanced metrics
-    const downsideReturns = returns.filter(r => r < 0);
-    const downsideDeviation = this.calculateStdDev(downsideReturns);
-    const sortinoRatio = downsideDeviation > 0 ? (avgReturn / downsideDeviation) * Math.sqrt(252) : 0;
+    const paramKeys = Object.keys(request.paramRanges);
+    const allCombinations = this.generateCombinations(request.paramRanges);
 
-    // Expectancy
-    const expectancy = (winRate / 100) * avgWin - ((100 - winRate) / 100) * Math.abs(avgLoss);
+    let bestScore = -Infinity;
+    let bestParams: Record<string, number> = {};
+    let bestMetrics: any = {};
+    const allResults: any[] = [];
 
-    // Streak analysis
-    let maxWinStreak = 0;
-    let maxLossStreak = 0;
-    let currentWinStreak = 0;
-    let currentLossStreak = 0;
+    for (const params of allCombinations) {
+      const backtestRequest = {
+        strategyName: request.strategyName,
+        strategyParams: params,
+        symbol: request.symbol,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        initialCapital: request.initialCapital,
+        feeRate: request.feeRate,
+        slippageRate: request.slippageRate,
+      };
 
-    for (const trade of trades) {
-      if ((trade.pnl || 0) > 0) {
-        currentWinStreak++;
-        currentLossStreak = 0;
-        maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-      } else if ((trade.pnl || 0) < 0) {
-        currentLossStreak++;
-        currentWinStreak = 0;
-        maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
+      const result = await this.runBacktest(backtestRequest);
+
+      // Score based on Sharpe + Profit Factor (customizable)
+      const score = (result.sharpeRatio || 0) * 0.6 + (result.profitFactor || 0) * 0.4;
+
+      allResults.push({ params, metrics: result });
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestParams = params;
+        bestMetrics = result;
       }
     }
 
+    this.logger.log(`Optimization complete. Best params: ${JSON.stringify(bestParams)}`);
+
     return {
-      success: true,
-      totalReturn: parseFloat(totalReturn.toFixed(2)),
-      netReturn: parseFloat(netReturn.toFixed(2)),
-      totalTrades: totalTradesCount,
-      winRate: parseFloat(winRate.toFixed(2)),
-      profitFactor: parseFloat(profitFactor.toFixed(2)),
-      maxDrawdown: parseFloat(maxDrawdown.toFixed(2)),
-      sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
-      sortinoRatio: parseFloat(sortinoRatio.toFixed(2)),
-      expectancy: parseFloat(expectancy.toFixed(2)),
-      maxConsecutiveWins: maxWinStreak,
-      maxConsecutiveLosses: maxLossStreak,
-      avgWin: parseFloat(avgWin.toFixed(2)),
-      avgLoss: parseFloat(avgLoss.toFixed(2)),
-      finalCapital: parseFloat(capital.toFixed(2)),
-      totalFees: parseFloat(totalFees.toFixed(2)),
-      equityCurve,
-      trades,
+      bestParams,
+      bestMetrics,
+      allResults: allResults.slice(0, 50), // limit results for response size
     };
   }
 
-  // ... (keep calculateStdDev and getEmptyResult)
+  private generateCombinations(ranges: Record<string, number[]>): Record<string, number>[] {
+    const keys = Object.keys(ranges);
+    if (keys.length === 0) return [{}];
+
+    const firstKey = keys[0];
+    const restKeys = keys.slice(1);
+    const restCombinations = this.generateCombinations(
+      Object.fromEntries(restKeys.map(k => [k, ranges[k]]))
+    );
+
+    const results: Record<string, number>[] = [];
+    for (const value of ranges[firstKey]) {
+      for (const rest of restCombinations) {
+        results.push({ [firstKey]: value, ...rest });
+      }
+    }
+    return results;
+  }
+
+  // ... keep existing private methods (calculateStdDev, getEmptyResult, etc.)
 }
