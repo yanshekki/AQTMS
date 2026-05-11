@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { IExchangeAdapter, PlaceOrderParams, OrderResult } from '../interfaces/exchange.adapter';
-import { OrderSide, OrderType } from '../types/order.types';
+import { OrderSide, OrderType } from '../interfaces/exchange.adapter';
 
 @Injectable()
 export class BinanceAdapter implements IExchangeAdapter {
@@ -20,7 +20,7 @@ export class BinanceAdapter implements IExchangeAdapter {
 
   async placeOrder(params: PlaceOrderParams): Promise<OrderResult> {
     // TODO: Implement real Binance order placement
-    return { success: true, orderId: 'demo-order' };
+    return { orderId: 'demo-order', exchangeOrderId: 'demo-order', symbol: params.symbol, side: params.side, type: params.type, status: 'NEW', quantity: params.quantity, filledQuantity: 0, timestamp: Date.now() };
   }
 
   async cancelOrder(orderId: string): Promise<boolean> {
@@ -35,14 +35,14 @@ export class BinanceAdapter implements IExchangeAdapter {
 
   async getPositions(): Promise<any[]> {
     const timestamp = Date.now();
-    const queryObj = { timestamp };
+    const queryObj = { timestamp: timestamp.toString() };
     const queryString = new URLSearchParams(queryObj).toString();
     const signature = this.createSignature(queryString);
 
     try {
       const response = await axios.get(`${this.baseUrl}/fapi/v2/positionRisk`, {
         params: {
-          ...queryObj,
+          timestamp,
           signature,
         },
         headers: {
@@ -65,14 +65,14 @@ export class BinanceAdapter implements IExchangeAdapter {
 
   async getAccountBalance(): Promise<any> {
     const timestamp = Date.now();
-    const queryObj = { timestamp };
+    const queryObj = { timestamp: timestamp.toString() };
     const queryString = new URLSearchParams(queryObj).toString();
     const signature = this.createSignature(queryString);
 
     try {
       const response = await axios.get(`${this.baseUrl}/api/v3/account`, {
         params: {
-          ...queryObj,
+          timestamp,
           signature,
         },
         headers: {

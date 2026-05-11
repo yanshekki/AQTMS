@@ -19,7 +19,7 @@ import {
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto } from '../order/dto/create-order.dto';
 import { ExecutionService } from '../execution/execution.service';
 import { IOrderRepository } from '../domain/repositories/order.repository.interface';
 import { Inject } from '@nestjs/common';
@@ -75,7 +75,7 @@ export class OrderController {
   @ApiOperation({ summary: 'Get orders for current user' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'List of orders' })
-  async getOrders(@Query('limit') limit?: string, @Req() req: Request): Promise<Order[]> {
+  async getOrders(@Req() req: Request, @Query('limit') limit?: string): Promise<Order[]> {
     const userId = (req.user as any)?.id;
     if (!userId) {
       return [];

@@ -31,10 +31,27 @@ export class InMemoryPositionRepository implements IPositionRepository {
     return position;
   }
 
-  async delete(symbol: string, exchangeAccountId: string): Promise<void> {
+  async delete(id: string): Promise<void> {
+    for (const [userId, posList] of this.positions.entries()) {
+      const filtered = posList.filter(p => p.id !== id);
+      this.positions.set(userId, filtered);
+    }
+  }
+
+  async deleteBySymbol(symbol: string, exchangeAccountId: string): Promise<void> {
     for (const [userId, posList] of this.positions.entries()) {
       const filtered = posList.filter(p => !(p.symbol === symbol && (p as any).exchangeAccountId === exchangeAccountId));
       this.positions.set(userId, filtered);
     }
+  }
+
+  async findByUserIdAndSymbol(userId: string, symbol: string): Promise<Position | null> {
+    const posList = this.positions.get(userId) || [];
+    return posList.find(p => p.symbol === symbol) || null;
+  }
+
+  async update(position: Position): Promise<Position> {
+    await this.save(position);
+    return position;
   }
 }

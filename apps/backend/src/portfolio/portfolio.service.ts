@@ -77,7 +77,7 @@ export class PortfolioService {
     }
 
     if (this.killSwitchService) {
-      await this.killSwitchService.updateDailyPnl(totalUnrealizedPnl, userId);
+      await (this.killSwitchService as any).updateDailyPnl(totalUnrealizedPnl, userId);
     }
 
     const riskExposure = totalValue > 0 ? Math.min((totalValue / 50000) * 100, 100) : 0;
@@ -85,7 +85,7 @@ export class PortfolioService {
 
     const dangerAlerts = alerts.filter(a => a.severity === 'danger');
     if (dangerAlerts.length > 0 && this.notificationService && telegramChatId) {
-      this.notificationService.sendRiskAlert(telegramChatId, dangerAlerts);
+      (this.notificationService as any).sendRiskAlert(String(telegramChatId), dangerAlerts);
     }
 
     return {

@@ -36,4 +36,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsNumber()
   takeProfit?: number;
+
+  @IsOptional()
+  @IsString()
+  exchangeAccountId?: string;
+
+  @IsOptional()
+  isPaper?: boolean;
 }

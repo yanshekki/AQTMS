@@ -1,4 +1,4 @@
-import { Processor, Process } from '@nestjs/bullmq';
+import { Processor } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -16,7 +16,6 @@ export class PortfolioSnapshotProcessor {
     private readonly portfolioService: PortfolioService,
   ) {}
 
-  @Process('create-snapshot')
   async handleCreateSnapshot(job: Job<{ userId: string; timestamp: Date }>) {
     const { userId, timestamp } = job.data;
     this.logger.log(`Processing create-snapshot job for user ${userId}`);

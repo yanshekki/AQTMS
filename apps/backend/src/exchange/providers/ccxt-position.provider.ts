@@ -46,7 +46,7 @@ export class CcxtPositionProvider implements ExchangePositionProvider {
       });
 
       // Fetch real positions from exchange
-      const rawPositions = await this.ccxtAdapter.getPositions(); // Assuming adapter has this method
+      const rawPositions = await this.ccxtAdapter.getPositions(account.id); // Using account.id as exchangeAccountId
 
       return rawPositions.map((pos: any) => ({
         symbol: pos.symbol,

@@ -110,7 +110,7 @@ export class MarketDataService implements OnModuleInit {
     }
 
     try {
-      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      await this.ccxtAdapter.initialize({ exchange: exchange as any, apiKey: '' });
       const ticker = await this.ccxtAdapter.getTicker(symbol);
       const price = ticker?.last || ticker?.close || 0;
       this.setCache(cacheKey, price);
@@ -127,7 +127,7 @@ export class MarketDataService implements OnModuleInit {
     }
 
     try {
-      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      await this.ccxtAdapter.initialize({ exchange: exchange as any, apiKey: '' });
       return await this.ccxtAdapter.getOHLCV(symbol, timeframe, limit);
     } catch (error: any) {
       this.logger.error(`Failed to get real candles for ${symbol}: ${error?.message}`);
@@ -141,7 +141,7 @@ export class MarketDataService implements OnModuleInit {
     }
 
     try {
-      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      await this.ccxtAdapter.initialize({ exchange: exchange as any, apiKey: '' });
       return await this.ccxtAdapter.getTicker(symbol);
     } catch (error: any) {
       this.logger.error(`Failed to get real ticker: ${error?.message}`);

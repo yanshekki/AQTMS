@@ -20,6 +20,20 @@ export class PrismaSignalRepository implements ISignalRepository {
     );
   }
 
+  async findById(id: string): Promise<Signal | null> {
+    const s = await this.prisma.signal.findUnique({ where: { id } });
+    return s ? this.mapToEntity(s) : null;
+  }
+
+  async findByUserId(userId: string): Promise<Signal[]> {
+    const prismaSignals = await this.prisma.signal.findMany({
+      where: { id: userId } as any,
+      take: 50,
+      orderBy: { timestamp: 'desc' },
+    });
+    return prismaSignals.map((s) => this.mapToEntity(s));
+  }
+
   async findBySymbol(symbol: string, limit = 50): Promise<Signal[]> {
     const prismaSignals = await this.prisma.signal.findMany({
       where: { symbol },

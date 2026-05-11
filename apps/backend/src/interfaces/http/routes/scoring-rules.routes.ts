@@ -101,7 +101,7 @@ export function createScoringRulesRoutes(): Router {
           name: body.name ?? existing.name,
           status: body.status ?? existing.status,
           enabled: body.enabled ?? existing.enabled,
-          weights: body.weights ?? existing.weights,
+          weights: (body.weights ?? existing.weights) as any,
           threshold: body.threshold ?? existing.threshold,
           action: body.action ?? existing.action,
         },

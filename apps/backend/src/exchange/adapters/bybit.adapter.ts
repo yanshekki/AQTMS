@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { IExchangeAdapter, PlaceOrderParams, OrderResult } from '../interfaces/exchange.adapter';
-import { OrderSide, OrderType } from '../types/order.types';
+import { OrderSide, OrderType } from '../interfaces/exchange.adapter';
 
 @Injectable()
 export class BybitAdapter implements IExchangeAdapter {

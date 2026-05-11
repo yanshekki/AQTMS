@@ -46,11 +46,13 @@ describe('OrderService', () => {
   it('should create an order with NEW status', async () => {
     const order = await service.createOrder({
       userId: 'user-1',
-      exchangeAccountId: 'acc-1',
+      exchange: 'acc-1',
       symbol: 'BTCUSDT',
       side: 'BUY',
       type: 'MARKET',
       quantity: 1,
+      status: OrderStatus.NEW,
+      filledQuantity: 0,
     });
 
     expect(order.status).toBe(OrderStatus.NEW);
@@ -62,25 +64,25 @@ describe('OrderService', () => {
       id: 'order-123',
       quantity: 2,
       filledQuantity: 0,
-      avgFillPrice: 0,
+      averageFillPrice: 0,
       status: OrderStatus.NEW,
     });
 
     const updated1 = await service.applyPartialFill('order-123', 1, 50000);
     expect(updated1?.filledQuantity).toBe(1);
-    expect(updated1?.avgFillPrice).toBe(50000);
+    expect(updated1?.averageFillPrice).toBe(50000);
 
     (orderRepository.findById as jest.Mock).mockResolvedValue({
       id: 'order-123',
       quantity: 2,
       filledQuantity: 1,
-      avgFillPrice: 50000,
+      averageFillPrice: 50000,
       status: OrderStatus.PARTIALLY_FILLED,
     });
 
     const updated2 = await service.applyPartialFill('order-123', 1, 51000);
     expect(updated2?.filledQuantity).toBe(2);
-    expect(updated2?.avgFillPrice).toBe(50500);
+    expect(updated2?.averageFillPrice).toBe(50500);
     expect(updated2?.status).toBe(OrderStatus.FILLED);
   });
 

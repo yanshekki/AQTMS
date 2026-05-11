@@ -10,7 +10,7 @@ export class OrderService {
     private readonly repository?: IOrderRepository,
   ) {}
 
-  async createOrder(orderData: Partial<Order>): Promise<Order> {
+  async createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> {
     if (!this.repository) {
       throw new Error('OrderRepository not available');
     }
@@ -40,7 +40,7 @@ export class OrderService {
 
     return this.repository.update(orderId, {
       filledQuantity: newFilled,
-      avgFillPrice: avgPrice,
+      averageFillPrice: avgPrice,
       status: newStatus,
     });
   }

@@ -22,7 +22,7 @@ export class StrategyRunnerService {
   ) {}
 
   async deployStrategy(strategyId: string, userId: string, isPaper: boolean = true): Promise<{ success: boolean; message: string }> {
-    const strategy = await this.prisma.strategy.findUnique({ where: { id: strategyId } });
+    const strategy = await (this.prisma as any).strategy.findUnique({ where: { id: strategyId } });
     if (!strategy) {
       return { success: false, message: 'Strategy not found' };
     }
@@ -53,7 +53,7 @@ export class StrategyRunnerService {
       if (!state.isRunning) continue;
 
       try {
-        const strategy = await this.prisma.strategy.findUnique({ where: { id: strategyId } });
+        const strategy = await (this.prisma as any).strategy.findUnique({ where: { id: strategyId } });
         if (!strategy) continue;
 
         const params = JSON.parse(strategy.params || '{}');

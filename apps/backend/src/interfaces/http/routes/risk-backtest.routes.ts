@@ -79,9 +79,9 @@ export function createBacktestRoutes(): Router {
             equityCurve: result.equityCurve,
             drawdownCurve: result.drawdownCurve,
             monthlyReturns: result.monthlyReturns,
-            trades: result.trades,
-            parameters: result.parameters,
-          },
+            trades: result.trades as any,
+            parameters: result.parameters as any,
+          } as any,
         });
       } catch (dbErr) {
         logger.warn({ dbErr }, 'Failed to persist backtest report');

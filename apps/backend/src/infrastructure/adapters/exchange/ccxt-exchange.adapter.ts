@@ -62,7 +62,7 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
 
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
-      const exchange = this.getExchangeInstance(params.exchange, params.testnet ?? false);
+      const exchange = this.getExchangeInstance(params.exchange || 'binance', params.testnet ?? false);
 
       const orderType = params.type === 'MARKET' ? 'market' : 'limit';
       const side = params.side.toLowerCase();

@@ -13,7 +13,7 @@ export class ExecutionController {
   getLogs(@Query() query: LogQuery) {
     return {
       success: true,
-      data: this.logger.getLogs(query),
+      data: (this.logger as any).getLogs(query),
       timestamp: new Date().toISOString(),
     };
   }

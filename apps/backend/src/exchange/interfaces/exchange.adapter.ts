@@ -1,4 +1,5 @@
-import { OrderSide, OrderType } from '../types/order.types';
+export type OrderSide = 'BUY' | 'SELL';
+export type OrderType = 'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'TAKE_PROFIT';
 
 export interface PlaceOrderParams {
   symbol: string;

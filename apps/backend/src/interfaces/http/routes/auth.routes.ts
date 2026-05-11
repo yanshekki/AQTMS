@@ -94,7 +94,7 @@ export function createAuthRoutes(): Router {
             walletAddress: normalizedAddress,
             nonce,
             role: 'VIEWER',
-            permissions: JSON.stringify(ROLE_PERMISSIONS.VIEWER),
+            permissions: JSON.stringify(ROLE_PERMISSIONS.VIEWER) as any,
           },
           update: { nonce },
         });
@@ -153,7 +153,7 @@ export function createAuthRoutes(): Router {
         });
 
         // Generate JWT
-        let permissions: string[] = JSON.parse(user.permissions || '[]') as string[];
+        let permissions: string[] = JSON.parse((user.permissions as any) || '[]') as string[];
         // Validate permissions against known list — prevent privilege escalation via DB manipulation
         permissions = permissions.filter((p) => VALID_PERMISSIONS.has(p));
         if (permissions.length === 0) {
@@ -237,7 +237,7 @@ export function createAuthRoutes(): Router {
         success: true,
         data: {
           ...user,
-          permissions: JSON.parse(user.permissions || '[]') as string[],
+          permissions: JSON.parse((user.permissions as any) || '[]') as string[],
         },
         timestamp: new Date().toISOString(),
       });

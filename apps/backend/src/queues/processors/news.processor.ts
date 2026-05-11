@@ -49,8 +49,8 @@ export class NewsProcessor extends WorkerHost {
 
         const tradeJob = {
           symbol,
-          side: simulatedResult.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
-          action: simulatedResult.score.suggestedAction === 'SELL' ? 'SELL' : 'BUY',
+          side: (simulatedResult.score.suggestedAction as string) === 'SELL' ? 'SELL' : 'BUY',
+          action: (simulatedResult.score.suggestedAction as string) === 'SELL' ? 'SELL' : 'BUY',
           quantity: suggestedSize,
           reason: `AI Signal ${simulatedResult.score.compositeScore}/100: ${simulatedResult.score.verdict} from news ${newsId}`,
           compositeScore: simulatedResult.score.compositeScore,
@@ -85,4 +85,10 @@ export class NewsProcessor extends WorkerHost {
   onFailed(job: Job, error: Error) {
     this.logger.error(`News job ${job.id} failed: ${error.message}`);
   }
+}
+
+// Legacy enqueueNews stub — bridged to BullMQ in future hardening
+export async function enqueueNews(data: any): Promise<void> {
+  // TODO: inject Queue via DI and add job
+  console.log('[news.processor] enqueueNews called — queue injection pending:', data.newsId);
 }
