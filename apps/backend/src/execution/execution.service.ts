@@ -23,30 +23,31 @@ export class ExecutionService {
   ) {}
 
   async executeOrder(orderData: any): Promise<any> {
-    this.logger.log(`Executing order: ${orderData.symbol} ${orderData.side} ${orderData.quantity}`);
+    const isPaper = orderData.isPaper !== false;
+    const isTestnet = orderData.testnet === true || (orderData.exchangeAccount && orderData.exchangeAccount.testnet);
 
+    this.logger.log(`[Execution] Starting order | Paper: ${isPaper} | Testnet: ${isTestnet} | Symbol: ${orderData.symbol}`);
+
+    // Risk + Kill Switch checks (existing logic)
     const riskResult = await this.riskService.evaluateRisk(orderData);
     if (!riskResult.passed) {
       throw new BadRequestException({ message: 'Risk check failed', reasons: riskResult.reasons });
     }
 
-    const isPaper = orderData.isPaper !== false;
-
-    // Kill Switch check
     if (!isPaper) {
       const isKillSwitchActive = await this.checkKillSwitch(orderData.userId);
       if (isKillSwitchActive) {
         if (this.notificationService) {
-          await this.notificationService.notifyKillSwitchActivated(orderData.userId, 'Live order blocked');
+          await this.notificationService.notifyKillSwitchActivated(orderData.userId, 'Live/Testnet order blocked');
         }
-        throw new BadRequestException({ message: 'Kill Switch active' });
+        throw new BadRequestException({ message: 'Kill Switch is active' });
       }
     }
 
     if (isPaper && this.paperTradingService) {
+      this.logger.log('[Execution] Routing to PaperTradingService');
+      // ... existing paper logic with processPaperFill
       const fillPrice = orderData.price || 50000;
-      const orderId = orderData.orderId || `paper-${Date.now()}`;
-
       const paperResult = await this.paperTradingService.processPaperFill({
         exchangeAccountId: orderData.exchangeAccountId || 'demo',
         userId: orderData.userId || 'demo',
@@ -54,69 +55,51 @@ export class ExecutionService {
         side: orderData.side?.toUpperCase(),
         quantity: orderData.quantity,
         fillPrice,
-        orderId,
+        orderId: orderData.orderId || `paper-${Date.now()}`,
         isPartial: orderData.isPartial || false,
       });
 
-      // Update order status in DB if exists
-      if (orderData.orderId) {
-        await this.updateOrderStatus(orderData.orderId, orderData.isPartial ? 'PARTIALLY_FILLED' : 'FILLED', paperResult);
-      }
-
-      return {
-        success: true,
-        orderId,
-        message: orderData.isPartial ? 'Partial fill processed' : 'Order filled',
-        paperResult,
-      };
+      return { success: true, mode: 'PAPER', paperResult };
     }
 
-    // Live trading with partial fill support
+    // Live / Testnet path
     if (!isPaper) {
-      // ... existing live logic with circuit breaker + retry
+      this.logger.log(`[Execution] LIVE/TESTNET mode | Testnet=${isTestnet}`);
+
+      if (!this.ccxtAdapter || !this.encryptionService) {
+        throw new Error('Real trading dependencies missing');
+      }
+
+      const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
+        where: { id: orderData.exchangeAccountId },
+      });
+
+      if (!exchangeAccount?.apiKeyEncrypted) {
+        throw new Error('No encrypted API key found');
+      }
+
+      const apiKey = this.encryptionService.decrypt(exchangeAccount.apiKeyEncrypted);
+      const apiSecret = exchangeAccount.apiSecretEncrypted 
+        ? this.encryptionService.decrypt(exchangeAccount.apiSecretEncrypted) 
+        : undefined;
+
+      await this.ccxtAdapter.initialize({
+        exchange: exchangeAccount.exchange as any,
+        apiKey,
+        apiSecret,
+        testnet: isTestnet || exchangeAccount.testnet || false,
+      });
+
       const liveResult = await this.liveTradingBreaker.execute(() =>
-        withRetry(() => this.placeRealOrder(orderData), { maxAttempts: 3 })
+        withRetry(() => this.ccxtAdapter!.placeOrder(orderData), { maxAttempts: 3 })
       );
 
-      const isPartialFill = liveResult?.filled !== undefined && liveResult.filled < orderData.quantity;
+      this.logger.log(`[Execution] Live/Testnet order placed successfully: ${liveResult?.id}`);
 
-      if (isPartialFill && this.paperTradingService) {
-        // For consistency, also update paper side if needed, or just log
-        await this.prisma.executionLog.create({
-          data: {
-            userId: orderData.userId,
-            action: 'PARTIAL_FILL_LIVE',
-            details: liveResult,
-          },
-        });
-      }
-
-      return {
-        success: true,
-        orderId: liveResult?.id,
-        message: isPartialFill ? 'Partial fill on exchange' : 'Live order executed',
-        liveResult,
-      };
+      return { success: true, mode: isTestnet ? 'TESTNET' : 'LIVE', liveResult };
     }
 
-    return { success: false, message: 'No execution path' };
-  }
-
-  private async placeRealOrder(orderData: any) {
-    // Existing real order placement logic using ccxtAdapter
-    // (kept for brevity - assumes it returns fill info)
-    return this.ccxtAdapter?.placeOrder(orderData);
-  }
-
-  private async updateOrderStatus(orderId: string, status: string, fillResult: any) {
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: status as any,
-        filledQuantity: fillResult?.filledQuantity || 0,
-        avgFillPrice: fillResult?.avgFillPrice,
-      },
-    }).catch(() => {});
+    return { success: false, message: 'No valid execution path' };
   }
 
   private async checkKillSwitch(userId: string): Promise<boolean> {
