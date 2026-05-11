@@ -1,7 +1,6 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // assume exists
+import { Injectable, Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
@@ -20,12 +19,10 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
-    // In production, authenticate via JWT handshake
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-    // Clean up user mapping
     for (const [userId, socket] of this.userSockets.entries()) {
       if (socket.id === client.id) {
         this.userSockets.delete(userId);
@@ -34,7 +31,6 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
   }
 
-  // Example: join user room after auth
   @SubscribeMessage('auth')
   handleAuth(client: Socket, payload: { userId: string; token?: string }) {
     const { userId } = payload;
@@ -42,6 +38,14 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     client.join(`user-${userId}`);
     this.logger.log(`User ${userId} authenticated and joined room`);
     return { status: 'ok', message: 'Authenticated' };
+  }
+
+  /**
+   * Push real-time price update (broadcast or to room)
+   */
+  pushPriceUpdate(symbol: string, price: number, timestamp: number) {
+    this.server.emit('price:update', { symbol, price, timestamp });
+    this.logger.debug(`Broadcast price update for ${symbol}: ${price}`);
   }
 
   /**
@@ -61,16 +65,16 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   /**
-   * Broadcast kill switch status
-   */
-  broadcastKillSwitch(status: { active: boolean; reason?: string }) {
-    this.server.emit('killswitch:status', status);
-  }
-
-  /**
    * Push partial fill notification
    */
   pushPartialFill(userId: string, fill: any) {
     this.server.to(`user-${userId}`).emit('order:partial-fill', fill);
+  }
+
+  /**
+   * Broadcast kill switch status
+   */
+  broadcastKillSwitch(status: { active: boolean; reason?: string }) {
+    this.server.emit('killswitch:status', status);
   }
 }
