@@ -1,33 +1,28 @@
-# AQTMS Production Deployment Optimization (Phase C - External Secrets)
+# AQTMS Production Deployment Optimization (Phase D - Observability)
 
-## External Secrets Operator (Recommended for Production)
+## Grafana Dashboard
+- Added example dashboard: `infra/grafana/aqtms-overview-dashboard.json`
+- Covers: Backend health, Kill Switch, Execution latency, Reconciliation issues, Active positions
 
-We now provide concrete examples under `infra/external-secrets/`.
+## Enhanced Alerting
+- Added more Prometheus alerts:
+  - High memory usage
+  - High CPU usage
+  - Existing: BackendDown, KillSwitchActive, HighExecutionLatency, ReconciliationDiscrepancies
 
-### 1. Install External Secrets Operator
-```bash
-helm repo add external-secrets https://charts.external-secrets.io
-helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
-```
+## Distributed Tracing (Recommended)
+For production observability, add OpenTelemetry:
 
-### 2. Create SecretStore (AWS Secrets Manager example)
-See `infra/external-secrets/secret-store.yaml`
-
-### 3. Create ExternalSecret for Backend
-See `infra/external-secrets/external-secret-backend.yaml`
-
-After applying these, your Kubernetes secrets will be automatically synced from AWS Secrets Manager.
-
-## Helm Integration
-In your Helm values, use:
 ```yaml
-secret:
-  existingSecret: aqtms-backend-secrets
+# Example env vars for backend
+OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+OTEL_SERVICE_NAME: aqtms-backend
 ```
 
-This way, sensitive values are never stored in Git or Helm values.
+Integrate `@opentelemetry/auto-instrumentations-node` in NestJS for automatic tracing of HTTP, Prisma, Redis, etc.
 
-## Next Steps
-- Create IAM role + ServiceAccount for External Secrets
-- Set up proper Secret rotation policy in AWS
-- Add similar ExternalSecret for frontend if needed
+## Recommended Stack
+- Prometheus + Grafana (metrics + dashboards)
+- Loki + Promtail (logs)
+- Tempo or Jaeger (tracing)
+- Alertmanager (alert routing)
