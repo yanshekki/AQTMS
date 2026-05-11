@@ -1,13 +1,13 @@
-// Professional Trading Terminal - Phase A (Real Data Only)
+// Professional Trading Terminal with TradingView Lightweight Charts - Phase B
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress,
   TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar } from 'recharts';
+import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
 
 interface OrderForm {
   symbol: string;
@@ -22,6 +22,9 @@ interface OrderForm {
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   const [currentMode, setCurrentMode] = useState<'PAPER' | 'TESTNET' | 'LIVE'>('PAPER');
   const [orderForm, setOrderForm] = useState<OrderForm>({
@@ -36,6 +39,8 @@ export default function Dashboard() {
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  // ... (keep other queries the same as previous version)
 
   const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary } = useQuery({
     queryKey: ['portfolio-summary'],
@@ -60,7 +65,7 @@ export default function Dashboard() {
   const { data: priceData = [] } = useQuery({
     queryKey: ['price-history', orderForm.symbol],
     queryFn: async () => {
-      const res = await axios.get(`/api/market-data/price-history?symbol=${orderForm.symbol}&limit=100`);
+      const res = await axios.get(`/api/market-data/price-history?symbol=${orderForm.symbol}&limit=200`);
       return res.data || [];
     },
     refetchInterval: 8000,
@@ -75,19 +80,95 @@ export default function Dashboard() {
     refetchInterval: 4000,
   });
 
-  // Strict real data only - no mock fallback
   const { data: depthData = [] } = useQuery({
     queryKey: ['depth', orderForm.symbol],
     queryFn: async () => {
       const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}`);
-      return res.data || []; // Return empty if no real data
+      return res.data || [];
     },
     refetchInterval: 6000,
   });
 
-  // Portfolio Performance - only show if real data available (remove hardcoded mock)
-  // For now, we hide this section if no real performance history API exists
-  // TODO: Connect to real /api/portfolio/performance-history when available
+  // Initialize TradingView Lightweight Chart
+  useEffect(() => {
+    if (!chartContainerRef.current || priceData.length === 0) return;
+
+    // Clean up previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+    }
+
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: 320,
+      layout: {
+        background: { type: ColorType.Solid, color: '#1e1e1e' },
+        textColor: '#d1d4dc',
+      },
+      grid: {
+        vertLines: { color: '#2B2B43' },
+        horzLines: { color: '#2B2B43' },
+      },
+      crosshair: {
+        mode: 0, // Normal crosshair
+      },
+      timeScale: {
+        borderColor: '#485c7b',
+      },
+    });
+
+    const lineSeries = chart.addLineSeries({
+      color: '#00bcd4',
+      lineWidth: 2,
+      // crosshairMarkerVisible: true,
+    });
+
+    // Format data for TradingView (time as number or string, value)
+    const formattedData = priceData.map((item: any) => ({
+      time: item.time, // Assuming API returns time in a format Lightweight Charts accepts (e.g. 'YYYY-MM-DD' or unix timestamp)
+      value: item.price,
+    }));
+
+    lineSeries.setData(formattedData);
+
+    chartRef.current = chart;
+    lineSeriesRef.current = lineSeries;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.resize(
+          chartContainerRef.current.clientWidth,
+          320
+        );
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+      }
+    };
+  }, [priceData, orderForm.symbol]);
+
+  // Update chart with new price in real-time
+  useEffect(() => {
+    if (lineSeriesRef.current && currentPrice && priceData.length > 0) {
+      const lastTime = priceData[priceData.length - 1]?.time;
+      if (lastTime) {
+        // Add or update the latest point
+        lineSeriesRef.current.update({
+          time: lastTime,
+          value: currentPrice,
+        });
+      }
+    }
+  }, [currentPrice, priceData]);
+
+  // ... (keep placeOrder, handle functions, etc. the same)
 
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
@@ -237,21 +318,23 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
+        {/* TradingView Lightweight Charts Price Chart */}
         <Grid item xs={12} md={7}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol}</Typography>
-              <Box sx={{ height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceData}>
-                    <CartesianGrid strokeDasharray="2 2" stroke="#444" />
-                    <XAxis dataKey="time" stroke="#888" />
-                    <YAxis domain={['auto', 'auto']} stroke="#888" />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', border: 'none' }} />
-                    <Line type="monotone" dataKey="price" stroke="#00bcd4" strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
+              <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol} (TradingView)</Typography>
+              <Box 
+                ref={chartContainerRef} 
+                sx={{ 
+                  height: 320, 
+                  width: '100%',
+                  backgroundColor: '#1e1e1e',
+                  borderRadius: 1
+                }} 
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Powered by TradingView Lightweight Charts • Real-time updates
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -259,7 +342,7 @@ export default function Dashboard() {
         <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Market Depth (Real Data Only)</Typography>
+              <Typography variant="h6" gutterBottom>Market Depth</Typography>
               <Box sx={{ height: 320 }}>
                 {depthData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -274,16 +357,13 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 ) : (
                   <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-                    <Typography color="text.secondary">No real depth data available</Typography>
+                    <Typography color="text.secondary">No depth data available</Typography>
                   </Box>
                 )}
               </Box>
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Portfolio Performance section removed until real history API is available */}
-        {/* TODO: Add real performance history chart when /api/portfolio/performance-history is ready */}
 
       </Grid>
 
