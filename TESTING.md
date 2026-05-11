@@ -106,12 +106,14 @@ Example tests are in `apps/web/cypress/e2e/`.
 Current coverage includes:
 - Dashboard loading, mode switching, and WebSocket status
 - Portfolio dashboard loading and real-time indicators
+- Basic order flow (type selection, LIVE mode warning, input handling)
 
 ### Recommended to Expand
 - Full order placement flow (with mocked backend responses)
 - Strategy creation and deployment
 - Real-time price updates across pages
 - Error states and loading handling
+- Kill Switch interaction
 
 ## E2E Test Coverage (Strengthened)
 
