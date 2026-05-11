@@ -6,7 +6,7 @@ import { ExecutionLog, LogQuery } from '../execution-logger.service';
 export class InMemoryExecutionLogRepository implements IExecutionLogRepository {
   private logs: ExecutionLog[] = [];
 
-  save(log: ExecutionLog): void {
+  async save(log: ExecutionLog): Promise<void> {
     this.logs.push(log);
 
     // 限制記憶體使用
@@ -15,31 +15,40 @@ export class InMemoryExecutionLogRepository implements IExecutionLogRepository {
     }
   }
 
-  find(query: LogQuery = {}): ExecutionLog[] {
-    let result = this.logs;
+  async find(query: LogQuery = {}): Promise<ExecutionLog[]> {
+    let result = [...this.logs];
 
-    if (query.userId) result = result.filter(l => l.userId === query.userId);
-    if (query.orderId) result = result.filter(l => l.orderId === query.orderId);
-    if (query.symbol) result = result.filter(l => l.symbol === query.symbol);
-    if (query.action) result = result.filter(l => l.action === query.action);
-    if (query.level) result = result.filter(l => l.level === query.level);
-    if (query.startTime) result = result.filter(l => l.timestamp >= query.startTime!);
-    if (query.endTime) result = result.filter(l => l.timestamp <= query.endTime!);
-
-    result = result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-    if (query.limit) {
-      result = result.slice(0, query.limit);
+    if (query.action) {
+      result = result.filter(l => l.action === query.action);
     }
+
+    if (query.level) {
+      result = result.filter(l => l.level === query.level);
+    }
+
+    if (query.from) {
+      result = result.filter(l => l.timestamp && l.timestamp >= query.from!);
+    }
+
+    if (query.to) {
+      result = result.filter(l => l.timestamp && l.timestamp <= query.to!);
+    }
+
+    // 按時間倒序排序
+    result.sort((a, b) => {
+      const timeA = a.timestamp?.getTime() ?? 0;
+      const timeB = b.timestamp?.getTime() ?? 0;
+      return timeB - timeA;
+    });
 
     return result;
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
     this.logs = [];
   }
 
-  count(): number {
+  async count(): Promise<number> {
     return this.logs.length;
   }
 }
