@@ -13,7 +13,7 @@ describe('KillSwitchService', () => {
         {
           provide: DailyPnLService,
           useValue: {
-            updateDailyPnL: jest.fn(),
+            updateDailyPnL: jest.fn().mockResolvedValue(undefined),
             getTodayPnL: jest.fn().mockResolvedValue(0),
           },
         },
@@ -34,21 +34,20 @@ describe('KillSwitchService', () => {
   });
 
   it('should trigger kill switch and block trading', async () => {
-    service.triggerKillSwitch('Manual test');
+    await service.triggerKillSwitch('Manual test');
     const result = await service.isTradingAllowed();
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('Kill switch is active');
   });
 
   it('should reset kill switch', async () => {
-    service.triggerKillSwitch('Test');
-    service.resetKillSwitch();
+    await service.triggerKillSwitch('Test');
+    await service.resetKillSwitch();
     const result = await service.isTradingAllowed();
     expect(result.allowed).toBe(true);
   });
 
   it('should trigger kill switch when daily loss limit is reached', async () => {
-    // Mock that today PnL is below limit
     jest.spyOn(dailyPnLService, 'getTodayPnL').mockResolvedValue(-600);
 
     const result = await service.isTradingAllowed();
