@@ -1,6 +1,6 @@
-import { Injectable, Logger, BadRequestException, Inject, Optional } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RiskService, RiskEvaluationResult } from '../risk/risk.service';
+import { RiskService } from '../risk/risk.service';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
 
 export interface OrderExecutionResult {
@@ -8,7 +8,7 @@ export interface OrderExecutionResult {
   orderId?: string;
   executionPrice?: number;
   message: string;
-  riskResult?: RiskEvaluationResult;
+  riskResult?: any;
   paperResult?: any;
 }
 
@@ -23,7 +23,7 @@ export class ExecutionService {
   ) {}
 
   async executeOrder(orderData: any): Promise<OrderExecutionResult> {
-    this.logger.log(`Executing order for symbol: ${orderData.symbol}, side: ${orderData.side}, isPaper: ${orderData.isPaper}`);
+    this.logger.log(`Executing order for symbol: ${orderData.symbol}, side: ${orderData.side}`);
 
     const riskResult = await this.riskService.evaluateRisk(orderData);
 
@@ -35,11 +35,11 @@ export class ExecutionService {
       });
     }
 
-    const isPaper = orderData.isPaper !== false; // default to paper if not explicitly false
+    const isPaper = orderData.isPaper !== false;
 
     if (isPaper && this.paperTradingService) {
-      // Deep integration: use PaperTradingService for real virtual balance / PnL updates
-      const simulatedPrice = orderData.price || (await this.getSimulatedPrice(orderData.symbol));
+      // Deep integration with PaperTrading
+      const simulatedPrice = orderData.price || 50000;
       const orderId = orderData.orderId || `paper-${Date.now()}`;
 
       try {
@@ -51,7 +51,6 @@ export class ExecutionService {
           quantity: orderData.quantity || 0.001,
           fillPrice: simulatedPrice,
           orderId,
-          isPartial: orderData.isPartial || false,
         });
 
         await this.prisma.executionLog.create({
@@ -59,12 +58,7 @@ export class ExecutionService {
             userId: orderData.userId || 'demo-user',
             orderId,
             action: 'PLACE_PAPER_ORDER',
-            details: {
-              ...orderData,
-              riskResult,
-              paperResult,
-              simulatedPrice,
-            },
+            details: { ...orderData, riskResult, paperResult, simulatedPrice },
           },
         }).catch((e) => this.logger.warn('Log failed', e.message));
 
@@ -79,12 +73,11 @@ export class ExecutionService {
           paperResult,
         };
       } catch (err: any) {
-        this.logger.error('PaperTradingService processPaperFill failed, falling back to simple sim', err);
-        // fallback simple
+        this.logger.error('PaperTrading integration failed, falling back', err);
       }
     }
 
-    // Fallback simple paper or real placeholder
+    // Fallback simple paper or real
     if (isPaper) {
       const simulatedPrice = orderData.price || 50000;
       const orderId = `paper-${Date.now()}`;
@@ -96,15 +89,13 @@ export class ExecutionService {
           action: 'PLACE_ORDER',
           details: { ...orderData, riskResult, simulatedPrice },
         },
-      }).catch((err) => this.logger.error('Failed to log execution', err));
-
-      this.logger.log(`Paper order executed (simple fallback): ${orderId} at simulated price ${simulatedPrice}`);
+      }).catch((err) => this.logger.error('Failed to log', err));
 
       return {
         success: true,
         orderId,
         executionPrice: simulatedPrice,
-        message: 'Paper order executed successfully (simulated fallback)',
+        message: 'Paper order executed (simple fallback)',
         riskResult,
       };
     }
@@ -116,16 +107,6 @@ export class ExecutionService {
       message: 'Real order execution placeholder - integrate ccxt here',
       riskResult,
     };
-  }
-
-  private async getSimulatedPrice(symbol: string): Promise<number> {
-    // In real impl, could use market-data or last price
-    return 50000 + Math.random() * 1000 - 500; // slight variation
-  }
-
-  registerRiskRule(ruleName: string, ruleFn: (data: any) => boolean): void {
-    this.riskService.registerRiskRule(ruleName, ruleFn);
-    this.logger.log(`ExecutionService: Risk rule '${ruleName}' registered via RiskService`);
   }
 
   async cancelOrder(orderId: string, userId: string): Promise<{ success: boolean; message: string }> {
