@@ -1,4 +1,4 @@
-# AQTMS Testing, Documentation & Deployment Guide (Phase E - Strengthened)
+# AQTMS Testing, Documentation & Deployment Guide (Phase E - Final)
 
 ## Quick Start for Traders (Real Data Focused)
 
@@ -12,6 +12,68 @@
 5. **Deploy Strategy** → StrategyRunner now uses real market data via MarketDataService
 6. **Monitor Portfolio** with real asset allocation and risk alerts
 
+## Phase E: Testnet + Small Live Testing Guide (實戰測試)
+
+### Recommended Testing Flow
+
+**Step 1: Paper Trading (Safe)**
+- Set `currentMode = 'PAPER'` in Dashboard
+- All orders go to internal PaperTradingService
+- No real funds at risk
+- Verify strategy logic, risk rules, Kill Switch
+
+**Step 2: Testnet Validation (Real Market Data)**
+- Switch to Testnet mode (`currentMode = 'TESTNET'`)
+- Use real testnet API keys from Binance/Bybit testnet
+- StrategyRunner will use real market data from testnet
+- Execute small test orders on testnet
+- Verify real-time WebSocket updates, position reconciliation, partial fills
+
+**Step 3: Small Live Trades (Real Money - Very Small Size)**
+- Only after successful testnet validation
+- Set `currentMode = 'LIVE'`
+- **Start with very small position sizes** (e.g. 0.001 BTC or $10-20 USDT)
+- Keep Kill Switch + Risk rules active
+- Monitor closely via Dashboard + Grafana
+
+### How to Switch Modes
+
+In Dashboard:
+- Click **PAPER** / **TESTNET** / **LIVE** buttons
+- LIVE mode shows clear warning: "⚠️ LIVE MODE — Real funds at risk!"
+
+### Testnet Setup (Binance Example)
+
+1. Go to https://testnet.binance.vision/
+2. Create API Key (enable Spot Trading)
+3. Add the API Key + Secret in Exchange Account page (select Testnet)
+4. In backend environment:
+   ```
+   ENABLE_TESTNET=true
+   BINANCE_TESTNET_API_KEY=your_testnet_key
+   BINANCE_TESTNET_API_SECRET=your_testnet_secret
+   ```
+
+### What to Test in Testnet + Small Live
+
+- [ ] Real price feed via MarketDataService
+- [ ] Strategy auto-execution with real market data
+- [ ] Order placement with Stop Loss / Take Profit
+- [ ] Real-time WebSocket updates (price, position, order)
+- [ ] Position reconciliation with exchange
+- [ ] Kill Switch triggering
+- [ ] Risk rule enforcement
+- [ ] Partial fill handling
+- [ ] Error handling & retry logic
+
+### Safety Rules for Small Live Testing
+
+- Always keep **Kill Switch enabled**
+- Start with **minimum position size**
+- Monitor **unrealized PnL** and alerts closely
+- Have a plan to manually close all positions if something goes wrong
+- Never test with money you cannot afford to lose
+
 ## E2E Test Coverage (Strengthened)
 
 ### Core Flows Covered
@@ -21,6 +83,7 @@
 - Portfolio summary & position updates
 - Kill Switch & Risk rule enforcement
 - Error handling & retry scenarios
+- MarketDataService robustness (caching + retry)
 
 ### How to Run
 ```bash
@@ -30,12 +93,7 @@ pnpm test:e2e
 
 Recommended: Run with testnet environment variables for more realistic testing.
 
-## Documentation Improvements
-- All critical paths now documented with real data requirements
-- StrategyRunner requires injected IMarketDataService for production
-- Frontend uses real APIs only (no mock data in production paths)
-
-## Production Deployment Checklist (Updated)
+## Production Deployment Checklist (Final)
 
 ### Secrets & Config
 - Use External Secrets Operator + Vault / AWS Secrets Manager
@@ -60,7 +118,7 @@ Recommended: Run with testnet environment variables for more realistic testing.
 
 For full details, see `DEPLOYMENT_OPTIMIZATION.md`
 
-## Recommended Production Flow
-**Paper Trading** → **Testnet Validation** (with real market data) → **Small Live Trades** (with Kill Switch + monitoring)
+## Recommended Safe Progression
+**Paper Trading** → **Testnet Validation** (real market data) → **Small Live Trades** (with Kill Switch + monitoring)
 
 Always start with small position sizes when going live.
