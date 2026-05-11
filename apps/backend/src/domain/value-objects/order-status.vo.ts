@@ -3,6 +3,7 @@ export enum OrderStatus {
   FILLED = 'FILLED',
   PARTIALLY_FILLED = 'PARTIALLY_FILLED',
   CANCELLED = 'CANCELLED',
+  CANCELED = 'CANCELLED', // alias for American spelling compatibility
   REJECTED = 'REJECTED',
 }
 
