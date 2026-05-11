@@ -78,7 +78,6 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
         orderParams.price = params.price;
       }
 
-      // Safety gate for live trading
       if (!params.testnet && process.env.ENABLE_LIVE_TRADING !== 'true') {
         this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
         return { success: false, message: 'Live trading is currently disabled for safety.' };
@@ -106,9 +105,10 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
     }
   }
 
-  async cancelOrder(exchangeAccountId: string, exchangeOrderId: string, exchange = 'binance', testnet = false): Promise<boolean> {
+  async cancelOrder(exchangeAccountId: string, exchangeOrderId: string): Promise<boolean> {
     try {
-      const ex = this.getExchangeInstance(exchange, testnet);
+      // Note: In real implementation, resolve exchange from exchangeAccountId
+      const ex = this.getExchangeInstance('binance', false);
       await ex.cancelOrder(exchangeOrderId);
       return true;
     } catch (error: any) {
@@ -117,28 +117,29 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
     }
   }
 
-  async getBalance(exchange = 'binance', testnet = false): Promise<any> {
+  async getBalance(exchangeAccountId: string): Promise<number> {
     try {
-      const ex = this.getExchangeInstance(exchange, testnet);
-      return await ex.fetchBalance();
+      const ex = this.getExchangeInstance('binance', false);
+      const balance = await ex.fetchBalance();
+      return balance.total || 0;
     } catch (error: any) {
       this.logger.error(`getBalance failed: ${error.message}`);
-      return {};
+      return 0;
     }
   }
 
-  async getPositions(exchange = 'binance', testnet = false): Promise<any[]> {
+  async getPositions(exchangeAccountId: string): Promise<any[]> {
     try {
-      const ex = this.getExchangeInstance(exchange, testnet);
+      const ex = this.getExchangeInstance('binance', false);
       return await ex.fetchPositions().catch(() => []);
     } catch (error: any) {
       return [];
     }
   }
 
-  async getOrderStatus(exchangeOrderId: string, exchange = 'binance', testnet = false): Promise<OrderStatusResult | null> {
+  async getOrderStatus(exchangeAccountId: string, exchangeOrderId: string): Promise<OrderStatusResult | null> {
     try {
-      const ex = this.getExchangeInstance(exchange, testnet);
+      const ex = this.getExchangeInstance('binance', false);
       const order = await ex.fetchOrder(exchangeOrderId);
       return {
         exchangeOrderId: order.id,
@@ -150,6 +151,16 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
       };
     } catch (error: any) {
       return null;
+    }
+  }
+
+  async getOpenOrders(exchangeAccountId: string, symbol?: string): Promise<any[]> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      return await ex.fetchOpenOrders(symbol).catch(() => []);
+    } catch (error: any) {
+      this.logger.error(`getOpenOrders failed: ${error.message}`);
+      return [];
     }
   }
 
