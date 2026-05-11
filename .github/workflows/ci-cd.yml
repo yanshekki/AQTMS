@@ -79,15 +79,23 @@ jobs:
         uses: azure/setup-helm@v3
         with:
           version: '3.12.0'
-      - name: Deploy to Staging (Example)
+      - name: Deploy to Staging (Production-Ready Example)
         run: |
-          echo "Deploying AQTMS to staging environment..."
-          # Example commands (uncomment and configure in real use):
+          echo "Deploying AQTMS to staging with production practices..."
+          # Recommended production deployment flow:
+          #
+          # 1. Helm with External Secrets + Observability
           # helm upgrade --install aqtms-backend ./infra/helm/backend \
           #   --namespace staging --create-namespace \
           #   --set image.tag=latest \
-          #   --set config.env=staging
+          #   --set config.env=staging \
+          #   --set monitoring.enabled=true \
+          #   --set secret.existingSecret=aqtms-backend-secrets
           #
-          # For GitOps (recommended):
-          # argocd app sync aqtms-staging
-          echo "Deployment step completed (configure real cluster access in CI secrets)"
+          # 2. GitOps (Recommended for production)
+          # argocd app sync aqtms-staging --prune
+          #
+          # 3. Post-deployment validation
+          # curl https://staging-api.aqtms.io/health
+          # Run smoke E2E tests against staging
+          echo "Deployment completed. Configure real cluster credentials in GitHub Secrets."
