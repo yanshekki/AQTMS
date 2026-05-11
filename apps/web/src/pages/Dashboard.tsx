@@ -1,4 +1,4 @@
-// Professional Trading Terminal with UX Optimizations - Phase D
+// Professional Trading Terminal - Phase A (Real Data Only)
 
 import React, { useState } from 'react';
 import {
@@ -37,7 +37,6 @@ export default function Dashboard() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Portfolio Summary
   const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary } = useQuery({
     queryKey: ['portfolio-summary'],
     queryFn: async () => {
@@ -48,7 +47,6 @@ export default function Dashboard() {
     refetchInterval: 15000,
   });
 
-  // Live Positions
   const { data: positions = [], isLoading: isLoadingPositions, refetch: refetchPositions } = useQuery({
     queryKey: ['positions'],
     queryFn: async () => {
@@ -59,7 +57,6 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
-  // Price History
   const { data: priceData = [] } = useQuery({
     queryKey: ['price-history', orderForm.symbol],
     queryFn: async () => {
@@ -69,7 +66,6 @@ export default function Dashboard() {
     refetchInterval: 8000,
   });
 
-  // Current Price
   const { data: currentPrice } = useQuery({
     queryKey: ['price', orderForm.symbol],
     queryFn: async () => {
@@ -79,38 +75,19 @@ export default function Dashboard() {
     refetchInterval: 4000,
   });
 
-  // Depth Data
+  // Strict real data only - no mock fallback
   const { data: depthData = [] } = useQuery({
     queryKey: ['depth', orderForm.symbol],
     queryFn: async () => {
-      try {
-        const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}`);
-        return res.data || generateMockDepth(currentPrice);
-      } catch {
-        return generateMockDepth(currentPrice);
-      }
+      const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}`);
+      return res.data || []; // Return empty if no real data
     },
     refetchInterval: 6000,
   });
 
-  function generateMockDepth(price: number | undefined) {
-    const basePrice = price || 60000;
-    return [
-      { price: basePrice - 80, bids: 8, asks: 0 },
-      { price: basePrice - 50, bids: 22, asks: 4 },
-      { price: basePrice - 20, bids: 45, asks: 18 },
-      { price: basePrice, bids: 60, asks: 35 },
-      { price: basePrice + 20, bids: 25, asks: 55 },
-      { price: basePrice + 50, bids: 9, asks: 48 },
-      { price: basePrice + 80, bids: 3, asks: 22 },
-    ];
-  }
-
-  const performanceData = [
-    { time: '09:00', pnl: 120 }, { time: '10:00', pnl: 280 }, { time: '11:00', pnl: 195 },
-    { time: '12:00', pnl: 420 }, { time: '13:00', pnl: 380 }, { time: '14:00', pnl: 610 },
-    { time: '15:00', pnl: 540 },
-  ];
+  // Portfolio Performance - only show if real data available (remove hardcoded mock)
+  // For now, we hide this section if no real performance history API exists
+  // TODO: Connect to real /api/portfolio/performance-history when available
 
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
@@ -176,7 +153,6 @@ export default function Dashboard() {
         </Stack>
       </Stack>
 
-      {/* Mode Selector */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -191,7 +167,6 @@ export default function Dashboard() {
       </Card>
 
       <Grid container spacing={3}>
-        {/* Quick Order Panel */}
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
@@ -226,7 +201,6 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Live Positions */}
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
@@ -263,7 +237,6 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Price Chart */}
         <Grid item xs={12} md={7}>
           <Card>
             <CardContent>
@@ -283,46 +256,35 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Market Depth */}
         <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Market Depth</Typography>
+              <Typography variant="h6" gutterBottom>Market Depth (Real Data Only)</Typography>
               <Box sx={{ height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={depthData}>
-                    <CartesianGrid strokeDasharray="2 2" />
-                    <XAxis dataKey="price" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="bids" fill="#4caf50" name="Bids" />
-                    <Bar dataKey="asks" fill="#f44336" name="Asks" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                {depthData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={depthData}>
+                      <CartesianGrid strokeDasharray="2 2" />
+                      <XAxis dataKey="price" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="bids" fill="#4caf50" name="Bids" />
+                      <Bar dataKey="asks" fill="#f44336" name="Asks" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+                    <Typography color="text.secondary">No real depth data available</Typography>
+                  </Box>
+                )}
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Portfolio Performance */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Portfolio Performance (Equity Curve)</Typography>
-              <Box sx={{ height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={performanceData}>
-                    <CartesianGrid strokeDasharray="2 2" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="pnl" stroke="#66bb6a" strokeWidth={3} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+        {/* Portfolio Performance section removed until real history API is available */}
+        {/* TODO: Add real performance history chart when /api/portfolio/performance-history is ready */}
+
       </Grid>
 
       <Snackbar open={snackbar.open} autoHideDuration={4500} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
