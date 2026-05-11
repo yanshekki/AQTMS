@@ -1,24 +1,11 @@
 // ── Prisma DataSource Repository Implementation ──
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { DataSource, type DataSourceType, type DataSourceStatus } from '../../domain/entities/DataSource';
 import type { DataSourceRepository } from '../../domain/repositories/DataSourceRepository';
 
-interface PrismaDataSource {
-  id: string;
-  userId: string;
-  type: string;
-  name: string;
-  config: string;
-  status: string;
-  lastError: string | null;
-  lastFetchedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export class PrismaDataSourceRepository implements DataSourceRepository {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaService) {}
 
   async findById(id: string): Promise<DataSource | null> {
     const record = await this.prisma.dataSource.findUnique({ where: { id } });
@@ -36,7 +23,7 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
 
   async findByUserAndType(userId: string, type: DataSourceType): Promise<DataSource[]> {
     const records = await this.prisma.dataSource.findMany({
-      where: { userId, type },
+      where: { userId, type: type as any },
       orderBy: { createdAt: 'desc' },
     });
     return records.map((r) => this.toDomain(r));
@@ -49,10 +36,10 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
       data: {
         id: primitives.id,
         userId: primitives.userId,
-        type: primitives.type,
+        type: primitives.type as any,
         name: primitives.name,
-        config: JSON.stringify(primitives.config),
-        status: primitives.status,
+        config: primitives.config as any,
+        status: primitives.status as any,
         lastError: primitives.lastError ?? null,
         lastFetchedAt: primitives.lastFetchedAt ?? null,
       },
@@ -68,8 +55,8 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
       where: { id: primitives.id },
       data: {
         name: primitives.name,
-        config: JSON.stringify(primitives.config),
-        status: primitives.status,
+        config: primitives.config as any,
+        status: primitives.status as any,
         lastError: primitives.lastError ?? null,
         lastFetchedAt: primitives.lastFetchedAt ?? null,
       },
@@ -84,18 +71,18 @@ export class PrismaDataSourceRepository implements DataSourceRepository {
 
   async exists(userId: string, type: DataSourceType, name: string): Promise<boolean> {
     const count = await this.prisma.dataSource.count({
-      where: { userId, type, name },
+      where: { userId, type: type as any, name },
     });
     return count > 0;
   }
 
-  private toDomain(record: PrismaDataSource): DataSource {
+  private toDomain(record: any): DataSource {
     return new DataSource({
       id: record.id,
       userId: record.userId,
       type: record.type as DataSourceType,
       name: record.name,
-      config: JSON.parse(record.config) as Record<string, unknown>,
+      config: record.config as Record<string, unknown>,
       status: record.status as DataSourceStatus,
       lastError: record.lastError ?? undefined,
       lastFetchedAt: record.lastFetchedAt ?? undefined,
