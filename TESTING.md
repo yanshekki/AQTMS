@@ -104,13 +104,14 @@ npx cypress run
 Example tests are in `apps/web/cypress/e2e/`.
 
 Current coverage includes:
-- Dashboard loading and mode switching
-- WebSocket connection status
+- Dashboard loading, mode switching, and WebSocket status
+- Portfolio dashboard loading and real-time indicators
 
 ### Recommended to Expand
-- Full order placement flow (mocked backend)
-- Portfolio real-time updates
-- Strategy creation and backtest
+- Full order placement flow (with mocked backend responses)
+- Strategy creation and deployment
+- Real-time price updates across pages
+- Error states and loading handling
 
 ## E2E Test Coverage (Strengthened)
 
