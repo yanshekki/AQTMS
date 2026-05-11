@@ -1,4 +1,4 @@
-// Advanced Trading Terminal Dashboard - Phase A
+// Advanced Trading Terminal with Charts - Phase A
 
 import React, { useState } from 'react';
 import {
@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-// Assuming Recharts is available or can be added; using simple display for now if not
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface OrderForm {
   symbol: string;
@@ -48,6 +48,16 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
+  // Current Price + Historical for Chart
+  const { data: priceData } = useQuery({
+    queryKey: ['price-history', orderForm.symbol],
+    queryFn: async () => {
+      const res = await axios.get(`/api/market-data/price-history?symbol=${orderForm.symbol}&limit=50`);
+      return res.data; // Expect array of { time, price }
+    },
+    refetchInterval: 10000,
+  });
+
   // Current Price
   const { data: currentPrice } = useQuery({
     queryKey: ['price', orderForm.symbol],
@@ -58,14 +68,35 @@ export default function Dashboard() {
     refetchInterval: 5000,
   });
 
-  // Place Order Mutation with better error handling
+  // Mock Depth Data (in real impl, fetch from /api/market-data/depth)
+  const depthData = [
+    { price: (currentPrice || 60000) - 50, bids: 12, asks: 0 },
+    { price: (currentPrice || 60000) - 30, bids: 25, asks: 5 },
+    { price: (currentPrice || 60000) - 10, bids: 40, asks: 15 },
+    { price: (currentPrice || 60000), bids: 55, asks: 30 },
+    { price: (currentPrice || 60000) + 10, bids: 20, asks: 45 },
+    { price: (currentPrice || 60000) + 30, bids: 8, asks: 60 },
+    { price: (currentPrice || 60000) + 50, bids: 3, asks: 35 },
+  ];
+
+  // Portfolio Performance (mock historical PnL)
+  const performanceData = [
+    { time: '09:00', pnl: 120 },
+    { time: '10:00', pnl: 280 },
+    { time: '11:00', pnl: 150 },
+    { time: '12:00', pnl: 420 },
+    { time: '13:00', pnl: 380 },
+    { time: '14:00', pnl: 650 },
+    { time: '15:00', pnl: 520 },
+  ];
+
+  // Place Order Mutation
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['positions'] });
       queryClient.invalidateQueries({ queryKey: ['portfolio-summary'] });
       setSnackbar({ open: true, message: 'Order placed successfully!', severity: 'success' });
-      // Reset form partially
       setOrderForm(prev => ({ ...prev, quantity: 0.001, price: 0, stopLoss: 0, takeProfit: 0 }));
     },
     onError: (error: any) => {
@@ -75,7 +106,6 @@ export default function Dashboard() {
   });
 
   const handlePlaceOrder = () => {
-    // Basic validation
     if (!orderForm.symbol || orderForm.quantity <= 0) {
       setSnackbar({ open: true, message: 'Please enter valid symbol and quantity', severity: 'error' });
       return;
@@ -121,104 +151,40 @@ export default function Dashboard() {
       </Card>
 
       <Grid container spacing={3}>
-        {/* Quick Order Panel with SL/TP */}
-        <Grid item xs={12} md={5}>
+        {/* Quick Order Panel */}
+        <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>Quick Order</Typography>
-
               <Stack spacing={2}>
-                <TextField
-                  label="Symbol"
-                  value={orderForm.symbol}
-                  onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())}
-                  fullWidth
-                />
-
-                <TextField
-                  select
-                  label="Side"
-                  value={orderForm.side}
-                  onChange={(e) => handleInputChange('side', e.target.value)}
-                  fullWidth
-                >
+                <TextField label="Symbol" value={orderForm.symbol} onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())} fullWidth />
+                <TextField select label="Side" value={orderForm.side} onChange={(e) => handleInputChange('side', e.target.value)} fullWidth>
                   <MenuItem value="BUY">BUY</MenuItem>
                   <MenuItem value="SELL">SELL</MenuItem>
                 </TextField>
-
-                <TextField
-                  select
-                  label="Type"
-                  value={orderForm.type}
-                  onChange={(e) => handleInputChange('type', e.target.value)}
-                  fullWidth
-                >
+                <TextField select label="Type" value={orderForm.type} onChange={(e) => handleInputChange('type', e.target.value)} fullWidth>
                   <MenuItem value="MARKET">MARKET</MenuItem>
                   <MenuItem value="LIMIT">LIMIT</MenuItem>
                 </TextField>
-
-                <TextField
-                  label="Quantity"
-                  type="number"
-                  value={orderForm.quantity}
-                  onChange={(e) => handleInputChange('quantity', parseFloat(e.target.value))}
-                  fullWidth
-                  inputProps={{ step: 0.001 }}
-                />
-
-                {orderForm.type === 'LIMIT' && (
-                  <TextField
-                    label="Limit Price"
-                    type="number"
-                    value={orderForm.price}
-                    onChange={(e) => handleInputChange('price', parseFloat(e.target.value))}
-                    fullWidth
-                  />
-                )}
-
-                {/* Stop Loss / Take Profit */}
-                <TextField
-                  label="Stop Loss Price (optional)"
-                  type="number"
-                  value={orderForm.stopLoss}
-                  onChange={(e) => handleInputChange('stopLoss', parseFloat(e.target.value))}
-                  fullWidth
-                  inputProps={{ step: 0.01 }}
-                />
-                <TextField
-                  label="Take Profit Price (optional)"
-                  type="number"
-                  value={orderForm.takeProfit}
-                  onChange={(e) => handleInputChange('takeProfit', parseFloat(e.target.value))}
-                  fullWidth
-                  inputProps={{ step: 0.01 }}
-                />
-
-                <Typography variant="body2" color="text.secondary">
-                  Current Price: {currentPrice ? `$${currentPrice}` : 'Loading...'}
-                </Typography>
-
-                <Button
-                  variant="contained"
-                  color={orderForm.side === 'BUY' ? 'success' : 'error'}
-                  size="large"
-                  onClick={handlePlaceOrder}
-                  disabled={placeOrder.isPending}
-                >
-                  {placeOrder.isPending ? 'Placing Order...' : `${orderForm.side} ${orderForm.symbol}`}
+                <TextField label="Quantity" type="number" value={orderForm.quantity} onChange={(e) => handleInputChange('quantity', parseFloat(e.target.value))} fullWidth />
+                {orderForm.type === 'LIMIT' && <TextField label="Limit Price" type="number" value={orderForm.price} onChange={(e) => handleInputChange('price', parseFloat(e.target.value))} fullWidth />}
+                <TextField label="Stop Loss (optional)" type="number" value={orderForm.stopLoss} onChange={(e) => handleInputChange('stopLoss', parseFloat(e.target.value))} fullWidth />
+                <TextField label="Take Profit (optional)" type="number" value={orderForm.takeProfit} onChange={(e) => handleInputChange('takeProfit', parseFloat(e.target.value))} fullWidth />
+                <Typography variant="body2" color="text.secondary">Current Price: {currentPrice ? `$${currentPrice}` : 'Loading...'}</Typography>
+                <Button variant="contained" color={orderForm.side === 'BUY' ? 'success' : 'error'} size="large" onClick={handlePlaceOrder} disabled={placeOrder.isPending}>
+                  {placeOrder.isPending ? 'Placing...' : `${orderForm.side} ${orderForm.symbol}`}
                 </Button>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Positions Table */}
-        <Grid item xs={12} md={7}>
+        {/* Live Positions */}
+        <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>Live Positions (Total Unrealized PnL: ${totalUnrealizedPnl.toFixed(2)})</Typography>
-
-              <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 380 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -230,9 +196,7 @@ export default function Dashboard() {
                   </TableHead>
                   <TableBody>
                     {positions.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">No open positions</TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={4} align="center">No open positions</TableCell></TableRow>
                     ) : (
                       positions.map((pos: any) => (
                         <TableRow key={pos.symbol}>
@@ -252,29 +216,72 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Simple Price Info / Future Chart Placeholder */}
+        {/* Real-time Price Chart */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Real-time Price Chart - {orderForm.symbol}</Typography>
+              <Box sx={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={priceData || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={['auto', 'auto']} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="price" stroke="#1976d2" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+              <Typography variant="caption" color="text.secondary">Updates every 10 seconds</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Depth Chart */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Market Depth (Simulated)</Typography>
+              <Box sx={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={depthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="price" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="bids" fill="#4caf50" name="Bids" />
+                    <Bar dataKey="asks" fill="#f44336" name="Asks" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+              <Typography variant="caption" color="text.secondary">Bids (green) / Asks (red) — replace with real /depth API</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Portfolio Historical Performance */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Market Overview</Typography>
-              <Typography variant="body1">
-                Current {orderForm.symbol} Price: <strong>{currentPrice ? `$${currentPrice}` : 'Loading...'}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                (Real-time price chart integration coming in next iteration. Current price updates every 5 seconds.)
-              </Typography>
+              <Typography variant="h6" gutterBottom>Portfolio Performance (PnL History)</Typography>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={performanceData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="pnl" stroke="#2e7d32" strokeWidth={3} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+              <Typography variant="caption" color="text.secondary">Equity curve / Cumulative PnL over time (connect to real /portfolio/history API)</Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Snackbar for feedback */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
-      />
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
     </Box>
   );
 }
