@@ -1,4 +1,4 @@
-// Professional Trading Terminal - Phase A (Strict Real Data Only)
+// Professional Trading Terminal - Phase A (Real-time WebSocket + Strict Real Data)
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -8,6 +8,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { io, Socket } from 'socket.io-client';
 
 interface OrderForm {
   symbol: string;
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [currentMode, setCurrentMode] = useState<'PAPER' | 'TESTNET' | 'LIVE'>('PAPER');
   const [orderForm, setOrderForm] = useState<OrderForm>({
@@ -39,6 +41,58 @@ export default function Dashboard() {
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const socket = io('http://localhost:3000/trading', {
+      transports: ['websocket'],
+      autoConnect: true,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setWsConnected(true);
+      // Authenticate (in production use real JWT)
+      socket.emit('auth', { userId: 'demo-user' });
+    });
+
+    socket.on('disconnect', () => {
+      setWsConnected(false);
+    });
+
+    // Real-time price update
+    socket.on('price:update', (data: { symbol: string; price: number; timestamp: number }) => {
+      if (data.symbol === orderForm.symbol) {
+        // Update chart in real-time
+        if (lineSeriesRef.current) {
+          const time = Math.floor(data.timestamp / 1000);
+          lineSeriesRef.current.update({ time, value: data.price });
+        }
+        setLastUpdated(new Date());
+      }
+    });
+
+    // Real-time position update
+    socket.on('position:update', () => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio-summary'] });
+      setLastUpdated(new Date());
+    });
+
+    // Real-time order update
+    socket.on('order:update', () => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      setLastUpdated(new Date());
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [orderForm.symbol, queryClient]);
+
+  // ... (rest of the component remains similar, with real data focus)
 
   const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary, error: summaryError } = useQuery({
     queryKey: ['portfolio-summary'],
@@ -80,7 +134,6 @@ export default function Dashboard() {
     refetchInterval: 4000,
   });
 
-  // Strict real data only - no mock fallback
   const { data: depthData = [] } = useQuery({
     queryKey: ['depth', orderForm.symbol],
     queryFn: async () => {
@@ -90,7 +143,7 @@ export default function Dashboard() {
     refetchInterval: 6000,
   });
 
-  // TradingView Lightweight Chart
+  // TradingView Lightweight Chart (same as before)
   useEffect(() => {
     if (!chartContainerRef.current || priceData.length === 0) return;
 
@@ -142,7 +195,7 @@ export default function Dashboard() {
     };
   }, [priceData, orderForm.symbol]);
 
-  // Real-time price update on chart
+  // Real-time price update on chart from query
   useEffect(() => {
     if (lineSeriesRef.current && currentPrice && priceData.length > 0) {
       const lastTime = priceData[priceData.length - 1]?.time;
@@ -215,7 +268,12 @@ export default function Dashboard() {
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h4" sx={{ color: '#fff' }}>Trading Terminal</Typography>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Chip label="Connected" color="success" size="small" variant="outlined" />
+          <Chip 
+            label={wsConnected ? 'WebSocket Connected' : 'Connecting...'} 
+            color={wsConnected ? 'success' : 'warning'} 
+            size="small" 
+            variant="outlined" 
+          />
           <Typography variant="caption" color="text.secondary">
             Last updated: {lastUpdated.toLocaleTimeString()}
           </Typography>
@@ -321,7 +379,7 @@ export default function Dashboard() {
               <Typography variant="h6" gutterBottom>Price Chart — {orderForm.symbol}</Typography>
               <Box ref={chartContainerRef} sx={{ height: 320, width: '100%', backgroundColor: '#0d1117', borderRadius: 1 }} />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                TradingView Lightweight Charts • Real-time
+                TradingView Lightweight Charts • Real-time via WebSocket
               </Typography>
             </CardContent>
           </Card>
