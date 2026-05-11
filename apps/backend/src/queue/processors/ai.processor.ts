@@ -20,7 +20,7 @@ export class AIProcessor extends WorkerHost {
     const { symbol, data } = job.data;
     this.logger.log(`Analyzing signal for ${symbol}`);
 
-    // TODO: Call AI provider (Gemini/OpenAI)
+    // TODO: Call AI provider
     return { success: true, symbol, analysis: 'placeholder' };
   }
 }
