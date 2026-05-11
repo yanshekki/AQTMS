@@ -1,30 +1,30 @@
-# AQTMS Testing & Deployment Guide (Updated Phase D)
+# AQTMS Testing & Deployment Guide (Updated Phase E)
 
 ## Quick Start for New Traders
 
 1. Connect Wallet → Get JWT
 2. Add Exchange (Testnet first)
-3. Use Dashboard Trading Terminal for quick orders
-4. Create & Backtest strategies on Strategies page
-5. Deploy strategy (now runs automatically via StrategyRunner)
+3. Use Dashboard Trading Terminal for quick orders (now with advanced order types)
+4. Create & Backtest strategies
+5. Deploy strategy (now runs with real logic)
+6. Monitor Portfolio with allocation pie chart and performance trend
+
+## Key Features
+- Portfolio Dashboard with asset allocation visualization and risk alerts
+- Strategy Runner with SMA Crossover / Mean Reversion logic
+- Professional Trading Terminal with charts and advanced orders
 
 ## E2E Test Coverage
 - Paper order placement
 - Trading terminal flow
 - Strategy deployment
-- Environment validation
-- Kill Switch & Risk checks
+- Portfolio summary and positions
 
 Run E2E:
 ```bash
 cd apps/backend
 pnpm test:e2e
 ```
-
-## CI/CD Pipeline
-- Automatic lint, type check, build, and E2E on every push/PR
-- Docker image build on main
-- Deployment job example included (configure real cluster in CI secrets)
 
 ## Recommended Production Flow
 Paper Trading → Testnet validation → Small live trades (with Kill Switch enabled)
