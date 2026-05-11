@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, Card, CardContent, Button, TextField, Grid, Chip, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Stack, CircularProgress, Alert } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { useRealTimePrice } from '@/hooks/useRealTimePrice';
 
 interface StrategyVersion {
   id: string;
@@ -28,6 +29,9 @@ export default function Strategies() {
     queryKey: ['strategies'],
     queryFn: async () => (await axios.get('/api/strategies')).data,
   });
+
+  // Real-time prices for common symbols
+  const { prices: realTimePrices, isConnected } = useRealTimePrice(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
 
   const createStrategy = useMutation({
     mutationFn: (data: any) => axios.post('/api/strategies', data),
