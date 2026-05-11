@@ -10,10 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =============================================
-// AQTMS Core Models - Prisma Schema (Aligned with Code)
-// =============================================
-
 model User {
   id            String   @id @default(cuid())
   walletAddress String   @unique
@@ -41,14 +37,14 @@ model User {
 model ExchangeAccount {
   id                  String   @id @default(cuid())
   userId              String
-  name                String?  // Friendly name for the account
-  exchange            String   // BINANCE | BYBIT | etc.
+  name                String?
+  exchange            String
   testnet             Boolean  @default(false)
-  apiKey              String   // encrypted with AES-256-GCM
-  apiSecret           String   // encrypted
-  apiKeyEncrypted     String?  // For more secure storage
-  apiSecretEncrypted  String?  // For more secure storage
-  status              String   @default("ACTIVE") // ACTIVE | DISABLED | EXPIRED
+  apiKey              String
+  apiSecret           String
+  apiKeyEncrypted     String?
+  apiSecretEncrypted  String?
+  status              String   @default("ACTIVE")
   isPaperTrading      Boolean  @default(true)
   paperVirtualBalance Float    @default(10000)
   createdAt           DateTime @default(now())
@@ -68,8 +64,8 @@ model Order {
   userId            String
   exchangeAccountId String
   symbol            String
-  side              String   // BUY | SELL
-  type              String   // MARKET | LIMIT | STOP_LOSS | TAKE_PROFIT
+  side              String
+  type              String
   quantity          Float
   price             Float?
   stopLoss          Float?
@@ -78,7 +74,7 @@ model Order {
   isPaper           Boolean  @default(true)
   filledQuantity    Float    @default(0)
   avgFillPrice      Float?
-  exchangeOrderId   String?  // Real exchange order ID
+  exchangeOrderId   String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -118,14 +114,14 @@ model Trade {
   userId            String
   exchangeAccountId String
   symbol            String
-  side              String   // BUY | SELL
-  type              String   // MARKET | LIMIT
+  side              String
+  type              String
   quantity          Float
   price             Float?
   stopPrice         Float?
-  timeInForce       String?  // GTC, IOC, FOK
+  timeInForce       String?
   filledQuantity    Float    @default(0)
-  exchangeOrderId   String?  // allow null
+  exchangeOrderId   String?
   idempotencyKey    String?  @unique
   status            String   @default("PENDING")
   isPaper           Boolean  @default(true)
@@ -144,9 +140,9 @@ model Trade {
 model Signal {
   id          String   @id @default(cuid())
   userId      String?
-  source      String   // e.g. AI_MODEL, TELEGRAM, X_TWITTER, NEWS_API
+  source      String
   symbol      String
-  action      String   // BUY | SELL | HOLD
+  action      String
   score       Float
   confidence  Float?
   metadata    Json?
@@ -162,9 +158,9 @@ model Signal {
 
 model NewsEvent {
   id          String   @id @default(cuid())
-  sourceId    String?  // e.g. telegram channel id or news source id
-  source      String   // TELEGRAM | X | NEWS_API etc.
-  language    String?  // e.g. en, zh
+  sourceId    String?
+  source      String
+  language    String?
   content     String   @db.Text
   symbol      String?
   score       Float?
@@ -187,14 +183,14 @@ model BacktestReport {
   strategy       String
   symbol         String
   params         Json
-  parameters     Json?    // alias for params
-  metrics        Json     // { sharpe, totalReturn, maxDrawdown, winRate, ... }
-  equityCurve    Json?    // array of {time, value}
+  parameters     Json?
+  metrics        Json
+  equityCurve    Json?
   drawdownCurve  Json?
   monthlyReturns Json?
   startDate      DateTime?
   endDate        DateTime?
-  trades         Json?    // executed trades in backtest
+  trades         Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -208,7 +204,7 @@ model ExecutionLog {
   id        String   @id @default(cuid())
   userId    String
   orderId   String?
-  action    String   // PLACE_ORDER | CANCEL_ORDER | FILL | RISK_CHECK | KILL_SWITCH etc.
+  action    String
   details   Json
   timestamp DateTime @default(now())
 
@@ -223,7 +219,7 @@ model PortfolioSnapshot {
   id         String   @id @default(cuid())
   userId     String
   totalValue Float
-  positions  Json     // [{symbol, quantity, avgPrice, currentPrice, pnl}]
+  positions  Json
   timestamp  DateTime @default(now())
 
   user       User     @relation(fields: [userId], references: [id])
@@ -236,12 +232,12 @@ model ScoringRule {
   id        String   @id @default(cuid())
   userId    String
   name      String
-  weights   Json     // { truth: 0.3, sentiment: 0.4, ... }
+  weights   Json
   threshold Float
-  action    String   // BUY | SELL | HOLD
+  action    String
   status    String   @default("ACTIVE")
   version   Int      @default(1)
-  versions  Json?    // version history
+  versions  Json?
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -258,7 +254,7 @@ model Notification {
   type        String
   title       String
   message     String
-  targetRoute String?  // e.g. /portfolio or /orders/123
+  targetRoute String?
   read        Boolean  @default(false)
   createdAt   DateTime @default(now())
 
@@ -273,7 +269,7 @@ model RiskRule {
   id        String   @id @default(cuid())
   userId    String
   name      String
-  params    Json     // e.g. { maxPositionPct: 0.1, dailyLossLimit: 500, atrMultiplier: 2 }
+  params    Json
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -288,9 +284,9 @@ model DataSource {
   id             String   @id @default(cuid())
   userId         String
   name           String
-  type           String   // TELEGRAM | X | NEWS | CUSTOM
+  type           String
   config         Json
-  status         String   @default("ACTIVE") // ACTIVE, ERROR, PAUSED
+  status         String   @default("ACTIVE")
   lastError      String?
   lastFetchedAt  DateTime?
   isActive       Boolean  @default(true)
@@ -307,7 +303,7 @@ model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
   action     String
-  resource   String?  // e.g. order, user, strategy
+  resource   String?
   resourceId String?
   details    Json?
   ipAddress  String?
