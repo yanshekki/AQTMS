@@ -8,6 +8,7 @@ import { prisma } from '../../../shared/prisma';
 import { logger } from '../../../shared/logger';
 import { permission } from '../middleware/permission.middleware';
 import { detectLang, t } from '../../../shared/i18n';
+import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
 // using shared prisma singleton
 const riskEngine = new RiskEngine();
@@ -17,16 +18,14 @@ const backtestService = new BacktestService();
 export function createRiskRoutes(): Router {
   const router = Router();
 
-  // POST /api/v1/risk/metrics — compute risk metrics for a portfolio
   router.post('/metrics', permission(['risk:view']), async (req, res, next) => {
     try {
-      const { portfolio } = req.body as { portfolio: Array<{ asset: string; quantity: number; currentPrice: number; historicalReturns: number[] }> };
+      const { portfolio } = req.body;
       const metrics = riskEngine.computeMetrics(portfolio);
       res.json({ success: true, data: metrics, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
   });
 
-  // POST /api/v1/risk/position-size — calculate position size
   router.post('/position-size', permission(['trade:execute']), async (req, res, next) => {
     try {
       const result = sizingCalculator.compareAll(req.body);
@@ -34,14 +33,9 @@ export function createRiskRoutes(): Router {
     } catch (err) { next(err); }
   });
 
-  // POST /api/v1/risk/evaluate — check if a trade passes risk rules
   router.post('/evaluate', permission(['risk:view']), async (req, res, next) => {
     try {
-      const { trade, portfolio, dailyPnL } = req.body as {
-        trade: { symbol: string; quantity: number; price: number };
-        portfolio: Array<{ asset: string; quantity: number; currentPrice: number; historicalReturns: number[] }>;
-        dailyPnL: number;
-      };
+      const { trade, portfolio, dailyPnL } = req.body;
       const result = riskEngine.evaluateTrade(trade, portfolio, dailyPnL);
       res.json({ success: true, data: result, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
@@ -53,17 +47,15 @@ export function createRiskRoutes(): Router {
 export function createBacktestRoutes(): Router {
   const router = Router();
 
-  // POST /api/v1/backtest/run — run backtest
   router.post('/run', permission(['backtest:run']), async (req, res, next) => {
     try {
       const result = await backtestService.runBacktest(req.body);
       logger.info({ id: result.id, symbol: result.symbol, return: result.totalReturn }, 'Backtest completed');
 
-      // Persist to DB
       try {
         await prisma.backtestReport.create({
           data: {
-            userId: (req.user?.userId) ?? 'anonymous',
+            userId: (req.user as AuthenticatedUser | undefined)?.userId ?? 'anonymous',
             symbol: result.symbol,
             startDate: new Date(result.startDate),
             endDate: new Date(result.endDate),
@@ -84,61 +76,45 @@ export function createBacktestRoutes(): Router {
             sortinoRatio: result.sortinoRatio,
             calmarRatio: result.calmarRatio,
             totalFees: result.totalFees,
-            equityCurve: JSON.stringify(result.equityCurve),
-            drawdownCurve: JSON.stringify(result.drawdownCurve),
-            monthlyReturns: JSON.stringify(result.monthlyReturns),
-            trades: JSON.stringify(result.trades),
-            parameters: JSON.stringify(result.parameters),
+            equityCurve: result.equityCurve,
+            drawdownCurve: result.drawdownCurve,
+            monthlyReturns: result.monthlyReturns,
+            trades: result.trades,
+            parameters: result.parameters,
           },
         });
-      } catch (dbErr) { logger.warn({ dbErr }, 'Failed to persist backtest report'); }
+      } catch (dbErr) {
+        logger.warn({ dbErr }, 'Failed to persist backtest report');
+      }
 
       res.json({ success: true, data: result, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
   });
 
-  // GET /api/v1/backtest/history — list past backtests (user-scoped)
   router.get('/history', permission(['backtest:run']), async (req, res, next) => {
     try {
-      const userId = req.user?.userId ?? '';
+      const user = req.user as AuthenticatedUser | undefined;
       const reports = await prisma.backtestReport.findMany({
-        where: { userId },
+        where: { userId: user?.userId ?? '' },
         orderBy: { createdAt: 'desc' },
         take: 20,
-        select: {
-          id: true, symbol: true, startDate: true, endDate: true,
-          totalReturn: true, winRate: true, sharpeRatio: true, maxDrawdown: true,
-          totalTrades: true, createdAt: true,
-        },
       });
       res.json({ success: true, data: reports, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
   });
 
-  // GET /api/v1/backtest/:id — get full report detail (user-scoped)
   router.get('/:id', permission(['backtest:run']), async (req, res, next) => {
     try {
-      const userId = req.user?.userId ?? '';
+      const user = req.user as AuthenticatedUser | undefined;
       const report = await prisma.backtestReport.findFirst({
-        where: { id: String(req.params.id), userId },
+        where: { id: String(req.params.id), userId: user?.userId ?? '' },
       });
       if (!report) {
         const lang = detectLang(req);
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: t('backtest.not_found', lang) }, timestamp: new Date().toISOString() });
         return;
       }
-      res.json({
-        success: true,
-        data: {
-          ...report,
-          equityCurve: JSON.parse(report.equityCurve) as unknown,
-          drawdownCurve: JSON.parse(report.drawdownCurve) as unknown,
-          monthlyReturns: JSON.parse(report.monthlyReturns) as unknown,
-          trades: JSON.parse(report.trades) as unknown,
-          parameters: JSON.parse(report.parameters) as unknown,
-        },
-        timestamp: new Date().toISOString(),
-      });
+      res.json({ success: true, data: report, timestamp: new Date().toISOString() });
     } catch (err) { next(err); }
   });
 
