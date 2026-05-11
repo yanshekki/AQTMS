@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Card, CardContent, Button, TextField, Grid, Chip, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Divider, Stack, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Card, CardContent, Button, TextField, Grid, Chip, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Stack, CircularProgress, Alert } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -69,13 +69,11 @@ export default function Strategies() {
     }
   };
 
-  // Improved version tracking without mock random performance
   const addVersion = (strategy: any) => {
     const newVersion: StrategyVersion = {
       id: `v${Date.now()}`,
       params: strategy.params || '{}',
       createdAt: new Date().toISOString(),
-      // Performance will be populated after real backtest runs
     };
     setVersions(prev => [...prev, newVersion]);
   };
@@ -89,7 +87,7 @@ export default function Strategies() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, backgroundColor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
       <Typography variant="h4" gutterBottom>Strategy Management</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
@@ -103,8 +101,7 @@ export default function Strategies() {
 
       {activeTab === 0 && (
         <>
-          {/* Create New Strategy */}
-          <Card sx={{ mb: 3 }}>
+          <Card sx={{ mb: 3, backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Create New Strategy</Typography>
               <Grid container spacing={2} alignItems="center">
@@ -146,8 +143,7 @@ export default function Strategies() {
             </CardContent>
           </Card>
 
-          {/* Strategy List with Deploy + Backtest + Versioning */}
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Your Strategies</Typography>
               {strategies.length === 0 ? (
@@ -195,7 +191,7 @@ export default function Strategies() {
       )}
 
       {activeTab === 1 && (
-        <Card>
+        <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>Performance Tracking (by Version)</Typography>
             {versions.length === 0 ? (
@@ -219,7 +215,6 @@ export default function Strategies() {
         </Card>
       )}
 
-      {/* Backtest Result Dialog */}
       <Dialog open={!!backtestResult} onClose={() => setBacktestResult(null)} maxWidth="md" fullWidth>
         <DialogTitle>Backtest Result - {selectedStrategy?.name}</DialogTitle>
         <DialogContent>
