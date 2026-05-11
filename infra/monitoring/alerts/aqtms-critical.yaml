@@ -1,0 +1,25 @@
+groups:
+- name: aqtms-critical
+  rules:
+  - alert: KillSwitchActive
+    expr: killswitch_active == 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kill Switch is ACTIVE"
+      description: "Immediate investigation required. Trading may be halted."
+
+  - alert: HighOrderExecutionLatency
+    expr: histogram_quantile(0.95, execution_latency_seconds_bucket) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High order execution latency detected"
+
+  - alert: PodCrashLooping
+    expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+    for: 5m
+    labels:
+      severity: critical
