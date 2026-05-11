@@ -23,3 +23,19 @@ groups:
     for: 5m
     labels:
       severity: critical
+
+  - alert: HighRiskExposure
+    expr: risk_exposure_ratio > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High portfolio risk exposure"
+
+  - alert: StrategyExecutionFailure
+    expr: increase(strategy_execution_errors_total[5m]) > 3
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Multiple strategy execution failures"
