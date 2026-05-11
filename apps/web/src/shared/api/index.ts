@@ -1,4 +1,4 @@
-export { axiosInstance, safeGet, safePost, safePut, safeDelete } from './axiosInstance';
+export { axiosInstance, safeGet, safePost, safePut, safeDelete, safePatch } from './axiosInstance';
 export { tradeApi } from './tradeApi';
 export { riskApi } from './riskApi';
 export { portfolioApi } from './portfolioApi';

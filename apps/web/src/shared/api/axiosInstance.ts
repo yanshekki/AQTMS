@@ -100,3 +100,18 @@ export async function safeDelete<T>(
   }
   return result.data;
 }
+
+// ── Zod-guarded PATCH ──
+export async function safePatch<T>(
+  url: string,
+  body: unknown,
+  schema: ZodSchema<T>,
+): Promise<T> {
+  const response = await axiosInstance.patch<unknown>(url, body);
+  const result = schema.safeParse(response.data);
+  if (!result.success) {
+    console.error('API response validation failed:', result.error.issues);
+    throw new Error('Data format error — backend returned unexpected shape');
+  }
+  return result.data;
+}
