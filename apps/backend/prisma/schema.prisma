@@ -11,9 +11,7 @@ datasource db {
 }
 
 // =============================================
-// AQTMS Core Models - Prisma Schema (Aligned - Step 2)
-// Hexagonal + DDD aligned. All models support RBAC, audit, encryption where needed.
-// Expanded for full trading pipeline.
+// AQTMS Core Models - Prisma Schema (Fixed Relations - Step 6)
 // =============================================
 
 model User {
@@ -36,6 +34,8 @@ model User {
   scoringRules       ScoringRule[]
   notifications      Notification[]
   riskRules          RiskRule[]
+  dataSources        DataSource[]     // <-- Added for DataSource relation
+  auditLogs          AuditLog[]       // <-- Added for AuditLog relation
 }
 
 model ExchangeAccount {
@@ -281,7 +281,7 @@ model RiskRule {
   @@index([name])
 }
 
-// DataSource for data source configuration (Phase later)
+// DataSource for data source configuration
 model DataSource {
   id          String   @id @default(cuid())
   userId      String
