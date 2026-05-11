@@ -5,35 +5,81 @@ import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-ex
 export class MarketDataService {
   private readonly logger = new Logger(MarketDataService.name);
 
+  // Simple in-memory cache (TTL based)
+  private cache = new Map<string, { data: any; expiresAt: number }>();
+  private readonly CACHE_TTL_MS = 10_000; // 10 seconds cache for prices
+
   constructor(
     @Optional() private readonly ccxtAdapter?: CcxtExchangeAdapter,
   ) {}
 
-  /**
-   * Get recent close prices for a symbol (used by StrategyRunner)
-   * This is the main method required for real strategy evaluation
-   */
-  async getRecentPrices(symbol: string, limit: number = 30, exchange: string = 'binance'): Promise<number[]> {
-    try {
-      if (this.ccxtAdapter) {
-        await this.ccxtAdapter.initialize({ exchange: exchange as any, testnet: false });
+  private getCacheKey(method: string, symbol: string, exchange: string, extra?: string): string {
+    return `${exchange}:${symbol}:${method}${extra ? ':' + extra : ''}`;
+  }
 
-        // Fetch OHLCV and extract close prices
-        const ohlcv = await this.ccxtAdapter.getOHLCV(symbol, '1m', limit);
+  private getFromCache<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data as T;
+    }
+    this.cache.delete(key);
+    return null;
+  }
 
-        if (ohlcv && ohlcv.length > 0) {
-          // OHLCV format from ccxt: [timestamp, open, high, low, close, volume]
-          const closePrices = ohlcv.map((candle: any[]) => candle[4]);
-          this.logger.debug(`Fetched ${closePrices.length} real prices for ${symbol}`);
-          return closePrices;
+  private setCache(key: string, data: any, ttlMs = this.CACHE_TTL_MS) {
+    this.cache.set(key, {
+      data,
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+    let lastError: any;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 300; // exponential backoff
+          this.logger.warn(`Retry attempt ${attempt} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
+    }
+    throw lastError;
+  }
 
-      // If ccxt fails or not available, throw to force proper configuration
-      throw new Error(`Unable to fetch real market data for ${symbol}. Ensure ccxt is properly configured.`);
+  /**
+   * Get recent close prices for a symbol (used by StrategyRunner)
+   */
+  async getRecentPrices(symbol: string, limit: number = 30, exchange: string = 'binance'): Promise<number[]> {
+    const cacheKey = this.getCacheKey('recentPrices', symbol, exchange, String(limit));
+    const cached = this.getFromCache<number[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      if (!this.ccxtAdapter) {
+        throw new Error('CcxtExchangeAdapter not available');
+      }
+
+      const prices = await this.withRetry(async () => {
+        await this.ccxtAdapter.initialize({ exchange: exchange as any, testnet: false });
+        const ohlcv = await this.ccxtAdapter.getOHLCV(symbol, '1m', limit);
+
+        if (!ohlcv || ohlcv.length === 0) {
+          throw new Error(`No OHLCV data returned for ${symbol}`);
+        }
+
+        return ohlcv.map((candle: any[]) => candle[4]);
+      });
+
+      this.setCache(cacheKey, prices);
+      this.logger.debug(`Fetched ${prices.length} real prices for ${symbol}`);
+      return prices;
     } catch (error) {
       this.logger.error(`Failed to get real recent prices for ${symbol}: ${error.message}`);
-      throw error; // Re-throw so StrategyRunner knows data is unavailable
+      throw new Error(`Unable to fetch real market data for ${symbol}. ${error.message}`);
     }
   }
 
@@ -41,13 +87,23 @@ export class MarketDataService {
    * Get current price for a symbol
    */
   async getPrice(symbol: string, exchange: string = 'binance'): Promise<number> {
+    const cacheKey = this.getCacheKey('price', symbol, exchange);
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached) return cached;
+
     try {
-      if (this.ccxtAdapter) {
+      if (!this.ccxtAdapter) {
+        throw new Error('CcxtExchangeAdapter not available');
+      }
+
+      const price = await this.withRetry(async () => {
         await this.ccxtAdapter.initialize({ exchange: exchange as any });
         const ticker = await this.ccxtAdapter.getTicker(symbol);
         return ticker?.last || ticker?.close || 0;
-      }
-      throw new Error(`No real price data available for ${symbol}`);
+      });
+
+      this.setCache(cacheKey, price);
+      return price;
     } catch (error) {
       this.logger.error(`Failed to get real price for ${symbol}: ${error.message}`);
       throw error;
@@ -64,11 +120,14 @@ export class MarketDataService {
     exchange: string = 'binance',
   ): Promise<any[]> {
     try {
-      if (this.ccxtAdapter) {
+      if (!this.ccxtAdapter) {
+        throw new Error('CcxtExchangeAdapter not available');
+      }
+
+      return await this.withRetry(async () => {
         await this.ccxtAdapter.initialize({ exchange: exchange as any });
         return await this.ccxtAdapter.getOHLCV(symbol, timeframe, limit);
-      }
-      throw new Error(`No real candle data available for ${symbol}`);
+      });
     } catch (error) {
       this.logger.error(`Failed to get real candles for ${symbol}: ${error.message}`);
       throw error;
@@ -80,11 +139,14 @@ export class MarketDataService {
    */
   async getTicker(symbol: string, exchange: string = 'binance') {
     try {
-      if (this.ccxtAdapter) {
+      if (!this.ccxtAdapter) {
+        throw new Error('CcxtExchangeAdapter not available');
+      }
+
+      return await this.withRetry(async () => {
         await this.ccxtAdapter.initialize({ exchange: exchange as any });
         return await this.ccxtAdapter.getTicker(symbol);
-      }
-      throw new Error(`No real ticker data available for ${symbol}`);
+      });
     } catch (error) {
       this.logger.error(`Failed to get real ticker: ${error.message}`);
       throw error;
