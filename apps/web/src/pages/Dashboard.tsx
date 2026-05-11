@@ -1,25 +1,38 @@
-// Trading Terminal Dashboard - Phase A
+// Advanced Trading Terminal Dashboard - Phase A
 
 import React, { useState } from 'react';
 import {
   Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress,
-  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
+  TextField, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+// Assuming Recharts is available or can be added; using simple display for now if not
+
+interface OrderForm {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  type: 'MARKET' | 'LIMIT';
+  quantity: number;
+  price: number;
+  stopLoss: number;
+  takeProfit: number;
+}
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
 
   const [currentMode, setCurrentMode] = useState<'PAPER' | 'TESTNET' | 'LIVE'>('PAPER');
-  const [orderForm, setOrderForm] = useState({
+  const [orderForm, setOrderForm] = useState<OrderForm>({
     symbol: 'BTCUSDT',
     side: 'BUY',
     type: 'MARKET',
     quantity: 0.001,
     price: 0,
+    stopLoss: 0,
+    takeProfit: 0,
   });
-  const [validationResult, setValidationResult] = useState<any>(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Portfolio Summary
   const { data: summary, isLoading: isLoadingSummary } = useQuery({
@@ -35,7 +48,7 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
-  // Current Price (simple)
+  // Current Price
   const { data: currentPrice } = useQuery({
     queryKey: ['price', orderForm.symbol],
     queryFn: async () => {
@@ -45,41 +58,44 @@ export default function Dashboard() {
     refetchInterval: 5000,
   });
 
-  // Place Order Mutation
+  // Place Order Mutation with better error handling
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['positions'] });
       queryClient.invalidateQueries({ queryKey: ['portfolio-summary'] });
-      alert('Order placed successfully!');
+      setSnackbar({ open: true, message: 'Order placed successfully!', severity: 'success' });
+      // Reset form partially
+      setOrderForm(prev => ({ ...prev, quantity: 0.001, price: 0, stopLoss: 0, takeProfit: 0 }));
     },
     onError: (error: any) => {
-      alert(`Order failed: ${error.response?.data?.message || error.message}`);
+      const message = error.response?.data?.message || error.message || 'Order failed';
+      setSnackbar({ open: true, message, severity: 'error' });
     },
   });
 
   const handlePlaceOrder = () => {
+    // Basic validation
+    if (!orderForm.symbol || orderForm.quantity <= 0) {
+      setSnackbar({ open: true, message: 'Please enter valid symbol and quantity', severity: 'error' });
+      return;
+    }
+
     const orderData = {
       ...orderForm,
       isPaper: currentMode === 'PAPER',
       testnet: currentMode === 'TESTNET',
-      userId: 'demo-user', // TODO: replace with real auth
+      userId: 'demo-user',
       exchangeAccountId: currentMode === 'PAPER' ? 'demo-paper' : 'demo-testnet',
       price: orderForm.type === 'LIMIT' ? orderForm.price : undefined,
+      stopLoss: orderForm.stopLoss > 0 ? orderForm.stopLoss : undefined,
+      takeProfit: orderForm.takeProfit > 0 ? orderForm.takeProfit : undefined,
     };
     placeOrder.mutate(orderData);
   };
 
-  const runValidation = async () => {
-    try {
-      const res = await axios.post('/api/execution/validate-testing', {
-        userId: 'demo-user',
-        exchangeAccountId: 'demo-account',
-      });
-      setValidationResult(res.data);
-    } catch (err) {
-      setValidationResult({ ready: false, issues: ['Validation failed'] });
-    }
+  const handleInputChange = (field: keyof OrderForm, value: any) => {
+    setOrderForm(prev => ({ ...prev, [field]: value }));
   };
 
   if (isLoadingSummary || isLoadingPositions) return <LinearProgress />;
@@ -99,14 +115,13 @@ export default function Dashboard() {
             <Button variant="outlined" size="small" onClick={() => setCurrentMode('PAPER')}>PAPER</Button>
             <Button variant="outlined" size="small" onClick={() => setCurrentMode('TESTNET')}>TESTNET</Button>
             <Button variant="outlined" size="small" color="error" onClick={() => setCurrentMode('LIVE')}>LIVE</Button>
-            <Button variant="outlined" size="small" onClick={runValidation}>Validate Env</Button>
           </Stack>
           {currentMode === 'LIVE' && <Alert severity="error" sx={{ mt: 1 }}>⚠️ LIVE MODE - Real funds at risk!</Alert>}
         </CardContent>
       </Card>
 
       <Grid container spacing={3}>
-        {/* Quick Order Panel */}
+        {/* Quick Order Panel with SL/TP */}
         <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
@@ -116,7 +131,7 @@ export default function Dashboard() {
                 <TextField
                   label="Symbol"
                   value={orderForm.symbol}
-                  onChange={(e) => setOrderForm({ ...orderForm, symbol: e.target.value.toUpperCase() })}
+                  onChange={(e) => handleInputChange('symbol', e.target.value.toUpperCase())}
                   fullWidth
                 />
 
@@ -124,7 +139,7 @@ export default function Dashboard() {
                   select
                   label="Side"
                   value={orderForm.side}
-                  onChange={(e) => setOrderForm({ ...orderForm, side: e.target.value })}
+                  onChange={(e) => handleInputChange('side', e.target.value)}
                   fullWidth
                 >
                   <MenuItem value="BUY">BUY</MenuItem>
@@ -135,7 +150,7 @@ export default function Dashboard() {
                   select
                   label="Type"
                   value={orderForm.type}
-                  onChange={(e) => setOrderForm({ ...orderForm, type: e.target.value })}
+                  onChange={(e) => handleInputChange('type', e.target.value)}
                   fullWidth
                 >
                   <MenuItem value="MARKET">MARKET</MenuItem>
@@ -146,19 +161,38 @@ export default function Dashboard() {
                   label="Quantity"
                   type="number"
                   value={orderForm.quantity}
-                  onChange={(e) => setOrderForm({ ...orderForm, quantity: parseFloat(e.target.value) })}
+                  onChange={(e) => handleInputChange('quantity', parseFloat(e.target.value))}
                   fullWidth
+                  inputProps={{ step: 0.001 }}
                 />
 
                 {orderForm.type === 'LIMIT' && (
                   <TextField
-                    label="Price"
+                    label="Limit Price"
                     type="number"
                     value={orderForm.price}
-                    onChange={(e) => setOrderForm({ ...orderForm, price: parseFloat(e.target.value) })}
+                    onChange={(e) => handleInputChange('price', parseFloat(e.target.value))}
                     fullWidth
                   />
                 )}
+
+                {/* Stop Loss / Take Profit */}
+                <TextField
+                  label="Stop Loss Price (optional)"
+                  type="number"
+                  value={orderForm.stopLoss}
+                  onChange={(e) => handleInputChange('stopLoss', parseFloat(e.target.value))}
+                  fullWidth
+                  inputProps={{ step: 0.01 }}
+                />
+                <TextField
+                  label="Take Profit Price (optional)"
+                  type="number"
+                  value={orderForm.takeProfit}
+                  onChange={(e) => handleInputChange('takeProfit', parseFloat(e.target.value))}
+                  fullWidth
+                  inputProps={{ step: 0.01 }}
+                />
 
                 <Typography variant="body2" color="text.secondary">
                   Current Price: {currentPrice ? `$${currentPrice}` : 'Loading...'}
@@ -171,7 +205,7 @@ export default function Dashboard() {
                   onClick={handlePlaceOrder}
                   disabled={placeOrder.isPending}
                 >
-                  {placeOrder.isPending ? 'Placing...' : `${orderForm.side} ${orderForm.symbol}`}
+                  {placeOrder.isPending ? 'Placing Order...' : `${orderForm.side} ${orderForm.symbol}`}
                 </Button>
               </Stack>
             </CardContent>
@@ -182,9 +216,9 @@ export default function Dashboard() {
         <Grid item xs={12} md={7}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Live Positions (PnL: ${totalUnrealizedPnl.toFixed(2)})</Typography>
+              <Typography variant="h6" gutterBottom>Live Positions (Total Unrealized PnL: ${totalUnrealizedPnl.toFixed(2)})</Typography>
 
-              <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -205,7 +239,7 @@ export default function Dashboard() {
                           <TableCell><strong>{pos.symbol}</strong></TableCell>
                           <TableCell align="right">{pos.quantity}</TableCell>
                           <TableCell align="right">${pos.avgPrice?.toFixed(2) || '-'}</TableCell>
-                          <TableCell align="right" sx={{ color: (pos.unrealizedPnl || 0) >= 0 ? 'success.main' : 'error.main' }}>
+                          <TableCell align="right" sx={{ color: (pos.unrealizedPnl || 0) >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
                             ${(pos.unrealizedPnl || 0).toFixed(2)}
                           </TableCell>
                         </TableRow>
@@ -218,19 +252,29 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Quick Backtest (kept from before) */}
+        {/* Simple Price Info / Future Chart Placeholder */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>📊 Quick Backtest</Typography>
-              {/* Keep simplified backtest section or link to Strategies page */}
-              <Typography variant="body2" color="text.secondary">
-                Use the Strategies page for full backtesting. Quick backtest available in previous version.
+              <Typography variant="h6" gutterBottom>Market Overview</Typography>
+              <Typography variant="body1">
+                Current {orderForm.symbol} Price: <strong>{currentPrice ? `$${currentPrice}` : 'Loading...'}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                (Real-time price chart integration coming in next iteration. Current price updates every 5 seconds.)
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+      />
     </Box>
   );
 }
