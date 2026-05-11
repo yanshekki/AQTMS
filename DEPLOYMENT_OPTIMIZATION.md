@@ -1,18 +1,38 @@
-# AQTMS Production Deployment Optimization (Phase E - Advanced)
+# AQTMS Production Deployment Optimization (Phase C - Complete Landing)
 
-## Compliance & Audit Logging
-- Added `AuditService` (global module)
-- Automatically logs key events: Order execution, Risk rejections, Kill Switch blocks
-- In production: Extend to persist in database or forward to SIEM / compliance system
+## Secrets Management (Production Ready)
+- Use `existingSecret: aqtms-backend-secrets` in Helm values
+- Recommended: External Secrets Operator + AWS Secrets Manager / Vault
+- Example manifests available in `infra/external-secrets/`
 
-## Performance Optimizations
-- Use Redis for caching frequently accessed data (positions, market data, strategy state)
-- Connection pooling already handled by Prisma + BullMQ
-- Consider adding response caching middleware for read-heavy endpoints
-- Monitor with the observability stack (Prometheus + Grafana)
+## Observability Stack (Complete)
+### Metrics
+- Prometheus + ServiceMonitor + PrometheusRule (enabled by default)
 
-## Recommended Production Hardening
-- Enable Audit logging to persistent storage
-- Add rate limiting + DDoS protection at ingress
-- Regular security audits + dependency updates
-- Load testing before going live with real capital
+### Logs
+- Loki enabled in values
+- Use Promtail to collect container logs
+
+### Traces
+- OpenTelemetry configured via `OTEL_EXPORTER_OTLP_ENDPOINT`
+- Tempo / Jaeger recommended
+- Backend now supports OTEL env vars out of the box
+
+### Dashboards
+- Basic: `infra/grafana/aqtms-overview-dashboard.json`
+- Full Observability: `infra/grafana/aqtms-full-observability-dashboard.json`
+
+## Recommended Production Values
+See updated `infra/helm/backend/values.yaml` for production-ready settings including:
+- Resource limits & HPA
+- SecurityContext (non-root)
+- Observability flags
+- External Secrets integration
+
+## Quick Production Checklist
+- [ ] External Secrets Operator deployed
+- [ ] All secrets in ExternalSecret / Vault
+- [ ] Prometheus + Grafana + Loki + Tempo running
+- [ ] Ingress + TLS configured
+- [ ] Kill Switch + Paper Trading flags set correctly
+- [ ] ResourceQuotas + NetworkPolicies enabled
