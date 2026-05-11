@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface PriceUpdate {
@@ -7,28 +7,41 @@ interface PriceUpdate {
   timestamp: number;
 }
 
-let socket: Socket | null = null;
+let globalSocket: Socket | null = null;
 
 const getSocket = () => {
-  if (!socket) {
-    socket = io('http://localhost:3000/trading', {
+  if (!globalSocket) {
+    globalSocket = io('http://localhost:3000/trading', {
       transports: ['websocket'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
-    socket.on('connect', () => {
-      socket?.emit('auth', { userId: 'demo-user' });
+    globalSocket.on('connect', () => {
+      globalSocket?.emit('auth', { userId: 'demo-user' });
+    });
+
+    globalSocket.on('disconnect', () => {
+      console.warn('WebSocket disconnected');
+    });
+
+    globalSocket.on('connect_error', (err) => {
+      console.error('WebSocket connection error:', err);
     });
   }
-  return socket;
+  return globalSocket;
 };
 
 export function useRealTimePrice(symbols: string[] = []) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [isConnected, setIsConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const s = getSocket();
+    socketRef.current = s;
 
     const onConnect = () => setIsConnected(true);
     const onDisconnect = () => setIsConnected(false);
@@ -45,6 +58,11 @@ export function useRealTimePrice(symbols: string[] = []) {
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
     s.on('price:update', onPriceUpdate);
+
+    // Initial connection status
+    if (s.connected) {
+      setIsConnected(true);
+    }
 
     return () => {
       s.off('connect', onConnect);
