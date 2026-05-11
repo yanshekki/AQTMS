@@ -11,6 +11,13 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { logger } from './logger';
 
+interface AuthenticatedSocketUser {
+  userId: string;
+  walletAddress?: string;
+  role?: string;
+  permissions?: string[];
+}
+
 let io: Server | null = null;
 
 export function initWebSocket(server: HttpServerType, jwtSecret: string, corsOrigin: string): Server {
@@ -26,14 +33,14 @@ export function initWebSocket(server: HttpServerType, jwtSecret: string, corsOri
     const token = socket.handshake.auth?.token as string | undefined;
     if (!token) return next(new Error('Authentication required'));
     try {
-      const decoded = jwt.verify(token, jwtSecret) as { userId: string; walletAddress: string; role: string; permissions: string[] };
-      (socket as unknown as Record<string, unknown>).user = decoded;
+      const decoded = jwt.verify(token, jwtSecret) as AuthenticatedSocketUser;
+      (socket as any).user = decoded;
       next();
     } catch { next(new Error('Invalid token')); }
   });
 
   io.on('connection', (socket: Socket) => {
-    const user = (socket as unknown as Record<string, unknown>).user as { userId: string };
+    const user = (socket as any).user as AuthenticatedSocketUser;
     logger.info({ userId: user.userId }, 'WebSocket connected');
     socket.join(`user:${user.userId}`);
     socket.on('subscribe:exchange', (exchangeId: string) => { socket.join(`exchange:${exchangeId}`); });
