@@ -1,53 +1,59 @@
 export interface RetryOptions {
-  retries?: number;           // 最大重試次數（預設 3）
-  delay?: number;             // 初始延遲毫秒（預設 500ms）
-  factor?: number;            // 指數退避倍數（預設 2）
-  maxDelay?: number;          // 最大延遲時間（預設 10000ms）
-  shouldRetry?: (error: any) => boolean; // 自訂是否需要重試
-  onRetry?: (error: any, attempt: number) => void; // 重試時的回調
+  maxAttempts?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  backoffMultiplier?: number;
+  shouldRetry?: (error: any) => boolean;
 }
 
-/**
- * 帶指數退避的重試工具
- */
-export async function retry<T>(
+const DEFAULT_OPTIONS: Required<RetryOptions> = {
+  maxAttempts: 3,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+  shouldRetry: (error: any) => {
+    // Retry on network errors, timeouts, rate limits (common in exchange APIs)
+    const message = error?.message?.toLowerCase() || '';
+    return (
+      message.includes('timeout') ||
+      message.includes('network') ||
+      message.includes('econnreset') ||
+      message.includes('rate limit') ||
+      message.includes('429') ||
+      message.includes('503') ||
+      message.includes('502')
+    );
+  },
+};
+
+export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {},
 ): Promise<T> {
-  const {
-    retries = 3,
-    delay = 500,
-    factor = 2,
-    maxDelay = 10000,
-    shouldRetry = () => true,
-    onRetry,
-  } = options;
-
+  const opts = { ...DEFAULT_OPTIONS, ...options };
   let lastError: any;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
 
-      if (attempt === retries || !shouldRetry(error)) {
+      if (attempt === opts.maxAttempts || !opts.shouldRetry(error)) {
         throw error;
       }
 
-      // 計算延遲時間（指數退避 + 最大上限）
-      const backoffDelay = Math.min(delay * Math.pow(factor, attempt), maxDelay);
-
-      if (onRetry) {
-        onRetry(error, attempt + 1);
-      }
-
-      console.warn(
-        `[Retry] Attempt ${attempt + 1} failed. Retrying in ${backoffDelay}ms...`,
-        error.message || error,
+      const delay = Math.min(
+        opts.initialDelayMs * Math.pow(opts.backoffMultiplier, attempt - 1),
+        opts.maxDelayMs,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+      console.warn(
+        `[Retry] Attempt ${attempt}/${opts.maxAttempts} failed. Retrying in ${delay}ms...`,
+        error?.message,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 

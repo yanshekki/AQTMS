@@ -1,9 +1,11 @@
-import { Injectable, Logger, BadRequestException, Optional, Inject } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RiskService } from '../risk/risk.service';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
 import { EncryptionService } from '../infrastructure/shared/encryption.service';
 import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-exchange.adapter';
+import { withRetry } from '../common/utils/retry.util';
+import { CircuitBreaker } from '../common/utils/circuit-breaker';
 
 export interface OrderExecutionResult {
   success: boolean;
@@ -19,6 +21,13 @@ export interface OrderExecutionResult {
 export class ExecutionService {
   private readonly logger = new Logger(ExecutionService.name);
 
+  // Circuit breaker for live exchange calls (per instance)
+  private readonly liveTradingBreaker = new CircuitBreaker({
+    failureThreshold: 5,
+    successThreshold: 2,
+    resetTimeoutMs: 60000, // 1 minute
+  });
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly riskService: RiskService,
@@ -30,7 +39,6 @@ export class ExecutionService {
   async executeOrder(orderData: any): Promise<OrderExecutionResult> {
     this.logger.log(`Executing order for symbol: ${orderData.symbol}, side: ${orderData.side}`);
 
-    // 1. Risk Evaluation
     const riskResult = await this.riskService.evaluateRisk(orderData);
 
     if (!riskResult.passed) {
@@ -43,7 +51,7 @@ export class ExecutionService {
 
     const isPaper = orderData.isPaper !== false;
 
-    // 2. Kill Switch Check (for live trading)
+    // Kill Switch Check
     if (!isPaper) {
       const isKillSwitchActive = await this.checkKillSwitch(orderData.userId);
       if (isKillSwitchActive) {
@@ -54,8 +62,9 @@ export class ExecutionService {
       }
     }
 
-    // 3. Paper Trading Path (fully integrated)
+    // Paper Trading Path
     if (isPaper && this.paperTradingService) {
+      // ... (paper trading logic remains the same)
       const simulatedPrice = orderData.price || 50000;
       const orderId = orderData.orderId || `paper-${Date.now()}`;
 
@@ -79,8 +88,6 @@ export class ExecutionService {
           },
         }).catch((e) => this.logger.warn('Log failed', e.message));
 
-        this.logger.log(`Paper order fully processed: ${orderId}`);
-
         return {
           success: true,
           orderId,
@@ -94,21 +101,19 @@ export class ExecutionService {
       }
     }
 
-    // 4. Real Live Trading Path (Phase A)
+    // Real Live Trading Path with Circuit Breaker + Retry
     if (!isPaper) {
-      this.logger.log('=== LIVE TRADING MODE ===');
+      this.logger.log('=== LIVE TRADING MODE (with Circuit Breaker + Retry) ===');
 
       if (!this.ccxtAdapter || !this.encryptionService) {
-        this.logger.error('Real trading dependencies missing (ccxtAdapter or EncryptionService)');
         return {
           success: false,
-          message: 'Real trading not configured. Missing ccxt adapter or encryption service.',
+          message: 'Real trading not configured.',
           riskResult,
         };
       }
 
       try {
-        // Get ExchangeAccount and decrypt API keys
         const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
           where: { id: orderData.exchangeAccountId },
         });
@@ -118,11 +123,11 @@ export class ExecutionService {
         }
 
         const apiKey = this.encryptionService.decrypt(exchangeAccount.apiKeyEncrypted);
-        const apiSecret = exchangeAccount.apiSecretEncrypted 
-          ? this.encryptionService.decrypt(exchangeAccount.apiSecretEncrypted) 
+        const apiSecret = exchangeAccount.apiSecretEncrypted
+          ? this.encryptionService.decrypt(exchangeAccount.apiSecretEncrypted)
           : undefined;
 
-        // Initialize ccxt with real credentials
+        // Initialize adapter
         await this.ccxtAdapter.initialize({
           exchange: exchangeAccount.exchange as any,
           apiKey,
@@ -130,16 +135,29 @@ export class ExecutionService {
           testnet: exchangeAccount.testnet || false,
         });
 
-        // Place real order
-        const liveResult = await this.ccxtAdapter.placeOrder({
-          symbol: orderData.symbol,
-          side: orderData.side?.toUpperCase(),
-          type: orderData.type || 'MARKET',
-          quantity: orderData.quantity,
-          price: orderData.price,
-          stopLoss: orderData.stopLoss,
-          takeProfit: orderData.takeProfit,
-        });
+        // Wrap live order placement with Circuit Breaker + Retry
+        const liveResult = await this.liveTradingBreaker.execute(() =>
+          withRetry(
+            () =>
+              this.ccxtAdapter!.placeOrder({
+                symbol: orderData.symbol,
+                side: orderData.side?.toUpperCase(),
+                type: orderData.type || 'MARKET',
+                quantity: orderData.quantity,
+                price: orderData.price,
+                stopLoss: orderData.stopLoss,
+                takeProfit: orderData.takeProfit,
+              }),
+            {
+              maxAttempts: 3,
+              initialDelayMs: 800,
+              shouldRetry: (err) => {
+                const msg = err?.message?.toLowerCase() || '';
+                return msg.includes('timeout') || msg.includes('network') || msg.includes('rate');
+              },
+            },
+          ),
+        );
 
         const orderId = liveResult?.id || `live-${Date.now()}`;
 
@@ -152,18 +170,26 @@ export class ExecutionService {
           },
         }).catch((e) => this.logger.warn('Log failed', e.message));
 
-        this.logger.log(`LIVE order placed successfully: ${orderId}`);
+        this.logger.log(`LIVE order placed successfully with protection: ${orderId}`);
 
         return {
           success: true,
           orderId,
           executionPrice: liveResult?.price || orderData.price,
-          message: 'Live order executed on exchange',
+          message: 'Live order executed on exchange (protected by Circuit Breaker + Retry)',
           riskResult,
           liveResult,
         };
       } catch (err: any) {
-        this.logger.error('Live trading execution failed', err);
+        this.logger.error('Live trading execution failed (after Circuit Breaker/Retry)', err);
+
+        if (err.message?.includes('Circuit breaker is OPEN')) {
+          throw new BadRequestException({
+            message: 'Exchange temporarily unavailable due to repeated failures. Please try again later.',
+            reason: 'CIRCUIT_BREAKER_OPEN',
+          });
+        }
+
         throw new BadRequestException({
           message: 'Live order execution failed',
           error: err.message,
@@ -171,7 +197,6 @@ export class ExecutionService {
       }
     }
 
-    // Fallback
     return {
       success: false,
       message: 'No execution path available',
@@ -181,18 +206,15 @@ export class ExecutionService {
 
   private async checkKillSwitch(userId: string): Promise<boolean> {
     try {
-      const safety = await this.prisma.safetySetting?.findFirst?.({
-        where: { userId },
-      });
+      const safety = await this.prisma.safetySetting?.findFirst?.({ where: { userId } });
       return safety?.killSwitchActive === true;
     } catch {
-      return false; // fail open for now
+      return false;
     }
   }
 
   async cancelOrder(orderId: string, userId: string): Promise<{ success: boolean; message: string }> {
     this.logger.log(`Cancelling order: ${orderId}`);
-    // TODO: Implement real cancel via ccxt if live
     return {
       success: true,
       message: `Order ${orderId} cancelled (demo)`,
