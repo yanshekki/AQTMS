@@ -1,46 +1,33 @@
-# AQTMS Production Deployment Optimization (Updated Phase E)
+# AQTMS Production Deployment Optimization (Phase C - External Secrets)
 
-## CI/CD Pipeline
-- GitHub Actions workflow added for:
-  - Backend lint + type check + tests
-  - Frontend build
-  - Helm lint
-  - Docker image build (ready for registry push)
-- Recommended: Add deployment job with ArgoCD or Flux for GitOps
+## External Secrets Operator (Recommended for Production)
 
-## External Secrets Management (Recommended for Production)
-```yaml
-# Example using External Secrets Operator
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: aqtms-backend-secrets
-spec:
-  secretStoreRef:
-    name: aws-secrets-manager
-    kind: SecretStore
-  target:
-    name: aqtms-backend-secrets
-  data:
-    - secretKey: JWT_SECRET
-      remoteRef:
-        key: aqtms/production
-        property: jwt_secret
-    # Add other secrets (DB, API keys, etc.)
+We now provide concrete examples under `infra/external-secrets/`.
+
+### 1. Install External Secrets Operator
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
 
-## Better Monitoring
-- PrometheusRule with critical alerts already included
-- Recommended additions:
-  - High memory/CPU alerts
-  - Reconciliation failure rate
-  - Order execution failure rate
-- Centralized logging with Loki + Promtail
+### 2. Create SecretStore (AWS Secrets Manager example)
+See `infra/external-secrets/secret-store.yaml`
 
-## Production Checklist
-- [ ] External Secrets Operator deployed
-- [ ] All secrets externalized (no hardcoded values)
-- [ ] CI/CD pipeline green on main
-- [ ] Resource quotas + NetworkPolicies enabled
-- [ ] Backup strategy for database
-- [ ] Disaster recovery runbook
+### 3. Create ExternalSecret for Backend
+See `infra/external-secrets/external-secret-backend.yaml`
+
+After applying these, your Kubernetes secrets will be automatically synced from AWS Secrets Manager.
+
+## Helm Integration
+In your Helm values, use:
+```yaml
+secret:
+  existingSecret: aqtms-backend-secrets
+```
+
+This way, sensitive values are never stored in Git or Helm values.
+
+## Next Steps
+- Create IAM role + ServiceAccount for External Secrets
+- Set up proper Secret rotation policy in AWS
+- Add similar ExternalSecret for frontend if needed
