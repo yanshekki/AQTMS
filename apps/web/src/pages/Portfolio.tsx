@@ -1,4 +1,4 @@
-// ── Portfolio Dashboard (Professional + Real-time Ready) ──
+// ── Portfolio Dashboard (Professional + Real-time Price Streaming) ──
 
 import { usePortfolio } from '@/features/portfolio/model/usePortfolio';
 import { PortfolioSummary } from '@/features/portfolio/ui/PortfolioSummary';
@@ -6,11 +6,36 @@ import { PositionTable } from '@/features/portfolio/ui/PositionTable';
 import { Container, Typography, Box, Button, Chip, Alert, Stack, Grid, Card, CardContent, CircularProgress } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 
 export function PortfolioPage() {
   const { summary, positions, isLoading, lastUpdated, refresh, error } = usePortfolio();
-
   const alerts = summary?.alerts || [];
+
+  // WebSocket for real-time price updates
+  useEffect(() => {
+    const socket = io('http://localhost:3000/trading', {
+      transports: ['websocket'],
+      autoConnect: true,
+    });
+
+    socket.on('connect', () => {
+      socket.emit('auth', { userId: 'demo-user' });
+    });
+
+    // Listen to real-time price updates and refresh positions
+    socket.on('price:update', (data: { symbol: string; price: number; timestamp: number }) => {
+      // Refresh portfolio when key prices update (simple but effective)
+      if (['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].includes(data.symbol)) {
+        refresh();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [refresh]);
 
   // Asset Allocation - strictly from real positions data
   const allocationData = positions.length > 0 

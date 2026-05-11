@@ -1,14 +1,14 @@
-import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, forwardRef, OnModuleInit } from '@nestjs/common';
 import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-exchange.adapter';
 import { WebsocketGateway } from '../websocket/websocket.gateway';
 
 @Injectable()
-export class MarketDataService {
+export class MarketDataService implements OnModuleInit {
   private readonly logger = new Logger(MarketDataService.name);
 
   // Simple in-memory cache (TTL based)
   private cache = new Map<string, { data: any; expiresAt: number }>();
-  private readonly CACHE_TTL_MS = 5_000; // 5 seconds for real-time feel
+  private readonly CACHE_TTL_MS = 5_000;
 
   // Active price streaming intervals per symbol
   private priceStreams = new Map<string, NodeJS.Timeout>();
@@ -17,6 +17,21 @@ export class MarketDataService {
     @Optional() private readonly ccxtAdapter?: CcxtExchangeAdapter,
     @Optional() @Inject(forwardRef(() => WebsocketGateway)) private readonly websocketGateway?: WebsocketGateway,
   ) {}
+
+  async onModuleInit() {
+    // Auto-start real-time price streaming for popular symbols on bootstrap
+    // This makes real-time updates available application-wide
+    const popularSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+
+    for (const symbol of popularSymbols) {
+      try {
+        await this.startPriceStreaming(symbol, 'binance', 3000);
+        this.logger.log(`Auto-started real-time streaming for ${symbol}`);
+      } catch (error) {
+        this.logger.warn(`Failed to auto-start streaming for ${symbol}: ${error.message}`);
+      }
+    }
+  }
 
   private getCacheKey(method: string, symbol: string, exchange: string, extra?: string): string {
     return `${exchange}:${symbol}:${method}${extra ? ':' + extra : ''}`;
