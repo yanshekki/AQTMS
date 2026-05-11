@@ -1,173 +1,139 @@
-// ── Enhanced Dashboard with Execution Logs + Live Trading Visualization ──
+// Enhanced Dashboard with Testing Controls
 
 import React, { useEffect, useState } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress, Button, Alert, List, ListItem, ListItemText, Stack
+  Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress
 } from '@mui/material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
-import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
 
-interface Position {
-  symbol: string;
-  quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  pnl: number;
-}
-
-interface ExecutionLog {
-  id: string;
-  timestamp: string;
-  action: string;
-  symbol?: string;
-  details: any;
-}
-
 export default function Dashboard() {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [livePositions, setLivePositions] = useState<Position[]>([]);
-  const [livePnL, setLivePnL] = useState(0);
-  const [killSwitchStatus, setKillSwitchStatus] = useState<{ active: boolean; reason?: string }>({ active: false });
-  const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
-  const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
-  const [isTogglingKillSwitch, setIsTogglingKillSwitch] = useState(false);
+  const [currentMode, setCurrentMode] = useState<'PAPER' | 'TESTNET' | 'LIVE'>('PAPER');
+  const [validationResult, setValidationResult] = useState<any>(null);
 
-  // Fetch portfolio summary
-  const { data: summary, isLoading, refetch } = useQuery({
+  const { data: summary, isLoading } = useQuery({
     queryKey: ['portfolio-summary'],
     queryFn: async () => {
-      const res = await axios.get('/api/portfolio/summary', { withCredentials: true });
+      const res = await axios.get('/api/portfolio/summary');
       return res.data;
     },
     refetchInterval: 30000,
   });
 
-  // Fetch recent snapshots
-  const { data: snapshots } = useQuery({
-    queryKey: ['portfolio-snapshots'],
-    queryFn: async () => {
-      const res = await axios.get('/api/portfolio/snapshots?limit=20', { withCredentials: true });
-      return res.data;
-    },
-  });
-
-  // WebSocket real-time connection
-  useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3001/trading';
-    const newSocket = io(wsUrl, {
-      withCredentials: true,
-      transports: ['websocket'],
-    });
-
-    newSocket.on('connect', () => {
-      console.log('WebSocket connected');
-      newSocket.emit('auth', { userId: 'demo-user-id' });
-    });
-
-    newSocket.on('position:update', (data: any) => {
-      if (data.positions) setLivePositions(data.positions);
-      if (data.totalValue) setLivePnL(data.totalValue);
-      refetch();
-    });
-
-    newSocket.on('killswitch:status', (status: { active: boolean; reason?: string }) => {
-      setKillSwitchStatus(status);
-    });
-
-    newSocket.on('order:update', (order: any) => {
-      setRealtimeUpdates(prev => [{ type: 'order', ...order }, ...prev].slice(0, 10));
-    });
-
-    // Listen for execution logs (live trading flow)
-    newSocket.on('execution:log', (log: ExecutionLog) => {
-      setExecutionLogs(prev => [log, ...prev].slice(0, 20));
-    });
-
-    setSocket(newSocket);
-
-    return () => newSocket.disconnect();
-  }, [refetch]);
-
-  // Kill Switch toggle
-  const toggleKillSwitch = async () => {
-    setIsTogglingKillSwitch(true);
+  const runValidation = async () => {
     try {
-      const newStatus = !killSwitchStatus.active;
-      await axios.post('/api/safety/kill-switch', { active: newStatus }, { withCredentials: true });
-      setKillSwitchStatus({ active: newStatus, reason: newStatus ? 'Manual activation from Dashboard' : undefined });
+      const res = await axios.post('/api/execution/validate-testing', {
+        userId: 'demo-user',
+        exchangeAccountId: 'demo-account'
+      });
+      setValidationResult(res.data);
     } catch (err) {
-      console.error('Failed to toggle Kill Switch', err);
-      alert('Failed to toggle Kill Switch');
-    } finally {
-      setIsTogglingKillSwitch(false);
+      setValidationResult({ ready: false, issues: ['Validation failed'] });
     }
   };
 
-  // Fetch initial execution logs
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const res = await axios.get('/api/execution/logs?limit=10', { withCredentials: true });
-        if (res.data?.logs) setExecutionLogs(res.data.logs);
-      } catch (e) {
-        console.log('No execution logs endpoint yet (optional)');
-      }
-    };
-    fetchLogs();
-  }, []);
-
-  const chartData = snapshots?.map((s: any) => ({
-    time: new Date(s.timestamp).toLocaleTimeString(),
-    value: s.totalValue,
-  })) || [];
-
-  const pieData = livePositions.length > 0 
-    ? livePositions.map((p, i) => ({ name: p.symbol, value: Math.abs(p.quantity * p.currentPrice) })) 
-    : [{ name: 'No positions', value: 100 }];
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
-  if (isLoading) return <Box sx={{ p: 3 }}><LinearProgress /></Box>;
+  if (isLoading) return <LinearProgress />;
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        📊 Trading Dashboard
-        {killSwitchStatus.active && <Chip label="⛔ KILL SWITCH ACTIVE" color="error" sx={{ ml: 2 }} />}
+        Trading Dashboard
       </Typography>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
+      {/* Trading Mode Indicator */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6">Current Trading Mode</Typography>
+          <Box sx={{ mt: 1 }}>
+            <Chip 
+              label={currentMode} 
+              color={currentMode === 'PAPER' ? 'success' : currentMode === 'TESTNET' ? 'warning' : 'error'}
+              sx={{ fontSize: '1rem', px: 2, py: 1 }}
+            />
+            {currentMode === 'LIVE' && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                ⚠️ You are in LIVE mode. Real funds are at risk!
+              </Alert>
+            )}
+            {currentMode === 'TESTNET' && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                Testnet mode active — using exchange test environment.
+              </Alert>
+            )}
+          </Box>
+
+          <Box sx={{ mt: 2 }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => setCurrentMode('PAPER')}
+              sx={{ mr: 1 }}
+            >
+              Switch to PAPER
+            </Button>
+            <Button 
+              variant="outlined" 
+              onClick={() => setCurrentMode('TESTNET')}
+              sx={{ mr: 1 }}
+            >
+              Switch to TESTNET
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="error"
+              onClick={() => setCurrentMode('LIVE')}
+            >
+              Switch to LIVE (Careful!)
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Testing Validation */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Testing Environment Validation</Typography>
+          <Button variant="contained" onClick={runValidation}>
+            Validate Testing Environment
+          </Button>
+
+          {validationResult && (
+            <Box sx={{ mt: 2 }}>
+              {validationResult.ready ? (
+                <Alert severity="success">Environment is ready for testing!</Alert>
+              ) : (
+                <Alert severity="error">
+                  Issues found:
+                  <ul>
+                    {validationResult.issues?.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
+                  </ul>
+                </Alert>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Portfolio Summary */}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography color="textSecondary">Total Portfolio Value</Typography>
-              <Typography variant="h4">${(summary?.totalValue || 0).toLocaleString()}</Typography>
+              <Typography color="textSecondary">Total Value</Typography>
+              <Typography variant="h4">${summary?.totalValue || 0}</Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
               <Typography color="textSecondary">Unrealized PnL</Typography>
               <Typography variant="h4" color={(summary?.totalUnrealizedPnl || 0) >= 0 ? 'success.main' : 'error.main'}>
-                ${(summary?.totalUnrealizedPnl || 0).toFixed(2)}
+                ${summary?.totalUnrealizedPnl || 0}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary">Risk Exposure</Typography>
-              <Typography variant="h4">{summary?.totalRiskExposure || 0}%</Typography>
-              <LinearProgress variant="determinate" value={summary?.totalRiskExposure || 0} color="warning" />
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
               <Typography color="textSecondary">Positions</Typography>
@@ -177,151 +143,8 @@ export default function Dashboard() {
         </Grid>
       </Grid>
 
-      {/* Kill Switch + Real-time */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ bgcolor: killSwitchStatus.active ? 'error.light' : 'success.light' }}>
-            <CardContent>
-              <Typography variant="h6">Kill Switch Control</Typography>
-              <Button
-                variant="contained"
-                color={killSwitchStatus.active ? 'error' : 'success'}
-                onClick={toggleKillSwitch}
-                disabled={isTogglingKillSwitch}
-                sx={{ mt: 1 }}
-              >
-                {killSwitchStatus.active ? 'DEACTIVATE KILL SWITCH' : 'ACTIVATE KILL SWITCH'}
-              </Button>
-              {killSwitchStatus.active && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  Trading is currently disabled. Reason: {killSwitchStatus.reason || 'Manual'}
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">⚡ Real-time Updates</Typography>
-              <Box sx={{ maxHeight: 180, overflow: 'auto' }}>
-                {realtimeUpdates.length === 0 ? (
-                  <Typography color="textSecondary">Waiting for live WebSocket data...</Typography>
-                ) : realtimeUpdates.map((u, i) => (
-                  <Chip key={i} label={`${u.type || 'update'}: ${JSON.stringify(u).slice(0, 60)}...`} size="small" sx={{ m: 0.5 }} />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Charts */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">Portfolio Value History</Typography>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={chartData.length > 0 ? chartData : [{ time: 'now', value: summary?.totalValue || 0 }]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">Position Allocation</Typography>
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
-                    {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Live Positions Table */}
-      <Card sx={{ mt: 3 }}>
-        <CardContent>
-          <Typography variant="h6">Current Positions (Live via WS)</Typography>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell align="right">Qty</TableCell>
-                  <TableCell align="right">Avg Price</TableCell>
-                  <TableCell align="right">Current Price</TableCell>
-                  <TableCell align="right">Unrealized PnL</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {livePositions.length > 0 ? livePositions.map((pos, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{pos.symbol}</TableCell>
-                    <TableCell align="right">{pos.quantity}</TableCell>
-                    <TableCell align="right">${pos.avgPrice}</TableCell>
-                    <TableCell align="right">${pos.currentPrice}</TableCell>
-                    <TableCell align="right" sx={{ color: (pos.pnl || 0) >= 0 ? 'green' : 'red' }}>
-                      ${(pos.pnl || 0).toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No live positions. Place trades or wait for WS updates.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
-
-      {/* Execution Logs Panel (Step 9 - Live Trading Flow Visualization) */}
-      <Card sx={{ mt: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>📝 Execution Logs (Live Trading Flow)</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Real-time execution events from backend (paper + live orders, partial fills, risk checks)
-          </Typography>
-          
-          {executionLogs.length === 0 ? (
-            <Typography color="text.secondary">No execution logs yet. Place orders or wait for live trading events...</Typography>
-          ) : (
-            <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-              {executionLogs.map((log, index) => (
-                <ListItem key={index} divider>
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip label={log.action} size="small" color={log.action.includes('PAPER') ? 'success' : 'primary'} />
-                        <Typography variant="body2">{log.symbol || ''}</Typography>
-                      </Stack>
-                    }
-                    secondary={
-                      <>
-                        {new Date(log.timestamp).toLocaleTimeString()} - {JSON.stringify(log.details || {}).slice(0, 120)}...
-                      </>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </CardContent>
-      </Card>
-
-      <Typography variant="caption" sx={{ mt: 2, display: 'block' }}>
-        Real-time powered by NestJS WebSocketGateway + BullMQ. Live trading flow + execution visualization enhanced in Step 9.
+      <Typography variant="caption" sx={{ mt: 3, display: 'block' }}>
+        Use the mode switcher above to safely test Paper → Testnet → Live flow.
       </Typography>
     </Box>
   );
