@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// IMPORTANT: User model uses `id` as primary key (not userId).
+// All code should use `user.id` instead of `user.userId`.
+// permissions is String[]
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ... rest of schema (unchanged)
+
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  role          String   @default("VIEWER")
+  permissions   String[] @default([])
+  nonce         String?  // for EIP-191 auth
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  exchangeAccounts   ExchangeAccount[]
+  trades             Trade[]
+  orders             Order[]
+  positions          Position[]
+  signals            Signal[]
+  backtestReports    BacktestReport[]
+  executionLogs      ExecutionLog[]
+  portfolioSnapshots PortfolioSnapshot[]
+  scoringRules       ScoringRule[]
+  notifications      Notification[]
+  riskRules          RiskRule[]
+  dataSources        DataSource[]
+  auditLogs          AuditLog[]
+}
+
+// ... other models unchanged
