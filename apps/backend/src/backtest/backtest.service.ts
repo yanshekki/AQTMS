@@ -13,6 +13,8 @@ export interface BacktestRequest {
   historicalBars?: Candle[];
   exchange?: 'BINANCE' | 'BYBIT';
   interval?: string;
+  feeRate?: number;           // e.g. 0.0004 (0.04%)
+  slippageRate?: number;      // e.g. 0.0005 (0.05%)
 }
 
 export interface BacktestResult {
@@ -28,6 +30,8 @@ export interface BacktestResult {
   finalCapital: number;
   equityCurve: number[];
   trades: any[];
+  totalFees: number;
+  netReturn: number;
 }
 
 @Injectable()
@@ -37,13 +41,14 @@ export class BacktestService {
   constructor(private readonly historicalDataService: HistoricalDataService) {}
 
   async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
-    this.logger.log(`Running backtest for strategy: ${request.strategyName}`);
+    this.logger.log(`Running enhanced backtest for strategy: ${request.strategyName}`);
+
+    const feeRate = request.feeRate ?? 0.0004;      // Default 0.04%
+    const slippageRate = request.slippageRate ?? 0.0005; // Default 0.05%
 
     let bars: Candle[] = request.historicalBars || [];
 
-    // Auto-fetch historical data if not provided
     if (bars.length === 0) {
-      this.logger.log('No historical bars provided. Fetching from exchange...');
       const exchange = request.exchange || 'BINANCE';
       const interval = request.interval || '1h';
       const rawBars = await this.historicalDataService.getHistoricalData(
@@ -67,11 +72,9 @@ export class BacktestService {
       return this.getEmptyResult(request.initialCapital);
     }
 
-    // Get strategy from registry
     const strategy = strategyRegistry.getStrategy(request.strategyName);
     strategy.initialize(request.strategyParams);
 
-    // Run backtest simulation
     let capital = request.initialCapital;
     let position = 0;
     let entryPrice = 0;
@@ -81,6 +84,7 @@ export class BacktestService {
 
     let peak = capital;
     let maxDrawdown = 0;
+    let totalFees = 0;
 
     for (const bar of bars) {
       const sig: Signal | null = strategy.onCandle(bar);
@@ -89,15 +93,39 @@ export class BacktestService {
       const action = sig.action;
 
       if (action === 'BUY' && position === 0) {
+        // Apply slippage on buy
+        const executionPrice = bar.close * (1 + slippageRate);
+        const fee = executionPrice * 1 * feeRate; // assume 1 unit for simplicity
+        totalFees += fee;
+
         position = 1;
-        entryPrice = bar.close;
-        trades.push({ type: 'BUY', price: bar.close, timestamp: new Date(bar.timestamp) });
+        entryPrice = executionPrice;
+        capital -= fee;
+
+        trades.push({
+          type: 'BUY',
+          price: executionPrice,
+          timestamp: new Date(bar.timestamp),
+          fee,
+        });
       }
 
       if (action === 'SELL' && position === 1) {
-        const pnl = (bar.close - entryPrice) * position;
-        capital += pnl;
-        trades.push({ type: 'SELL', price: bar.close, timestamp: new Date(bar.timestamp), pnl });
+        const executionPrice = bar.close * (1 - slippageRate);
+        const pnl = (executionPrice - entryPrice) * position;
+        const fee = executionPrice * position * feeRate;
+        totalFees += fee;
+
+        capital += pnl - fee;
+
+        trades.push({
+          type: 'SELL',
+          price: executionPrice,
+          timestamp: new Date(bar.timestamp),
+          pnl: pnl - fee,
+          fee,
+        });
+
         position = 0;
       }
 
@@ -113,29 +141,39 @@ export class BacktestService {
       }
     }
 
-    // Close any open position at the end
+    // Close open position
     if (position === 1 && bars.length > 0) {
       const lastBar = bars[bars.length - 1];
-      const pnl = (lastBar.close - entryPrice) * position;
-      capital += pnl;
-      trades.push({ type: 'SELL', price: lastBar.close, timestamp: new Date(lastBar.timestamp), pnl });
+      const executionPrice = lastBar.close * (1 - slippageRate);
+      const pnl = (executionPrice - entryPrice) * position;
+      const fee = executionPrice * position * feeRate;
+      totalFees += fee;
+      capital += pnl - fee;
+
+      trades.push({
+        type: 'SELL',
+        price: executionPrice,
+        timestamp: new Date(lastBar.timestamp),
+        pnl: pnl - fee,
+        fee,
+      });
     }
 
-    // Calculate performance metrics
     const totalReturn = ((capital - request.initialCapital) / request.initialCapital) * 100;
-    const winningTrades = trades.filter((t: any) => t.pnl > 0);
-    const losingTrades = trades.filter((t: any) => t.pnl < 0);
+    const netReturn = totalReturn - (totalFees / request.initialCapital) * 100;
+
+    const winningTrades = trades.filter((t: any) => (t.pnl || 0) > 0);
+    const losingTrades = trades.filter((t: any) => (t.pnl || 0) < 0);
     const totalTradesCount = trades.length;
     const winRate = totalTradesCount > 0 ? (winningTrades.length / totalTradesCount) * 100 : 0;
 
-    const grossProfit = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
-    const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
+    const grossProfit = winningTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + (t.pnl || 0), 0));
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? Infinity : 0);
 
     const avgWin = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
     const avgLoss = losingTrades.length > 0 ? grossLoss / losingTrades.length : 0;
 
-    // Sharpe Ratio (annualized assuming daily bars)
     const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
     const stdDev = this.calculateStdDev(returns);
     const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
@@ -143,6 +181,7 @@ export class BacktestService {
     return {
       success: true,
       totalReturn: parseFloat(totalReturn.toFixed(2)),
+      netReturn: parseFloat(netReturn.toFixed(2)),
       totalTrades: totalTradesCount,
       winRate: parseFloat(winRate.toFixed(2)),
       profitFactor: parseFloat(profitFactor.toFixed(2)),
@@ -151,6 +190,7 @@ export class BacktestService {
       avgWin: parseFloat(avgWin.toFixed(2)),
       avgLoss: parseFloat(avgLoss.toFixed(2)),
       finalCapital: parseFloat(capital.toFixed(2)),
+      totalFees: parseFloat(totalFees.toFixed(2)),
       equityCurve,
       trades,
     };
@@ -167,6 +207,7 @@ export class BacktestService {
     return {
       success: false,
       totalReturn: 0,
+      netReturn: 0,
       totalTrades: 0,
       winRate: 0,
       profitFactor: 0,
@@ -175,6 +216,7 @@ export class BacktestService {
       avgWin: 0,
       avgLoss: 0,
       finalCapital: initialCapital,
+      totalFees: 0,
       equityCurve: [initialCapital],
       trades: [],
     };
