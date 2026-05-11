@@ -25,7 +25,7 @@ export class PrismaUserRepository implements IUserRepository {
         id: user.id || undefined,
         walletAddress: user.walletAddress,
         role: user.role,
-        permissions: user.permissions,
+        permissions: (user.permissions || "[]") as any,
         nonce: user.nonce,
       },
     });
@@ -37,7 +37,7 @@ export class PrismaUserRepository implements IUserRepository {
       where: { id: user.id },
       data: {
         role: user.role,
-        permissions: user.permissions,
+        permissions: (user.permissions || "[]") as any,
         nonce: user.nonce,
       },
     });

@@ -14,7 +14,7 @@ export class PortfolioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paperTradingService: PaperTradingService,
-    private readonly exchangeAccountRepo: ExchangeAccountRepository,
+    @Optional() private readonly exchangeAccountRepo: ExchangeAccountRepository = undefined as any,
     @Optional() @Inject('EXCHANGE_POSITION_PROVIDER')
     private readonly positionProvider?: ExchangePositionProvider,
     private readonly notificationService?: NotificationService,

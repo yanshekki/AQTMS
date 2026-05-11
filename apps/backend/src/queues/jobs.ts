@@ -1,9 +1,9 @@
 // ── Queue Job Definitions ──
 
 export const QUEUE_NAMES = {
-  NEWS_PROCESS: 'news:process',
-  AI_SCORING: 'ai:scoring',
-  TRADE_EXECUTE: 'trade:execute',
+  NEWS_PROCESS: 'news-process',
+  AI_SCORING: 'ai-scoring',
+  TRADE_EXECUTE: 'trade-execute',
 } as const;
 
 export interface NewsProcessJob {
