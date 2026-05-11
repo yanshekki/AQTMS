@@ -1,8 +1,8 @@
-// ── Enhanced Dashboard with Real-time WS + Kill Switch UI ──
+// ── Enhanced Dashboard with Execution Logs + Live Trading Visualization ──
 
 import React, { useEffect, useState } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress, Button, Alert
+  Box, Grid, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, LinearProgress, Button, Alert, List, ListItem, ListItemText, Stack
 } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
@@ -17,12 +17,21 @@ interface Position {
   pnl: number;
 }
 
+interface ExecutionLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  symbol?: string;
+  details: any;
+}
+
 export default function Dashboard() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [livePositions, setLivePositions] = useState<Position[]>([]);
   const [livePnL, setLivePnL] = useState(0);
   const [killSwitchStatus, setKillSwitchStatus] = useState<{ active: boolean; reason?: string }>({ active: false });
   const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
   const [isTogglingKillSwitch, setIsTogglingKillSwitch] = useState(false);
 
   // Fetch portfolio summary
@@ -35,7 +44,7 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
-  // Fetch recent snapshots for chart history
+  // Fetch recent snapshots
   const { data: snapshots } = useQuery({
     queryKey: ['portfolio-snapshots'],
     queryFn: async () => {
@@ -71,12 +80,17 @@ export default function Dashboard() {
       setRealtimeUpdates(prev => [{ type: 'order', ...order }, ...prev].slice(0, 10));
     });
 
+    // Listen for execution logs (live trading flow)
+    newSocket.on('execution:log', (log: ExecutionLog) => {
+      setExecutionLogs(prev => [log, ...prev].slice(0, 20));
+    });
+
     setSocket(newSocket);
 
     return () => newSocket.disconnect();
   }, [refetch]);
 
-  // Kill Switch toggle handler
+  // Kill Switch toggle
   const toggleKillSwitch = async () => {
     setIsTogglingKillSwitch(true);
     try {
@@ -85,13 +99,25 @@ export default function Dashboard() {
       setKillSwitchStatus({ active: newStatus, reason: newStatus ? 'Manual activation from Dashboard' : undefined });
     } catch (err) {
       console.error('Failed to toggle Kill Switch', err);
-      alert('Failed to toggle Kill Switch. Check backend SafetyModule.');
+      alert('Failed to toggle Kill Switch');
     } finally {
       setIsTogglingKillSwitch(false);
     }
   };
 
-  // Chart data
+  // Fetch initial execution logs
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const res = await axios.get('/api/execution/logs?limit=10', { withCredentials: true });
+        if (res.data?.logs) setExecutionLogs(res.data.logs);
+      } catch (e) {
+        console.log('No execution logs endpoint yet (optional)');
+      }
+    };
+    fetchLogs();
+  }, []);
+
   const chartData = snapshots?.map((s: any) => ({
     time: new Date(s.timestamp).toLocaleTimeString(),
     value: s.totalValue,
@@ -151,7 +177,7 @@ export default function Dashboard() {
         </Grid>
       </Grid>
 
-      {/* Kill Switch Control + Real-time */}
+      {/* Kill Switch + Real-time */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>
           <Card sx={{ bgcolor: killSwitchStatus.active ? 'error.light' : 'success.light' }}>
@@ -260,8 +286,42 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {/* Execution Logs Panel (Step 9 - Live Trading Flow Visualization) */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>📝 Execution Logs (Live Trading Flow)</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Real-time execution events from backend (paper + live orders, partial fills, risk checks)
+          </Typography>
+          
+          {executionLogs.length === 0 ? (
+            <Typography color="text.secondary">No execution logs yet. Place orders or wait for live trading events...</Typography>
+          ) : (
+            <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {executionLogs.map((log, index) => (
+                <ListItem key={index} divider>
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip label={log.action} size="small" color={log.action.includes('PAPER') ? 'success' : 'primary'} />
+                        <Typography variant="body2">{log.symbol || ''}</Typography>
+                      </Stack>
+                    }
+                    secondary={
+                      <>
+                        {new Date(log.timestamp).toLocaleTimeString()} - {JSON.stringify(log.details || {}).slice(0, 120)}...
+                      </>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </CardContent>
+      </Card>
+
       <Typography variant="caption" sx={{ mt: 2, display: 'block' }}>
-        Real-time powered by NestJS WebSocketGateway + BullMQ. Kill Switch integrated with backend SafetyModule.
+        Real-time powered by NestJS WebSocketGateway + BullMQ. Live trading flow + execution visualization enhanced in Step 9.
       </Typography>
     </Box>
   );
