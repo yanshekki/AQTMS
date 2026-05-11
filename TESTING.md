@@ -42,12 +42,26 @@ In Dashboard:
 - Click **PAPER** / **TESTNET** / **LIVE** buttons
 - LIVE mode shows clear warning: "⚠️ LIVE MODE — Real funds at risk!"
 
+### Enabling Real-time Price Streaming (for Testing)
+
+To get the best real-time experience during testnet/small live testing:
+
+In backend, you can start price streaming for key symbols (e.g. in a bootstrap service or manually via API if exposed):
+
+```ts
+// Example (in a service or controller)
+await this.marketDataService.startPriceStreaming('BTCUSDT', 'binance', 2000);
+await this.marketDataService.startPriceStreaming('ETHUSDT', 'binance', 2000);
+```
+
+This will push real-time prices via WebSocket to the Dashboard.
+
 ### Testnet Setup (Binance Example)
 
 1. Go to https://testnet.binance.vision/
 2. Create API Key (enable Spot Trading)
 3. Add the API Key + Secret in Exchange Account page (select Testnet)
-4. In backend environment:
+4. In backend environment / secrets:
    ```
    ENABLE_TESTNET=true
    BINANCE_TESTNET_API_KEY=your_testnet_key
@@ -56,7 +70,7 @@ In Dashboard:
 
 ### What to Test in Testnet + Small Live
 
-- [ ] Real price feed via MarketDataService
+- [ ] Real price feed via MarketDataService (with real-time streaming enabled)
 - [ ] Strategy auto-execution with real market data
 - [ ] Order placement with Stop Loss / Take Profit
 - [ ] Real-time WebSocket updates (price, position, order)
@@ -84,6 +98,7 @@ In Dashboard:
 - Kill Switch & Risk rule enforcement
 - Error handling & retry scenarios
 - MarketDataService robustness (caching + retry)
+- Multi-exchange support (Binance + Bybit)
 
 ### How to Run
 ```bash
@@ -116,9 +131,9 @@ Recommended: Run with testnet environment variables for more realistic testing.
 - Paper Trading mode available for validation
 - Circuit Breaker + Retry logic in ExecutionService
 
-For full details, see `DEPLOYMENT_OPTIMIZATION.md`
+For full details, see `PRODUCTION_RUNBOOK.md` and `DEPLOYMENT_OPTIMIZATION.md`
 
 ## Recommended Safe Progression
-**Paper Trading** → **Testnet Validation** (real market data) → **Small Live Trades** (with Kill Switch + monitoring)
+**Paper Trading** → **Testnet Validation** (real market data + real-time streaming) → **Small Live Trades** (with Kill Switch + monitoring)
 
 Always start with small position sizes when going live.
