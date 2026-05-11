@@ -14,9 +14,6 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
 
-  /**
-   * Initialize or get exchange instance with dynamic credentials (recommended for per-user accounts)
-   */
   async initialize(config: ExchangeConfig): Promise<void> {
     const cacheKey = `${config.exchange.toLowerCase()}-${config.testnet ? 'testnet' : 'mainnet'}`;
 
@@ -81,6 +78,12 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
         orderParams.price = params.price;
       }
 
+      // For live trading, add safety checks
+      if (!params.testnet && process.env.ENABLE_LIVE_TRADING !== 'true') {
+        this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
+        return { success: false, message: 'Live trading is currently disabled for safety.' };
+      }
+
       const result = await exchange.createOrder(
         orderParams.symbol,
         orderParams.type,
@@ -98,7 +101,7 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
         filledPrice: result.average || result.price,
       };
     } catch (error: any) {
-      this.logger.error(`placeOrder failed: ${error.message}`);
+      this.logger.error(`placeOrder failed on ${params.exchange}: ${error.message}`);
       return { success: false, message: error.message };
     }
   }
