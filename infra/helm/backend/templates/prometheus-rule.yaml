@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "backend.fullname" . }}-alerts
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+    release: prometheus
+spec:
+  groups:
+  - name: aqtms.backend
+    rules:
+    - alert: BackendDown
+      expr: up{job="{{ include "backend.fullname" . }}"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "AQTMS Backend is down"
+        description: "Backend pod {{ $labels.pod }} is down for more than 1 minute."
+
+    - alert: KillSwitchActive
+      expr: kill_switch_active == 1
+      for: 30s
+      labels:
+        severity: critical
+      annotations:
+        summary: "Kill Switch is active"
+        description: "Kill Switch has been activated. All live trading is disabled."
+
+    - alert: HighExecutionLatency
+      expr: histogram_quantile(0.95, rate(execution_duration_seconds_bucket[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High execution latency detected"
+        description: "P95 execution latency is over 2 seconds."
+
+    - alert: ReconciliationDiscrepancies
+      expr: increase(reconciliation_discrepancies_total[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Reconciliation discrepancies detected"
+        description: "{{ $value }} discrepancies found in the last 15 minutes."

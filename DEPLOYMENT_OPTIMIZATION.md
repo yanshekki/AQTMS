@@ -1,56 +1,42 @@
-# AQTMS Production Deployment & Monitoring (Phase C)
+# AQTMS Production Deployment Optimization (Phase 6+)
+
+## Secrets Management (Recommended)
+- Use `existingSecret` in Helm values
+- Prefer **External Secrets Operator** or **Sealed Secrets** in production
+- Never commit real API keys or JWT_SECRET to git
+- Rotate secrets regularly
 
 ## Security Hardening
-- Non-root user in Dockerfile (already implemented)
-- Secrets: Use Kubernetes Secrets + SealedSecrets or External Secrets Operator
-- Enable rate limiting in NestJS (ThrottlerModule)
-- mTLS between services if scaled horizontally
-- Regular dependency scanning (Dependabot + Snyk)
+- Non-root containers (already in values.yaml)
+- Read-only root filesystem
+- Resource limits + requests
+- NetworkPolicies (recommended)
+- Pod Security Standards (restricted)
 
-## Monitoring Stack (Recommended)
-- **Prometheus** + **Grafana** (core metrics)
-- **Alertmanager** for critical alerts (Kill Switch, high risk score, reconciliation discrepancies)
-- **Loki** or ELK for centralized logging
-- **Tempo** or Jaeger for distributed tracing
+## Monitoring & Alerting
+- Prometheus + Grafana already configured
+- Critical alerts added:
+  - BackendDown
+  - KillSwitchActive
+  - HighExecutionLatency
+  - ReconciliationDiscrepancies
+- Set up Alertmanager routes (PagerDuty / Slack / Email)
 
-## Key Grafana Dashboards
-- AQTMS Production Full Monitoring (see monitoring/grafana-dashboards/)
-- Panels include: Kill Switch, Execution p95 latency, Paper vs Live ratio, Risk distribution, Reconciliation issues, Daily PnL
-
-## Prometheus Alert Rules (Example)
+## Recommended Production Values
 ```yaml
-- alert: KillSwitchActive
-  expr: kill_switch_active == 1
-  for: 1m
-  annotations:
-    summary: "Kill Switch is active"
+securityContext:
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
 
-- alert: HighExecutionLatency
-  expr: histogram_quantile(0.95, rate(execution_duration_seconds_bucket[5m])) > 2
-  for: 5m
+secret:
+  existingSecret: aqtms-backend-secrets
+
+monitoring:
+  prometheusRule: true
 ```
 
-## Scalability & Reliability
-- Use BullMQ + Redis for durable queues
-- Horizontal Pod Autoscaler for backend
-- Database connection pooling (Prisma + PgBouncer)
-- Circuit Breaker + Retry already implemented in ExecutionService
-
-## CI/CD Recommendations
-- GitHub Actions: lint + test + build + security scan
-- Automated Prisma migrations in pipeline
-- Canary or Blue-Green deployments
-
-## Production Checklist
-- [x] Kill Switch + Risk rules active
-- [x] Circuit Breaker + Retry in live path
-- [x] Real-time monitoring + alerting
-- [ ] Set strong secrets (JWT, Encryption, Exchange API keys)
-- [ ] Enable rate limiting
-- [ ] Configure Alertmanager routes
-- [ ] Set resource limits & requests in Kubernetes
-- [ ] Backup strategy for PostgreSQL + Redis
-- [ ] Load testing completed
-- [ ] Runbook for Kill Switch activation
-
-Phase C focuses on making the system production-ready with robust monitoring and deployment practices.
+## Next Steps
+- Set up External Secrets Operator
+- Configure proper NetworkPolicies
+- Add canary/blue-green deployment strategy
+- Enable audit logging
