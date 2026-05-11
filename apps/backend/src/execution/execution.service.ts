@@ -22,112 +22,107 @@ export class ExecutionService {
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
+  /**
+   * Main entry point for order execution.
+   * Supports three modes: PAPER, TESTNET, LIVE
+   */
   async executeOrder(orderData: any): Promise<any> {
-    const isPaper = orderData.isPaper !== false;
-    const isTestnet = this.isTestnetMode(orderData);
+    const mode = this.detectExecutionMode(orderData);
+    this.logger.log(`[Execution] Mode detected: ${mode} | ${orderData.symbol} ${orderData.side} x${orderData.quantity}`);
 
-    this.logger.log(
-      `[Execution] Mode: ${isPaper ? 'PAPER' : isTestnet ? 'TESTNET' : 'LIVE'} | ${orderData.symbol} ${orderData.side} x${orderData.quantity}`
-    );
-
-    // Risk check
+    // Risk evaluation (always)
     const riskResult = await this.riskService.evaluateRisk(orderData);
     if (!riskResult.passed) {
       throw new BadRequestException({ message: 'Risk check failed', reasons: riskResult.reasons });
     }
 
-    // Kill Switch for non-paper
-    if (!isPaper) {
+    // Kill Switch protection for non-paper modes
+    if (mode !== 'PAPER') {
       const isKillSwitchActive = await this.checkKillSwitch(orderData.userId);
       if (isKillSwitchActive) {
         if (this.notificationService) {
-          await this.notificationService.notifyKillSwitchActivated(orderData.userId, 'Order blocked by Kill Switch');
+          await this.notificationService.notifyKillSwitchActivated(orderData.userId, `Order blocked in ${mode} mode`);
         }
-        throw new BadRequestException({ message: 'Kill Switch is active' });
+        throw new BadRequestException({ message: 'Kill Switch is active. Trading disabled.' });
       }
     }
 
-    // Paper Trading
-    if (isPaper && this.paperTradingService) {
-      this.logger.log('[Execution] → PaperTradingService');
-      const fillPrice = orderData.price || 50000;
-      const paperResult = await this.paperTradingService.processPaperFill({
-        exchangeAccountId: orderData.exchangeAccountId || 'demo-paper',
-        userId: orderData.userId || 'demo-user',
-        symbol: orderData.symbol,
-        side: orderData.side?.toUpperCase() || 'BUY',
-        quantity: orderData.quantity,
-        fillPrice,
-        orderId: orderData.orderId || `paper-${Date.now()}`,
-        isPartial: orderData.isPartial || false,
-      });
-
-      return {
-        success: true,
-        mode: 'PAPER',
-        result: paperResult,
-      };
+    if (mode === 'PAPER' && this.paperTradingService) {
+      return this.executePaperOrder(orderData);
     }
 
-    // Testnet or Live
-    if (!isPaper) {
-      const modeLabel = isTestnet ? 'TESTNET' : 'LIVE';
-      this.logger.log(`[Execution] → ${modeLabel} via ccxt`);
-
-      if (!this.ccxtAdapter || !this.encryptionService) {
-        throw new Error('Missing ccxtAdapter or EncryptionService for real trading');
-      }
-
-      const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
-        where: { id: orderData.exchangeAccountId },
-      });
-
-      if (!exchangeAccount?.apiKeyEncrypted) {
-        throw new Error('No encrypted API keys found for this account');
-      }
-
-      const apiKey = this.encryptionService.decrypt(exchangeAccount.apiKeyEncrypted);
-      const apiSecret = exchangeAccount.apiSecretEncrypted
-        ? this.encryptionService.decrypt(exchangeAccount.apiSecretEncrypted)
-        : undefined;
-
-      const useTestnet = isTestnet || exchangeAccount.testnet || false;
-
-      await this.ccxtAdapter.initialize({
-        exchange: exchangeAccount.exchange as any,
-        apiKey,
-        apiSecret,
-        testnet: useTestnet,
-      });
-
-      // Safety warning for first live orders
-      if (!useTestnet) {
-        this.logger.warn('[Execution] ⚠️ LIVE TRADING - Real money at risk!');
-      }
-
-      const liveResult = await this.liveTradingBreaker.execute(() =>
-        withRetry(
-          () => this.ccxtAdapter!.placeOrder(orderData),
-          { maxAttempts: 3, initialDelayMs: 800 }
-        )
-      );
-
-      this.logger.log(`[Execution] ${modeLabel} order successful: ${liveResult?.id}`);
-
-      return {
-        success: true,
-        mode: modeLabel,
-        result: liveResult,
-      };
+    if (mode === 'TESTNET' || mode === 'LIVE') {
+      return this.executeRealOrder(orderData, mode);
     }
 
-    return { success: false, message: 'No execution path available' };
+    throw new Error('Unsupported execution mode');
   }
 
-  private isTestnetMode(orderData: any): boolean {
-    if (orderData.testnet === true) return true;
-    if (orderData.exchangeAccount?.testnet === true) return true;
-    return false;
+  private detectExecutionMode(orderData: any): 'PAPER' | 'TESTNET' | 'LIVE' {
+    if (orderData.isPaper === true) return 'PAPER';
+    if (orderData.testnet === true) return 'TESTNET';
+    // fallback to ExchangeAccount setting
+    if (orderData.exchangeAccountId) {
+      // In real usage, you would fetch and check account.testnet here
+    }
+    return 'LIVE';
+  }
+
+  private async executePaperOrder(orderData: any) {
+    this.logger.log('[Execution] Executing in PAPER mode');
+    const fillPrice = orderData.price || 50000;
+    const paperResult = await this.paperTradingService!.processPaperFill({
+      exchangeAccountId: orderData.exchangeAccountId || 'demo-paper',
+      userId: orderData.userId || 'demo-user',
+      symbol: orderData.symbol,
+      side: orderData.side?.toUpperCase() || 'BUY',
+      quantity: orderData.quantity,
+      fillPrice,
+      orderId: orderData.orderId || `paper-${Date.now()}`,
+      isPartial: orderData.isPartial || false,
+    });
+
+    return { success: true, mode: 'PAPER', result: paperResult };
+  }
+
+  private async executeRealOrder(orderData: any, mode: 'TESTNET' | 'LIVE') {
+    this.logger.log(`[Execution] Executing in ${mode} mode`);
+
+    if (!this.ccxtAdapter || !this.encryptionService) {
+      throw new Error('Real trading requires ccxtAdapter and EncryptionService');
+    }
+
+    const exchangeAccount = await this.prisma.exchangeAccount.findUnique({
+      where: { id: orderData.exchangeAccountId },
+    });
+
+    if (!exchangeAccount?.apiKeyEncrypted) {
+      throw new Error('No encrypted API key found');
+    }
+
+    const apiKey = this.encryptionService.decrypt(exchangeAccount.apiKeyEncrypted);
+    const apiSecret = exchangeAccount.apiSecretEncrypted
+      ? this.encryptionService.decrypt(exchangeAccount.apiSecretEncrypted)
+      : undefined;
+
+    const useTestnet = mode === 'TESTNET' || exchangeAccount.testnet === true;
+
+    await this.ccxtAdapter.initialize({
+      exchange: exchangeAccount.exchange as any,
+      apiKey,
+      apiSecret,
+      testnet: useTestnet,
+    });
+
+    if (mode === 'LIVE') {
+      this.logger.warn('⚠️ LIVE TRADING - Real funds at risk!');
+    }
+
+    const result = await this.liveTradingBreaker.execute(() =>
+      withRetry(() => this.ccxtAdapter!.placeOrder(orderData), { maxAttempts: 3 })
+    );
+
+    return { success: true, mode, result };
   }
 
   private async checkKillSwitch(userId: string): Promise<boolean> {
@@ -137,5 +132,24 @@ export class ExecutionService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Helper for testing: Validate if system is ready for testnet/live
+   */
+  async validateTestingEnvironment(userId: string, exchangeAccountId: string): Promise<{ ready: boolean; issues: string[] }> {
+    const issues: string[] = [];
+
+    const account = await this.prisma.exchangeAccount.findUnique({ where: { id: exchangeAccountId } });
+    if (!account) issues.push('ExchangeAccount not found');
+    if (account && !account.apiKeyEncrypted) issues.push('No API key configured');
+
+    const isKillSwitchActive = await this.checkKillSwitch(userId);
+    if (isKillSwitchActive) issues.push('Kill Switch is currently active');
+
+    return {
+      ready: issues.length === 0,
+      issues,
+    };
   }
 }
