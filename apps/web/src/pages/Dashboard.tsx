@@ -1,4 +1,4 @@
-// Professional Trading Terminal - Phase D (Dark Theme + Better UX + Real-time)
+// Professional Trading Terminal - Phase A (Strict Real Data Only)
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -39,15 +39,6 @@ export default function Dashboard() {
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isOnline, setIsOnline] = useState(true);
-
-  // Simulate connection status (in real app, connect to WebSocket health)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsOnline(Math.random() > 0.05); // 95% uptime simulation
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary, error: summaryError } = useQuery({
     queryKey: ['portfolio-summary'],
@@ -89,6 +80,7 @@ export default function Dashboard() {
     refetchInterval: 4000,
   });
 
+  // Strict real data only - no mock fallback
   const { data: depthData = [] } = useQuery({
     queryKey: ['depth', orderForm.symbol],
     queryFn: async () => {
@@ -223,12 +215,7 @@ export default function Dashboard() {
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h4" sx={{ color: '#fff' }}>Trading Terminal</Typography>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Chip 
-            label={isOnline ? 'Connected' : 'Reconnecting...'} 
-            color={isOnline ? 'success' : 'warning'} 
-            size="small" 
-            variant="outlined" 
-          />
+          <Chip label="Connected" color="success" size="small" variant="outlined" />
           <Typography variant="caption" color="text.secondary">
             Last updated: {lastUpdated.toLocaleTimeString()}
           </Typography>
@@ -343,7 +330,7 @@ export default function Dashboard() {
         <Grid item xs={12} md={5}>
           <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Market Depth</Typography>
+              <Typography variant="h6" gutterBottom>Market Depth (Real Data Only)</Typography>
               <Box sx={{ height: 320 }}>
                 {depthData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -358,7 +345,7 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 ) : (
                   <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-                    <Typography color="text.secondary">No depth data available</Typography>
+                    <Typography color="text.secondary">No real depth data available</Typography>
                   </Box>
                 )}
               </Box>
