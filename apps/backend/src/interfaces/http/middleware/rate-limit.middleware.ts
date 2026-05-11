@@ -5,6 +5,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import redis from '../../../shared/redis';
 import { detectLang, t } from '../../../shared/i18n';
+import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
 const WINDOW_SEC = 60;
 const MAX_REQUESTS_PER_IP = 100;
@@ -31,8 +32,9 @@ export async function rateLimitMiddleware(req: Request, res: Response, next: Nex
     }
 
     // User-based rate limit (if authenticated)
-    if (req.user?.userId) {
-      const userKey = `ratelimit:user:${req.user.userId}`;
+    const user = req.user as AuthenticatedUser | undefined;
+    if (user?.userId) {
+      const userKey = `ratelimit:user:${user.userId}`;
       const userCount = await redis.incr(userKey);
       if (userCount === 1) await redis.expire(userKey, WINDOW_SEC);
       if (userCount > MAX_REQUESTS_PER_USER) {
@@ -55,8 +57,9 @@ export async function rateLimitMiddleware(req: Request, res: Response, next: Nex
 
 export async function strictRateLimitMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const key = req.user?.userId
-      ? `ratelimit:strict:${req.user.userId}`
+    const user = req.user as AuthenticatedUser | undefined;
+    const key = user?.userId
+      ? `ratelimit:strict:${user.userId}`
       : `ratelimit:strict:${req.ip ?? 'unknown'}`;
 
     const count = await redis.incr(key);
