@@ -9,12 +9,17 @@ service:
   type: ClusterIP
   port: 3001
 
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+
 resources:
   requests:
     cpu: 500m
     memory: 1Gi
   limits:
-    cpu: 1
+    cpu: 2
     memory: 2Gi
 
 hpa:
@@ -27,7 +32,7 @@ livenessProbe:
   httpGet:
     path: /health
     port: 3001
-  initialDelaySeconds: 15
+  initialDelaySeconds: 20
   periodSeconds: 10
 
 readinessProbe:
@@ -39,10 +44,26 @@ readinessProbe:
 
 env:
   NODE_ENV: production
-  DATABASE_URL: "mysql://aqtms:${DB_PASSWORD}@mysql:3306/aqtms"
-  REDIS_URL: "redis://redis:6379"
-  CORS_ORIGIN: "*"
   LOG_LEVEL: info
+  CORS_ORIGIN: "*"
+  # Testnet / Live mode control
+  ENABLE_TESTNET: "true"
+  # Feature flags for testing
+  ENABLE_PAPER_TRADING: "true"
+  ENABLE_KILL_SWITCH: "true"
+
+secret:
+  enabled: true
+  existingSecret: aqtms-backend-secrets
+  keys:
+    - JWT_SECRET
+    - ENCRYPTION_SECRET
+    - DATABASE_URL
+    - REDIS_URL
+    - BINANCE_API_KEY
+    - BINANCE_API_SECRET
+    - BYBIT_API_KEY
+    - BYBIT_API_SECRET
 
 ingress:
   enabled: true
@@ -51,3 +72,14 @@ ingress:
   tls:
     enabled: true
     secretName: aqtms-tls
+
+monitoring:
+  enabled: true
+  serviceMonitor: true
+
+# For testnet vs live configuration
+config:
+  testnet:
+    enabled: true
+    binanceTestnet: true
+    bybitTestnet: true
