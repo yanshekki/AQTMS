@@ -52,6 +52,7 @@ Key alerts include:
 - PodCrashLooping (Critical)
 - HighRiskExposure (Warning)
 - StrategyExecutionFailure (Critical)
+- WebSocketConnectionDown (Warning)
 
 ## 4. Common Operations
 
