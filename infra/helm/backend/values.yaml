@@ -1,7 +1,7 @@
 replicaCount: 3
 
 image:
-  repository: aqtms-backend
+  repository: ghcr.io/yanshekki/aqtms-backend
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -47,10 +47,11 @@ readinessProbe:
 env:
   NODE_ENV: production
   LOG_LEVEL: info
-  CORS_ORIGIN: "*"
+  CORS_ORIGIN: "https://app.aqtms.io"
   ENABLE_TESTNET: "false"
   ENABLE_PAPER_TRADING: "true"
   ENABLE_KILL_SWITCH: "true"
+
   # Observability
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
   OTEL_SERVICE_NAME: aqtms-backend
@@ -58,7 +59,8 @@ env:
 
 secret:
   enabled: true
-  existingSecret: aqtms-backend-secrets   # Use External Secrets Operator in production
+  # Production recommendation: Use External Secrets Operator + Vault / AWS Secrets Manager
+  existingSecret: aqtms-backend-secrets
   keys:
     - JWT_SECRET
     - ENCRYPTION_SECRET
@@ -82,16 +84,23 @@ monitoring:
   enabled: true
   serviceMonitor: true
   prometheusRule: true
-  # Observability stack
+
   loki:
     enabled: true
   tempo:
     enabled: true
 
 config:
-  testnet:
-    enabled: false
   production:
     enableResourceQuotas: true
     enableNetworkPolicies: true
     enablePodDisruptionBudget: true
+    enableExternalSecrets: true
+
+# Production hardening recommendations
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true
