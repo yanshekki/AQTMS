@@ -47,3 +47,11 @@ groups:
       severity: warning
     annotations:
       summary: "WebSocket connections are down"
+
+  - alert: HighDatabaseLatency
+    expr: histogram_quantile(0.95, database_query_duration_seconds_bucket) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database query latency detected"
