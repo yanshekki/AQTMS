@@ -4,13 +4,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../../../shared/errors';
-
-export interface AuthenticatedUser {
-  userId: string;
-  walletAddress: string;
-  role: string;
-  permissions: string[];
-}
+import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
 // Extend Express Request to include authenticated user
 declare global {
@@ -23,12 +17,10 @@ declare global {
 
 export function permission(requiredPermissions: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    // Authentication check
     if (!req.user) {
       throw new UnauthorizedError('Authentication required');
     }
 
-    // Permission check — user must have ALL required permissions
     const userPermissions = req.user.permissions ?? [];
     const hasAllPermissions = requiredPermissions.every((perm) =>
       userPermissions.includes(perm),
@@ -46,7 +38,6 @@ export function permission(requiredPermissions: string[]) {
   };
 }
 
-// Convenience: permission with wildcard support
 export function permissionAny(requiredPermissions: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
