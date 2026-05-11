@@ -11,7 +11,7 @@ datasource db {
 }
 
 // =============================================
-// AQTMS Core Models - Full Schema (Restored)
+// AQTMS Core Models - Prisma Schema (Aligned with Code)
 // =============================================
 
 model User {
@@ -125,7 +125,7 @@ model Trade {
   stopPrice         Float?
   timeInForce       String?  // GTC, IOC, FOK
   filledQuantity    Float    @default(0)
-  exchangeOrderId   String?
+  exchangeOrderId   String?  // allow null
   idempotencyKey    String?  @unique
   status            String   @default("PENDING")
   isPaper           Boolean  @default(true)
@@ -164,11 +164,13 @@ model NewsEvent {
   id          String   @id @default(cuid())
   sourceId    String?  // e.g. telegram channel id or news source id
   source      String   // TELEGRAM | X | NEWS_API etc.
+  language    String?  // e.g. en, zh
   content     String   @db.Text
   symbol      String?
   score       Float?
   aiAnalysis  String?  @db.Text
   isProcessed Boolean  @default(false)
+  processedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -176,6 +178,7 @@ model NewsEvent {
   @@index([symbol])
   @@index([createdAt])
   @@index([isProcessed])
+  @@unique([source, sourceId])
 }
 
 model BacktestReport {
@@ -190,6 +193,7 @@ model BacktestReport {
   drawdownCurve  Json?
   monthlyReturns Json?
   startDate      DateTime?
+  endDate        DateTime?
   trades         Json?    // executed trades in backtest
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -281,31 +285,35 @@ model RiskRule {
 }
 
 model DataSource {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  type        String   // TELEGRAM | X | NEWS | CUSTOM
-  config      Json
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  type           String   // TELEGRAM | X | NEWS | CUSTOM
+  config         Json
+  status         String   @default("ACTIVE") // ACTIVE, ERROR, PAUSED
+  lastError      String?
+  lastFetchedAt  DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([type])
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  action    String
-  resource  String?
-  details   Json?
-  ipAddress String?
-  timestamp DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String?  // e.g. order, user, strategy
+  resourceId String?
+  details    Json?
+  ipAddress  String?
+  timestamp  DateTime @default(now())
 
-  user      User?    @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([action])
