@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// NOTE (Step 1): Relations for DataSource and AuditLog on User model have been added.
-// Run `pnpm prisma generate` and `pnpm prisma migrate dev` after merging this branch.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,7 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ... (rest of schema remains the same as previous fix)
+// =============================================
+// AQTMS Core Models - Full Schema (Restored)
+// =============================================
 
 model User {
   id            String   @id @default(cuid())
@@ -39,4 +38,276 @@ model User {
   auditLogs          AuditLog[]
 }
 
-// ... (other models unchanged from previous merge)
+model ExchangeAccount {
+  id                  String   @id @default(cuid())
+  userId              String
+  name                String?  // Friendly name for the account
+  exchange            String   // BINANCE | BYBIT | etc.
+  testnet             Boolean  @default(false)
+  apiKey              String   // encrypted with AES-256-GCM
+  apiSecret           String   // encrypted
+  apiKeyEncrypted     String?  // For more secure storage
+  apiSecretEncrypted  String?  // For more secure storage
+  status              String   @default("ACTIVE") // ACTIVE | DISABLED | EXPIRED
+  isPaperTrading      Boolean  @default(true)
+  paperVirtualBalance Float    @default(10000)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  orders Order[]
+  positions Position[]
+  trades Trade[]
+
+  @@index([userId])
+  @@index([exchange])
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  userId            String
+  exchangeAccountId String
+  symbol            String
+  side              String   // BUY | SELL
+  type              String   // MARKET | LIMIT | STOP_LOSS | TAKE_PROFIT
+  quantity          Float
+  price             Float?
+  stopLoss          Float?
+  takeProfit        Float?
+  status            String   @default("PENDING")
+  isPaper           Boolean  @default(true)
+  filledQuantity    Float    @default(0)
+  avgFillPrice      Float?
+  exchangeOrderId   String?  // Real exchange order ID
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+  @@index([symbol])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Position {
+  id                String   @id @default(cuid())
+  userId            String
+  exchangeAccountId String
+  symbol            String
+  quantity          Float    @default(0)
+  avgPrice          Float    @default(0)
+  unrealizedPnl     Float    @default(0)
+  realizedPnl       Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+  @@unique([exchangeAccountId, symbol])
+  @@index([symbol])
+}
+
+model Trade {
+  id                String   @id @default(cuid())
+  userId            String
+  exchangeAccountId String
+  symbol            String
+  side              String   // BUY | SELL
+  type              String   // MARKET | LIMIT
+  quantity          Float
+  price             Float?
+  stopPrice         Float?
+  timeInForce       String?  // GTC, IOC, FOK
+  filledQuantity    Float    @default(0)
+  exchangeOrderId   String?
+  idempotencyKey    String?  @unique
+  status            String   @default("PENDING")
+  isPaper           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
+
+  @@index([userId])
+  @@index([exchangeAccountId])
+  @@index([symbol])
+  @@index([createdAt])
+}
+
+model Signal {
+  id          String   @id @default(cuid())
+  userId      String?
+  source      String   // e.g. AI_MODEL, TELEGRAM, X_TWITTER, NEWS_API
+  symbol      String
+  action      String   // BUY | SELL | HOLD
+  score       Float
+  confidence  Float?
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([timestamp])
+  @@index([score])
+}
+
+model NewsEvent {
+  id          String   @id @default(cuid())
+  sourceId    String?  // e.g. telegram channel id or news source id
+  source      String   // TELEGRAM | X | NEWS_API etc.
+  content     String   @db.Text
+  symbol      String?
+  score       Float?
+  aiAnalysis  String?  @db.Text
+  isProcessed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([source])
+  @@index([symbol])
+  @@index([createdAt])
+  @@index([isProcessed])
+}
+
+model BacktestReport {
+  id             String   @id @default(cuid())
+  userId         String
+  strategy       String
+  symbol         String
+  params         Json
+  parameters     Json?    // alias for params
+  metrics        Json     // { sharpe, totalReturn, maxDrawdown, winRate, ... }
+  equityCurve    Json?    // array of {time, value}
+  drawdownCurve  Json?
+  monthlyReturns Json?
+  startDate      DateTime?
+  trades         Json?    // executed trades in backtest
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([strategy])
+}
+
+model ExecutionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  orderId   String?
+  action    String   // PLACE_ORDER | CANCEL_ORDER | FILL | RISK_CHECK | KILL_SWITCH etc.
+  details   Json
+  timestamp DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+model PortfolioSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  totalValue Float
+  positions  Json     // [{symbol, quantity, avgPrice, currentPrice, pnl}]
+  timestamp  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model ScoringRule {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  weights   Json     // { truth: 0.3, sentiment: 0.4, ... }
+  threshold Float
+  action    String   // BUY | SELL | HOLD
+  status    String   @default("ACTIVE")
+  version   Int      @default(1)
+  versions  Json?    // version history
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([name])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  title       String
+  message     String
+  targetRoute String?  // e.g. /portfolio or /orders/123
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([read])
+}
+
+model RiskRule {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  params    Json     // e.g. { maxPositionPct: 0.1, dailyLossLimit: 500, atrMultiplier: 2 }
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([name])
+}
+
+model DataSource {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  type        String   // TELEGRAM | X | NEWS | CUSTOM
+  config      Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String?
+  details   Json?
+  ipAddress String?
+  timestamp DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+}
