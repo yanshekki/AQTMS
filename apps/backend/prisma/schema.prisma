@@ -11,10 +11,9 @@ datasource db {
 }
 
 // =============================================
-// AQTMS Core Models - Prisma Schema (Step 1 Complete)
+// AQTMS Core Models - Prisma Schema (Aligned - Step 2)
 // Hexagonal + DDD aligned. All models support RBAC, audit, encryption where needed.
-// Expanded for full trading pipeline: User -> ExchangeAccount -> Order/Position/Trade
-// Risk, Signal, Backtest, Notification, Snapshot support.
+// Expanded for full trading pipeline.
 // =============================================
 
 model User {
@@ -40,15 +39,20 @@ model User {
 }
 
 model ExchangeAccount {
-  id          String   @id @default(cuid())
-  userId      String
-  exchange    String   // BINANCE | BYBIT | etc.
-  apiKey      String   // encrypted with AES-256-GCM
-  apiSecret   String   // encrypted
-  isPaperTrading Boolean @default(true)
-  paperVirtualBalance Float  @default(10000)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  userId              String
+  name                String?  // Friendly name for the account
+  exchange            String   // BINANCE | BYBIT | etc.
+  testnet             Boolean  @default(false)
+  apiKey              String   // encrypted with AES-256-GCM
+  apiSecret           String   // encrypted
+  apiKeyEncrypted     String?  // For more secure storage
+  apiSecretEncrypted  String?  // For more secure storage
+  status              String   @default("ACTIVE") // ACTIVE | DISABLED | EXPIRED
+  isPaperTrading      Boolean  @default(true)
+  paperVirtualBalance Float    @default(10000)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
   orders Order[]
@@ -70,11 +74,11 @@ model Order {
   price             Float?
   stopLoss          Float?
   takeProfit        Float?
-  status            String   @default("PENDING") // PENDING | FILLED | PARTIALLY_FILLED | CANCELLED | REJECTED
+  status            String   @default("PENDING")
   isPaper           Boolean  @default(true)
   filledQuantity    Float    @default(0)
   avgFillPrice      Float?
-  exchangeOrderId   String?  // Real exchange order ID for reconciliation & partial fills
+  exchangeOrderId   String?  // Real exchange order ID
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -110,18 +114,23 @@ model Position {
 }
 
 model Trade {
-  id              String   @id @default(cuid())
-  userId          String
+  id                String   @id @default(cuid())
+  userId            String
   exchangeAccountId String
-  symbol          String
-  side            String   // BUY | SELL
-  type            String   // MARKET | LIMIT
-  quantity        Float
-  price           Float?
-  status          String   @default("PENDING") // PENDING | FILLED | PARTIALLY_FILLED | CANCELLED
-  isPaper         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  symbol            String
+  side              String   // BUY | SELL
+  type              String   // MARKET | LIMIT
+  quantity          Float
+  price             Float?
+  stopPrice         Float?
+  timeInForce       String?  // GTC, IOC, FOK
+  filledQuantity    Float    @default(0)
+  exchangeOrderId   String?
+  idempotencyKey    String?  @unique
+  status            String   @default("PENDING")
+  isPaper           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   user            User            @relation(fields: [userId], references: [id])
   exchangeAccount ExchangeAccount @relation(fields: [exchangeAccountId], references: [id])
@@ -153,32 +162,39 @@ model Signal {
 
 model NewsEvent {
   id          String   @id @default(cuid())
+  sourceId    String?  // e.g. telegram channel id or news source id
   source      String   // TELEGRAM | X | NEWS_API etc.
   content     String   @db.Text
   symbol      String?
   score       Float?
   aiAnalysis  String?  @db.Text
+  isProcessed Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([source])
   @@index([symbol])
   @@index([createdAt])
+  @@index([isProcessed])
 }
 
 model BacktestReport {
-  id          String   @id @default(cuid())
-  userId      String
-  strategy    String
-  symbol      String
-  params      Json
-  metrics     Json     // { sharpe, totalReturn, maxDrawdown, winRate, ... }
-  equityCurve Json?    // array of {time, value}
-  trades      Json?    // executed trades in backtest
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  strategy       String
+  symbol         String
+  params         Json
+  parameters     Json?    // alias for params
+  metrics        Json     // { sharpe, totalReturn, maxDrawdown, winRate, ... }
+  equityCurve    Json?    // array of {time, value}
+  drawdownCurve  Json?
+  monthlyReturns Json?
+  startDate      DateTime?
+  trades         Json?    // executed trades in backtest
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([strategy])
@@ -219,6 +235,9 @@ model ScoringRule {
   weights   Json     // { truth: 0.3, sentiment: 0.4, ... }
   threshold Float
   action    String   // BUY | SELL | HOLD
+  status    String   @default("ACTIVE")
+  version   Int      @default(1)
+  versions  Json?    // version history
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -230,22 +249,23 @@ model ScoringRule {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  title       String
+  message     String
+  targetRoute String?  // e.g. /portfolio or /orders/123
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([type])
   @@index([read])
 }
 
-// RiskRule for configurable risk engine (Phase 1+)
+// RiskRule for configurable risk engine
 model RiskRule {
   id        String   @id @default(cuid())
   userId    String
@@ -259,4 +279,38 @@ model RiskRule {
 
   @@index([userId])
   @@index([name])
+}
+
+// DataSource for data source configuration (Phase later)
+model DataSource {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  type        String   // TELEGRAM | X | NEWS | CUSTOM
+  config      Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+}
+
+// AuditLog for compliance and security
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String?
+  details   Json?
+  ipAddress String?
+  timestamp DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
 }
