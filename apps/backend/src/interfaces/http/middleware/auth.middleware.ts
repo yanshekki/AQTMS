@@ -33,6 +33,7 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
 
     // Set user immediately from decoded JWT (security: JWT signature already verified)
     req.user = {
+      id: decoded.userId,
       userId: decoded.userId,
       walletAddress: decoded.walletAddress,
       role: decoded.role,

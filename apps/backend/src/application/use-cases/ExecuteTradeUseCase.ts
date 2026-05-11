@@ -19,13 +19,13 @@ export class ExecuteTradeUseCase {
 
   async execute(dto: CreateTradeDto, userId: string) {
     // 1. Check idempotency (prevent duplicate execution)
-    const existing = await this.tradeRepository.findByIdempotencyKey(dto.idempotencyKey);
+    const existing = dto.idempotencyKey ? await this.tradeRepository.findByIdempotencyKey(dto.idempotencyKey) : null;
     if (existing) {
       return existing;
     }
 
     // 2. Get the correct exchange adapter (resolves account ID → exchange type → adapter)
-    const adapter = await this.adapterMap.get(dto.exchangeAccountId, userId);
+    const adapter = await this.adapterMap.get(dto.exchangeAccountId || '', userId);
     if (!adapter) {
       throw new DomainError(
         `Exchange account not found: ${dto.exchangeAccountId}`,
@@ -43,7 +43,7 @@ export class ExecuteTradeUseCase {
         ...(dto.price !== undefined ? { price: dto.price } : {}),
         ...(dto.stopPrice !== undefined ? { stopPrice: dto.stopPrice } : {}),
         timeInForce: dto.timeInForce,
-        idempotencyKey: dto.idempotencyKey,
+        idempotencyKey: dto.idempotencyKey || '',
       });
 
       // 4. Persist trade

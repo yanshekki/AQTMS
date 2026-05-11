@@ -1,11 +1,11 @@
-import { AuthenticatedUser } from './authenticated-user.interface';
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
+declare namespace Express {
+  interface Request {
+    user?: {
+      id: string;
+      userId: string;
+      walletAddress: string;
+      role: string;
+      permissions: string[];
+    };
   }
 }
-
-export {};

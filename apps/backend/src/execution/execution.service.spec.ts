@@ -51,7 +51,6 @@ describe('ExecutionService WebSocket Flow', () => {
       x: 'TRADE',
     };
 
-    // @ts-expect-error - testing internal/private method
     await (service as any)['handleExecutionReport'](fakeReport);
 
     expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('987654');

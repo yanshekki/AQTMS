@@ -12,7 +12,7 @@ export interface RiskEvaluationResult {
 export interface RiskRule {
   name: string;
   enabled: boolean;
-  check: (orderData: any, context: any) => { passed: boolean; reason?: string };
+  check: (orderData: any, context: any) => { passed: boolean; reason?: string } | Promise<{ passed: boolean; reason?: string }>;
 }
 
 @Injectable()

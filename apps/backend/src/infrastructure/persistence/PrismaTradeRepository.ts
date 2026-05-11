@@ -89,7 +89,7 @@ export class PrismaTradeRepository implements ITradeRepository {
       timeInForce: row.timeInForce as Trade['timeInForce'],
       status: row.status as TradeStatus,
       filledQuantity: row.filledQuantity,
-      idempotencyKey: row.idempotencyKey,
+      idempotencyKey: row.idempotencyKey as string,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

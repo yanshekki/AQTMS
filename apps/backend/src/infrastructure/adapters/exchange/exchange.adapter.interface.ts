@@ -10,6 +10,8 @@ export interface PlaceOrderParams {
   stopLoss?: number;
   takeProfit?: number;
   isPaper?: boolean;
+  exchange?: string;
+  testnet?: boolean;
 }
 
 export interface PlaceOrderResult {

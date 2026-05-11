@@ -38,7 +38,7 @@ export class BinanceWebsocketClient {
 
   private setState(state: ConnectionState) {
     if (this.connectionState !== state) {
-      this.structuredLogger.log('Connection state changed', { from: this.connectionState, to: state });
+      this.structuredLogger.log(`Connection state changed: ${this.connectionState} -> ${state}`);
       this.connectionState = state;
     }
   }
@@ -73,8 +73,8 @@ export class BinanceWebsocketClient {
         }
       });
 
-      this.ws.on('error', (error) => {
-        this.structuredLogger.error('WebSocket error', error);
+      this.ws.on('error', (error: any) => {
+        this.structuredLogger.error(`WebSocket error: ${error?.message || error}`);
         this.setState(ConnectionState.RECONNECTING);
         if (this.errorCallback) this.errorCallback(error as Error);
         this.scheduleReconnect();

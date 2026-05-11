@@ -63,7 +63,7 @@ export class ProcessNewsUseCase {
           relevanceScore: compositeScore.relevanceScore,
           compositeScore: compositeScore.compositeScore,
           aiAnalysis: JSON.stringify(compositeScore),
-        },
+        } as any,
       });
 
       // 5. Create audit log

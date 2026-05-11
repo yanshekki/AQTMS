@@ -6,6 +6,14 @@ import { Signal } from '../../domain/entities/signal.entity';
 export class InMemorySignalRepository implements ISignalRepository {
   private signals: Signal[] = [];
 
+  async findById(id: string): Promise<Signal | null> {
+    return this.signals.find(s => s.id === id) || null;
+  }
+
+  async findByUserId(userId: string): Promise<Signal[]> {
+    return this.signals.filter(s => (s as any).userId === userId);
+  }
+
   async findBySymbol(symbol: string, limit = 50): Promise<Signal[]> {
     return this.signals
       .filter(s => s.symbol === symbol)

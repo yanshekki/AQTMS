@@ -21,7 +21,7 @@ export class ReconciliationService {
     }
 
     try {
-      const exchangePositions = await this.positionProvider.getPositions(userId, exchangeAccountId);
+      const exchangePositions = await (this.positionProvider as any).getPositions(userId, exchangeAccountId);
 
       const dbPositions = await this.prisma.position.findMany({
         where: { userId, ...(exchangeAccountId && { exchangeAccountId }) },
@@ -37,9 +37,9 @@ export class ReconciliationService {
         dbPositions,
       };
 
-      if (result.hasDiscrepancy && this.notificationService) {
-        this.notificationService
-          .notifyReconciliationDiscrepancy(userId, discrepancies)
+      if ((result as any).hasDiscrepancy && this.notificationService) {
+        (this.notificationService as any)
+          .notifyReconciliationDiscrepancy(userId, discrepancies as any)
           .catch(() => this.logger.warn('Failed to send reconciliation notification'));
       }
 

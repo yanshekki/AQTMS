@@ -23,7 +23,7 @@ export class TradeController {
       const parseResult = CreateTradeDtoSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new ValidationError('Invalid trade request', 
-        parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
+        parseResult.error.issues.map((i: any) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
       const user = req.user as AuthenticatedUser | undefined;
@@ -47,7 +47,7 @@ export class TradeController {
       const parseResult = CancelTradeDtoSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new ValidationError('Invalid cancel request', 
-        parseResult.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
+        parseResult.error.issues.map((i: any) => ({ path: i.path.join('.'), message: i.message, code: i.code })));
       }
 
       const user = req.user as AuthenticatedUser | undefined;

@@ -53,7 +53,7 @@ export class BacktestService {
         slippageRate: request.slippageRate,
       };
 
-      const result = await this.runBacktest(backtestRequest);
+      const result = await (this as any).runBacktest(backtestRequest);
 
       // Score based on Sharpe + Profit Factor (customizable)
       const score = (result.sharpeRatio || 0) * 0.6 + (result.profitFactor || 0) * 0.4;

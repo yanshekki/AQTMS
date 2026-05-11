@@ -2,7 +2,7 @@
 // Refactored to proper NestJS BullMQ Processor class
 // Integrated with ExecutionService path (demo simulation for now; full UseCase wiring in hardening)
 
-import { Processor, Process } from '@nestjs/bullmq';
+import { Processor } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { QUEUE_NAMES, type TradeExecuteJob } from '../jobs';
@@ -14,7 +14,6 @@ export class TradeProcessor {
 
   constructor() {}
 
-  @Process()
   async handleTrade(job: Job<TradeExecuteJob>) {
     const { symbol, side, quantity, reason, compositeScore, exchangeAccountId, idempotencyKey, userId } = job.data;
     this.logger.log(`Processing trade job for ${symbol} ${side} (score: ${compositeScore}, user: ${userId})`);
