@@ -164,6 +164,7 @@ model NewsEvent {
   content     String   @db.Text
   symbol      String?
   score       Float?
+  truthScore  Float?     // AI truth/reliability score
   aiAnalysis  String?  @db.Text
   isProcessed Boolean  @default(false)
   isFake      Boolean  @default(false)
