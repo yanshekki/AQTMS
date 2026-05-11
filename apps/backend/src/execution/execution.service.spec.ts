@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-// ... other imports ...
+import { ExecutionService } from './execution.service';
+import { OrderService } from '../order/order.service';
+import { WebsocketService } from '../websocket/websocket.service';
 
 describe('ExecutionService WebSocket Flow', () => {
   let service: ExecutionService;
@@ -25,11 +27,11 @@ describe('ExecutionService WebSocket Flow', () => {
               id: 'local-order-123',
               filledQuantity: 0,
             }),
-            applyPartialFill: jest.fn(),
-            updateOrderStatus: jest.fn(),
+            applyPartialFill: jest.fn().mockResolvedValue(undefined),
+            updateOrderStatus: jest.fn().mockResolvedValue(undefined),
+            createOrder: jest.fn().mockResolvedValue({ id: 'new-order' }),
           },
         },
-        // ... other mocks ...
       ],
     }).compile();
 
@@ -49,8 +51,8 @@ describe('ExecutionService WebSocket Flow', () => {
       x: 'TRADE',
     };
 
-    // @ts-ignore - testing private method
-    await service['handleExecutionReport'](fakeReport);
+    // @ts-expect-error - testing internal/private method
+    await (service as any)['handleExecutionReport'](fakeReport);
 
     expect(orderService.findByExchangeOrderId).toHaveBeenCalledWith('987654');
     expect(orderService.applyPartialFill).toHaveBeenCalled();
