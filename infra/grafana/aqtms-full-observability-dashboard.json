@@ -1,0 +1,42 @@
+{
+  "dashboard": {
+    "title": "AQTMS Full Observability",
+    "tags": ["aqtms", "observability", "logs", "traces"],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "title": "Backend Health",
+        "type": "stat",
+        "targets": [ { "expr": "up{job=\"aqtms-backend\"}", "legendFormat": "Up" } ]
+      },
+      {
+        "title": "Kill Switch Status",
+        "type": "stat",
+        "targets": [ { "expr": "kill_switch_active", "legendFormat": "Active" } ]
+      },
+      {
+        "title": "Execution P95 Latency",
+        "type": "graph",
+        "targets": [ { "expr": "histogram_quantile(0.95, rate(execution_duration_seconds_bucket[5m]))" } ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [ { "expr": "rate(http_requests_total{status=~\"5..\"}[5m])" } ]
+      },
+      {
+        "title": "Log Volume (Loki)",
+        "type": "graph",
+        "targets": [ { "expr": "sum(count_over_time({namespace=\"aqtms\"}[5m]))", "legendFormat": "Logs/min" } ]
+      },
+      {
+        "title": "Trace Duration (Tempo)",
+        "type": "graph",
+        "targets": [ { "expr": "histogram_quantile(0.95, tempo_spanmetrics_latency_bucket)", "legendFormat": "P95 Trace Duration" } ]
+      }
+    ]
+  }
+}
