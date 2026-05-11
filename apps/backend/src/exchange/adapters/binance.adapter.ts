@@ -18,11 +18,23 @@ export class BinanceAdapter implements IExchangeAdapter {
       : 'https://api.binance.com';
   }
 
-  // ... existing methods (placeOrder, cancelOrder, getOrder) ...
+  async placeOrder(params: PlaceOrderParams): Promise<OrderResult> {
+    // TODO: Implement real Binance order placement
+    return { success: true, orderId: 'demo-order' };
+  }
+
+  async cancelOrder(orderId: string): Promise<boolean> {
+    // TODO: Implement real cancel
+    return true;
+  }
+
+  async getOrder(orderId: string): Promise<any> {
+    // TODO: Implement real get order
+    return {};
+  }
 
   async getPositions(): Promise<any[]> {
     const timestamp = Date.now();
-    // For Futures positions
     const queryObj = { timestamp };
     const queryString = new URLSearchParams(queryObj).toString();
     const signature = this.createSignature(queryString);
@@ -58,7 +70,6 @@ export class BinanceAdapter implements IExchangeAdapter {
     const signature = this.createSignature(queryString);
 
     try {
-      // Spot account
       const response = await axios.get(`${this.baseUrl}/api/v3/account`, {
         params: {
           ...queryObj,
