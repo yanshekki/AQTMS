@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { verifyMessage } from 'viem';
 import { Role } from './roles.enum';
+import { AuthenticatedUser } from './auth.types';
 
 export interface JwtPayload {
   sub: string;
@@ -41,7 +42,7 @@ export class AuthService {
     walletAddress: string,
     signature: string,
     message: string,
-  ): Promise<{ accessToken: string; user: any }> {
+  ): Promise<{ accessToken: string; user: AuthenticatedUser }> {
     const user = await this.prisma.user.findUnique({
       where: { walletAddress },
     });
@@ -50,12 +51,10 @@ export class AuthService {
       throw new UnauthorizedException('No nonce found. Please request a new nonce first.');
     }
 
-    // Verify the message matches the nonce
     if (!message.includes(user.nonce)) {
       throw new UnauthorizedException('Invalid message or nonce mismatch.');
     }
 
-    // Verify EIP-191 signature using viem
     const isValid = await verifyMessage({
       address: walletAddress as `0x${string}`,
       message,
@@ -66,13 +65,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid wallet signature.');
     }
 
-    // Clear nonce after successful login
     await this.prisma.user.update({
       where: { walletAddress },
       data: { nonce: null },
     });
 
-    // Generate JWT
     const payload: JwtPayload = {
       sub: user.id,
       walletAddress: user.walletAddress,
@@ -82,21 +79,21 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
 
-    this.logger.log(`User ${walletAddress} logged in successfully`);
+    const authenticatedUser: AuthenticatedUser = {
+      id: user.id,
+      userId: user.id,
+      walletAddress: user.walletAddress,
+      role: user.role,
+      permissions: user.permissions || [],
+    };
 
     return {
       accessToken,
-      user: {
-        id: user.id,
-        userId: user.id,
-        walletAddress: user.walletAddress,
-        role: user.role,
-        permissions: user.permissions || [],
-      },
+      user: authenticatedUser,
     };
   }
 
-  async validateUser(payload: JwtPayload): Promise<any> {
+  async validateUser(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
