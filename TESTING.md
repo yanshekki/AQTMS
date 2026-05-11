@@ -88,6 +88,30 @@ This will push real-time prices via WebSocket to the Dashboard.
 - Have a plan to manually close all positions if something goes wrong
 - Never test with money you cannot afford to lose
 
+## Frontend E2E Testing
+
+We use **Cypress** for frontend E2E tests.
+
+### How to Run
+```bash
+cd apps/web
+pnpm add -D cypress
+npx cypress open
+# or
+npx cypress run
+```
+
+Example tests are in `apps/web/cypress/e2e/`.
+
+Current coverage includes:
+- Dashboard loading and mode switching
+- WebSocket connection status
+
+### Recommended to Expand
+- Full order placement flow (mocked backend)
+- Portfolio real-time updates
+- Strategy creation and backtest
+
 ## E2E Test Coverage (Strengthened)
 
 ### Core Flows Covered
