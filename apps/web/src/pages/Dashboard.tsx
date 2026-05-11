@@ -1,8 +1,8 @@
-// Enhanced Dashboard with Backtesting UI and improved testing controls
+// Polished Dashboard with improved testing controls and backtesting UI
 
 import React, { useState } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress, TextField, MenuItem, Stack
+  Box, Grid, Card, CardContent, Typography, Chip, Button, Alert, LinearProgress, TextField, MenuItem, Stack, Divider
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -36,7 +36,7 @@ export default function Dashboard() {
       });
       setValidationResult(res.data);
     } catch (err) {
-      setValidationResult({ ready: false, issues: ['Validation request failed'] });
+      setValidationResult({ ready: false, issues: ['Validation failed'] });
     }
   };
 
@@ -46,9 +46,28 @@ export default function Dashboard() {
       const res = await axios.post('/api/backtest/run', backtestParams);
       setBacktestResult(res.data);
     } catch (err) {
-      setBacktestResult({ error: 'Backtest failed or endpoint not available yet' });
+      setBacktestResult({ error: 'Backtest endpoint not fully available yet. This is a UI preview.' });
     } finally {
       setIsRunningBacktest(false);
+    }
+  };
+
+  const placeQuickTestOrder = async (mode: 'PAPER' | 'TESTNET') => {
+    const orderData = {
+      isPaper: mode === 'PAPER',
+      testnet: mode === 'TESTNET',
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 0.001,
+      userId: 'demo-user',
+      exchangeAccountId: mode === 'PAPER' ? 'demo-paper' : 'demo-testnet',
+    };
+
+    try {
+      const res = await axios.post('/api/execution/execute', orderData);
+      alert(`${mode} order placed! Result: ${JSON.stringify(res.data).slice(0, 100)}...`);
+    } catch (err: any) {
+      alert(`Failed to place ${mode} order: ${err.message}`);
     }
   };
 
@@ -60,69 +79,60 @@ export default function Dashboard() {
         Trading Dashboard
       </Typography>
 
-      {/* Trading Mode + Testing Controls */}
+      {/* Mode + Testing Controls */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={7}>
           <Card>
             <CardContent>
-              <Typography variant="h6">Current Trading Mode</Typography>
-              <Box sx={{ mt: 1, mb: 2 }}>
+              <Typography variant="h6" gutterBottom>Trading Mode</Typography>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <Chip
                   label={currentMode}
                   color={currentMode === 'PAPER' ? 'success' : currentMode === 'TESTNET' ? 'warning' : 'error'}
-                  sx={{ fontSize: '1.1rem', px: 3, py: 1.5 }}
+                  sx={{ fontSize: '1.1rem', px: 2.5, py: 1 }}
                 />
-              </Box>
-
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Button variant="outlined" onClick={() => setCurrentMode('PAPER')}>PAPER</Button>
-                <Button variant="outlined" onClick={() => setCurrentMode('TESTNET')}>TESTNET</Button>
-                <Button variant="outlined" color="error" onClick={() => setCurrentMode('LIVE')}>LIVE</Button>
+                {currentMode === 'LIVE' && <Alert severity="error" sx={{ py: 0 }}>Real money active!</Alert>}
               </Stack>
 
-              {currentMode === 'LIVE' && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  ⚠️ LIVE mode active — Real money at risk!
-                </Alert>
-              )}
+              <Stack direction="row" spacing={1}>
+                <Button variant="outlined" size="small" onClick={() => setCurrentMode('PAPER')}>PAPER</Button>
+                <Button variant="outlined" size="small" onClick={() => setCurrentMode('TESTNET')}>TESTNET</Button>
+                <Button variant="outlined" size="small" color="error" onClick={() => setCurrentMode('LIVE')}>LIVE</Button>
+              </Stack>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
-              <Typography variant="h6">Testing Tools</Typography>
-              <Button variant="contained" onClick={runValidation} sx={{ mt: 1 }}>
-                Validate Testing Environment
-              </Button>
-
-              {validationResult && (
-                <Box sx={{ mt: 2 }}>
-                  {validationResult.ready ? (
-                    <Alert severity="success">Ready for testing!</Alert>
-                  ) : (
-                    <Alert severity="warning">
-                      Issues: {validationResult.issues?.join(', ')}
-                    </Alert>
-                  )}
-                </Box>
-              )}
+              <Typography variant="h6" gutterBottom>Quick Testing Actions</Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Button variant="contained" size="small" onClick={() => placeQuickTestOrder('PAPER')}>
+                  Quick Paper Order
+                </Button>
+                <Button variant="contained" size="small" color="warning" onClick={() => placeQuickTestOrder('TESTNET')}>
+                  Quick Testnet Order
+                </Button>
+                <Button variant="outlined" size="small" onClick={runValidation}>
+                  Validate Env
+                </Button>
+              </Stack>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Backtesting UI Section */}
+      {/* Backtesting Section */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>📊 Quick Backtest</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Run a quick backtest before going live (recommended in PAPER mode)
+            Test your strategy before going live (best in PAPER mode)
           </Typography>
 
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={3}>
+          <Grid container spacing={2} alignItems="flex-end">
+            <Grid item xs={6} sm={3}>
               <TextField
                 select
                 label="Strategy"
@@ -133,10 +143,9 @@ export default function Dashboard() {
               >
                 <MenuItem value="sma_crossover">SMA Crossover</MenuItem>
                 <MenuItem value="mean_reversion">Mean Reversion</MenuItem>
-                <MenuItem value="momentum">Momentum</MenuItem>
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={3}>
+            <Grid item xs={6} sm={2}>
               <TextField
                 label="Symbol"
                 value={backtestParams.symbol}
@@ -145,9 +154,9 @@ export default function Dashboard() {
                 size="small"
               />
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={6} sm={2}>
               <TextField
-                label="Start Date"
+                label="From"
                 type="date"
                 value={backtestParams.startDate}
                 onChange={(e) => setBacktestParams({ ...backtestParams, startDate: e.target.value })}
@@ -156,9 +165,9 @@ export default function Dashboard() {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={6} sm={2}>
               <TextField
-                label="End Date"
+                label="To"
                 type="date"
                 value={backtestParams.endDate}
                 onChange={(e) => setBacktestParams({ ...backtestParams, endDate: e.target.value })}
@@ -167,12 +176,12 @@ export default function Dashboard() {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={12} sm={3}>
               <Button
                 variant="contained"
+                fullWidth
                 onClick={runBacktest}
                 disabled={isRunningBacktest}
-                fullWidth
               >
                 {isRunningBacktest ? 'Running...' : 'Run Backtest'}
               </Button>
@@ -180,13 +189,30 @@ export default function Dashboard() {
           </Grid>
 
           {backtestResult && (
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               {backtestResult.error ? (
-                <Alert severity="info">{backtestResult.error}</Alert>
+                <Typography color="text.secondary">{backtestResult.error}</Typography>
               ) : (
-                <Alert severity="success">
-                  Backtest completed! Sharpe: {backtestResult.sharpe || 'N/A'} | Return: {backtestResult.totalReturn || 'N/A'}%
-                </Alert>
+                <Stack direction="row" spacing={3} flexWrap="wrap">
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Total Return</Typography>
+                    <Typography variant="h6" color={backtestResult.totalReturn > 0 ? 'success.main' : 'error.main'}>
+                      {backtestResult.totalReturn || 'N/A'}%
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Sharpe Ratio</Typography>
+                    <Typography variant="h6">{backtestResult.sharpe || 'N/A'}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Max Drawdown</Typography>
+                    <Typography variant="h6" color="error.main">{backtestResult.maxDrawdown || 'N/A'}%</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+                    <Typography variant="h6">{backtestResult.winRate || 'N/A'}%</Typography>
+                  </Box>
+                </Stack>
               )}
             </Box>
           )}
@@ -198,7 +224,7 @@ export default function Dashboard() {
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography color="textSecondary">Total Portfolio Value</Typography>
+              <Typography color="textSecondary">Total Value</Typography>
               <Typography variant="h4">${summary?.totalValue || 0}</Typography>
             </CardContent>
           </Card>
@@ -216,7 +242,7 @@ export default function Dashboard() {
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography color="textSecondary">Open Positions</Typography>
+              <Typography color="textSecondary">Positions</Typography>
               <Typography variant="h4">{summary?.positionCount || 0}</Typography>
             </CardContent>
           </Card>
@@ -224,7 +250,7 @@ export default function Dashboard() {
       </Grid>
 
       <Typography variant="caption" sx={{ mt: 3, display: 'block', color: 'text.secondary' }}>
-        Tip: Use PAPER mode + Backtest first. Then move to TESTNET before small LIVE trades.
+        Recommended flow: Backtest → PAPER mode → TESTNET validation → Small LIVE trades
       </Typography>
     </Box>
   );
