@@ -1,46 +1,56 @@
-# AQTMS Advanced Deployment Optimization (Step 10)
+# AQTMS Production Deployment & Monitoring (Phase C)
 
-## Risk & Portfolio Management Enhancements
-- Daily Loss Limit tracking (in-memory, persist to Redis/DB in prod)
-- Max Position Size enforcement
-- Dynamic risk scoring with Kelly/ATR/VaR placeholders
-- Suggested position sizing in RiskService
-- Integration with Kill Switch for automatic trading halt
+## Security Hardening
+- Non-root user in Dockerfile (already implemented)
+- Secrets: Use Kubernetes Secrets + SealedSecrets or External Secrets Operator
+- Enable rate limiting in NestJS (ThrottlerModule)
+- mTLS between services if scaled horizontally
+- Regular dependency scanning (Dependabot + Snyk)
 
-## Deployment Optimizations
+## Monitoring Stack (Recommended)
+- **Prometheus** + **Grafana** (core metrics)
+- **Alertmanager** for critical alerts (Kill Switch, high risk score, reconciliation discrepancies)
+- **Loki** or ELK for centralized logging
+- **Tempo** or Jaeger for distributed tracing
 
-### Security
-- Non-root container user (already in Dockerfile)
-- Secrets management: Use Kubernetes Secrets, HashiCorp Vault, or AWS Secrets Manager
-- Enable mTLS between services if scaled
-- Rate limiting + DDoS protection at ingress
+## Key Grafana Dashboards
+- AQTMS Production Full Monitoring (see monitoring/grafana-dashboards/)
+- Panels include: Kill Switch, Execution p95 latency, Paper vs Live ratio, Risk distribution, Reconciliation issues, Daily PnL
 
-### Monitoring & Observability
-- Prometheus + Grafana (Kill Switch, execution latency, daily PnL, risk violations)
-- Distributed tracing (OpenTelemetry)
-- Centralized logging (ELK or Loki)
+## Prometheus Alert Rules (Example)
+```yaml
+- alert: KillSwitchActive
+  expr: kill_switch_active == 1
+  for: 1m
+  annotations:
+    summary: "Kill Switch is active"
 
-### Scalability
-- Horizontal scaling of NestJS workers
-- BullMQ + Redis for queue durability
-- Database: Use managed PostgreSQL (Neon, Supabase, AWS RDS) with connection pooling
-- Caching: Redis for frequently accessed data (positions, risk params)
+- alert: HighExecutionLatency
+  expr: histogram_quantile(0.95, rate(execution_duration_seconds_bucket[5m])) > 2
+  for: 5m
+```
 
-### CI/CD Recommendations
-- GitHub Actions: Build + test + security scan (Trivy/Snyk)
-- Automated Prisma migrations
-- Canary deployments with ArgoCD or Flux
+## Scalability & Reliability
+- Use BullMQ + Redis for durable queues
+- Horizontal Pod Autoscaler for backend
+- Database connection pooling (Prisma + PgBouncer)
+- Circuit Breaker + Retry already implemented in ExecutionService
 
-### Production Checklist
-- [ ] Set strong JWT_SECRET + ENCRYPTION_SECRET
-- [ ] Configure real exchange API keys (encrypted at rest)
-- [ ] Enable Kill Switch + daily loss alerts
-- [ ] Set up alerting for high risk score / daily loss breach
+## CI/CD Recommendations
+- GitHub Actions: lint + test + build + security scan
+- Automated Prisma migrations in pipeline
+- Canary or Blue-Green deployments
+
+## Production Checklist
+- [x] Kill Switch + Risk rules active
+- [x] Circuit Breaker + Retry in live path
+- [x] Real-time monitoring + alerting
+- [ ] Set strong secrets (JWT, Encryption, Exchange API keys)
+- [ ] Enable rate limiting
+- [ ] Configure Alertmanager routes
+- [ ] Set resource limits & requests in Kubernetes
 - [ ] Backup strategy for PostgreSQL + Redis
-- [ ] Load testing with k6 or Artillery
+- [ ] Load testing completed
+- [ ] Runbook for Kill Switch activation
 
-## Next Steps
-- Persist daily loss & risk state to database
-- Add real VaR / Kelly calculation library
-- Implement portfolio optimization algorithms (mean-variance, Black-Litterman)
-- Full multi-exchange reconciliation service
+Phase C focuses on making the system production-ready with robust monitoring and deployment practices.
