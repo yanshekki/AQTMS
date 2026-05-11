@@ -18,7 +18,7 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
    * Initialize or get exchange instance with dynamic credentials (recommended for per-user accounts)
    */
   async initialize(config: ExchangeConfig): Promise<void> {
-    const cacheKey = `${config.exchange}-${config.testnet ? 'testnet' : 'mainnet'}`;
+    const cacheKey = `${config.exchange.toLowerCase()}-${config.testnet ? 'testnet' : 'mainnet'}`;
 
     if (this.exchangeInstances.has(cacheKey)) {
       return;
@@ -33,27 +33,39 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
       sandbox: config.testnet ?? false,
     };
 
-    if (config.exchange.toLowerCase() === 'binance') {
+    const exchangeName = config.exchange.toLowerCase();
+
+    if (exchangeName === 'binance') {
       exchange = new ccxt.binance({
         ...commonOptions,
         options: { defaultType: 'spot' },
       });
-    } else if (config.exchange.toLowerCase() === 'bybit') {
+    } else if (exchangeName === 'bybit') {
       exchange = new ccxt.bybit({
         ...commonOptions,
         options: { defaultType: 'spot' },
       });
     } else {
-      throw new Error(`Unsupported exchange: ${config.exchange}`);
+      throw new Error(`Unsupported exchange: ${config.exchange}. Supported: binance, bybit`);
     }
 
     this.exchangeInstances.set(cacheKey, exchange);
     this.logger.log(`Initialized ${config.exchange} adapter (testnet=${config.testnet})`);
   }
 
+  private getExchangeInstance(exchangeName: string, testnet = false): any {
+    const cacheKey = `${exchangeName.toLowerCase()}-${testnet ? 'testnet' : 'mainnet'}`;
+    const instance = this.exchangeInstances.get(cacheKey);
+
+    if (!instance) {
+      throw new Error(`Exchange ${exchangeName} not initialized. Call initialize() first.`);
+    }
+    return instance;
+  }
+
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
-      const exchange = await this.getExchangeInstance(params.exchange);
+      const exchange = this.getExchangeInstance(params.exchange, params.testnet);
 
       const orderType = params.type === 'MARKET' ? 'market' : 'limit';
       const side = params.side.toLowerCase();
@@ -91,19 +103,10 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
     }
   }
 
-  private async getExchangeInstance(exchangeName: string) {
-    // For simplicity, return the last initialized instance or throw if none
-    const instances = Array.from(this.exchangeInstances.values());
-    if (instances.length === 0) {
-      throw new Error('No exchange initialized. Call initialize() first with API keys.');
-    }
-    return instances[instances.length - 1]; // Return most recent
-  }
-
-  async cancelOrder(exchangeAccountId: string, exchangeOrderId: string): Promise<boolean> {
+  async cancelOrder(exchangeAccountId: string, exchangeOrderId: string, exchange = 'binance', testnet = false): Promise<boolean> {
     try {
-      const exchange = await this.getExchangeInstance('');
-      await exchange.cancelOrder(exchangeOrderId);
+      const ex = this.getExchangeInstance(exchange, testnet);
+      await ex.cancelOrder(exchangeOrderId);
       return true;
     } catch (error: any) {
       this.logger.error(`cancelOrder failed: ${error.message}`);
@@ -111,29 +114,29 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
     }
   }
 
-  async getBalance(): Promise<any> {
+  async getBalance(exchange = 'binance', testnet = false): Promise<any> {
     try {
-      const exchange = await this.getExchangeInstance('');
-      return await exchange.fetchBalance();
+      const ex = this.getExchangeInstance(exchange, testnet);
+      return await ex.fetchBalance();
     } catch (error: any) {
       this.logger.error(`getBalance failed: ${error.message}`);
       return {};
     }
   }
 
-  async getPositions(): Promise<any[]> {
+  async getPositions(exchange = 'binance', testnet = false): Promise<any[]> {
     try {
-      const exchange = await this.getExchangeInstance('');
-      return await exchange.fetchPositions().catch(() => []);
+      const ex = this.getExchangeInstance(exchange, testnet);
+      return await ex.fetchPositions().catch(() => []);
     } catch (error: any) {
       return [];
     }
   }
 
-  async getOrderStatus(exchangeOrderId: string): Promise<OrderStatusResult | null> {
+  async getOrderStatus(exchangeOrderId: string, exchange = 'binance', testnet = false): Promise<OrderStatusResult | null> {
     try {
-      const exchange = await this.getExchangeInstance('');
-      const order = await exchange.fetchOrder(exchangeOrderId);
+      const ex = this.getExchangeInstance(exchange, testnet);
+      const order = await ex.fetchOrder(exchangeOrderId);
       return {
         exchangeOrderId: order.id,
         status: order.status,
@@ -144,6 +147,26 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
       };
     } catch (error: any) {
       return null;
+    }
+  }
+
+  async getTicker(symbol: string, exchange = 'binance', testnet = false) {
+    try {
+      const ex = this.getExchangeInstance(exchange, testnet);
+      return await ex.fetchTicker(symbol);
+    } catch (error: any) {
+      this.logger.error(`getTicker failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  async getOHLCV(symbol: string, timeframe = '1m', limit = 100, exchange = 'binance', testnet = false) {
+    try {
+      const ex = this.getExchangeInstance(exchange, testnet);
+      return await ex.fetchOHLCV(symbol, timeframe, limit);
+    } catch (error: any) {
+      this.logger.error(`getOHLCV failed: ${error.message}`);
+      return [];
     }
   }
 }
