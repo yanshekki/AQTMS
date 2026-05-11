@@ -1,14 +1,14 @@
-// ── Portfolio Dashboard (Real Data Only) ──
+// ── Portfolio Dashboard (Professional Dark Theme + Real-time) ──
 
 import { usePortfolio } from '@/features/portfolio/model/usePortfolio';
 import { PortfolioSummary } from '@/features/portfolio/ui/PortfolioSummary';
 import { PositionTable } from '@/features/portfolio/ui/PositionTable';
-import { Container, Typography, Box, Button, Chip, Alert, Stack, Grid, Card, CardContent } from '@mui/material';
+import { Container, Typography, Box, Button, Chip, Alert, Stack, Grid, Card, CardContent, CircularProgress } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export function PortfolioPage() {
-  const { summary, positions, isLoading, lastUpdated, refresh } = usePortfolio();
+  const { summary, positions, isLoading, lastUpdated, refresh, error } = usePortfolio();
 
   const alerts = summary?.alerts || [];
 
@@ -21,8 +21,16 @@ export function PortfolioPage() {
       }))
     : [];
 
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4, backgroundColor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h5" fontWeight={800}>
@@ -42,6 +50,12 @@ export function PortfolioPage() {
           </Button>
         </Box>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load portfolio data. Please try refreshing.
+        </Alert>
+      )}
 
       {alerts.length > 0 && (
         <Stack spacing={1} mb={3}>
@@ -70,7 +84,7 @@ export function PortfolioPage() {
       {allocationData.length > 0 && (
         <Grid container spacing={3} mt={2}>
           <Grid item xs={12} md={5}>
-            <Card>
+            <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} mb={2}>
                   資產分配
@@ -100,7 +114,7 @@ export function PortfolioPage() {
         </Grid>
 
         <Grid item xs={12} md={7}>
-          <Card>
+          <Card sx={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} mb={2}>
                 持倉明細
