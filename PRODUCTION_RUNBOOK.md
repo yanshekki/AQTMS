@@ -44,33 +44,14 @@ helm upgrade --install aqtms-backend ./infra/helm/backend \
 - **Strategy Performance**: Active strategies, Signal latency, Execution success rate
 
 ### Recommended Alerts (PrometheusRule)
-```yaml
-groups:
-- name: aqtms-critical
-  rules:
-  - alert: KillSwitchActive
-    expr: killswitch_active == 1
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Kill Switch is ACTIVE"
-      description: "Immediate investigation required. Trading may be halted."
+See `infra/monitoring/alerts/aqtms-critical.yaml` for the latest rules.
 
-  - alert: HighOrderExecutionLatency
-    expr: histogram_quantile(0.95, execution_latency_seconds_bucket) > 2
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High order execution latency detected"
-
-  - alert: PodCrashLooping
-    expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
-    for: 5m
-    labels:
-      severity: critical
-```
+Key alerts include:
+- KillSwitchActive (Critical)
+- HighOrderExecutionLatency (Warning)
+- PodCrashLooping (Critical)
+- HighRiskExposure (Warning)
+- StrategyExecutionFailure (Critical)
 
 ## 4. Common Operations
 
@@ -108,30 +89,41 @@ helm rollback aqtms-backend 1 -n production
 argocd app rollback aqtms-production --revision HEAD~
 ```
 
-## 5. Troubleshooting
+## 5. Troubleshooting (實戰化)
 
 ### High Latency / Slow Execution
 1. Check Grafana → Execution Latency panel
 2. Check pod resource usage (CPU throttling?)
 3. Check exchange API rate limits
 4. Review recent logs for retries or errors
+5. Verify MarketDataService caching is working
 
 ### Kill Switch Triggered Unexpectedly
 1. Check alert history in Grafana
-2. Review RiskService logs
+2. Review RiskService logs for which rule triggered
 3. Check daily PnL and position exposure
 4. Verify if it was manual or automatic trigger
+5. Review recent large orders or strategy executions
 
 ### WebSocket / Real-time Updates Not Working
 1. Check `WebsocketGateway` logs
-2. Verify frontend WebSocket connection status
-3. Confirm `startPriceStreaming` is active for key symbols
+2. Verify frontend WebSocket connection status (in Dashboard/Portfolio)
+3. Confirm `startPriceStreaming` is active (check logs on startup)
 4. Check network policies / ingress WebSocket support
+5. Test with `wscat` or browser dev tools
 
 ### Database / Redis Connection Issues
 1. Check External Secrets mounting
 2. Verify DATABASE_URL / REDIS_URL in pod env
 3. Check network connectivity to database
+4. Review connection pool settings
+
+### Strategy Not Executing
+1. Check StrategyRunner logs
+2. Verify MarketDataService is returning real data
+3. Check if strategy is marked as active
+4. Review risk rules that may be blocking execution
+5. Check Kill Switch status
 
 ## 6. Scaling & Maintenance
 
