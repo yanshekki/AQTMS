@@ -44,3 +44,21 @@ spec:
       annotations:
         summary: "Reconciliation discrepancies detected"
         description: "{{ $value }} discrepancies found in the last 15 minutes."
+
+    - alert: HighMemoryUsage
+      expr: (container_memory_working_set_bytes{container="backend"} / container_spec_memory_limit_bytes{container="backend"}) > 0.85
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage"
+        description: "Backend memory usage is above 85%."
+
+    - alert: HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{container="backend"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "Backend CPU usage is high."
