@@ -1,7 +1,23 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { IExecutionLogRepository } from './interfaces/execution-log.repository';
-import { ExecutionLog, LogQuery } from './execution-logger.service';
 import { ExecutionStatsDto } from './dto/execution-stats.dto';
+
+// Define types locally to avoid circular import
+export interface ExecutionLog {
+  id?: string;
+  action: string;
+  level?: string;
+  details?: any;
+  latencyMs?: number;
+  timestamp?: Date;
+}
+
+export interface LogQuery {
+  action?: string;
+  level?: string;
+  from?: Date;
+  to?: Date;
+}
 
 @Injectable()
 export class ExecutionLoggerService {
@@ -10,10 +26,8 @@ export class ExecutionLoggerService {
     private readonly logRepository?: IExecutionLogRepository,
   ) {}
 
-  // ... existing methods ...
-
   getStats(): ExecutionStatsDto {
-    const logs = this.logRepository ? this.logRepository.find({}) as ExecutionLog[] : [];
+    const logs = this.logRepository ? (this.logRepository.find({}) as ExecutionLog[]) : [];
     const total = logs.length;
     const errors = logs.filter(l => l.level === 'error').length;
     const retries = logs.filter(l => l.action === 'RETRY').length;
@@ -36,5 +50,5 @@ export class ExecutionLoggerService {
     };
   }
 
-  // ... other methods ...
+  // TODO: Add other logging methods (log, find, etc.)
 }
