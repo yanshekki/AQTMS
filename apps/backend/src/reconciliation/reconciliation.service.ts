@@ -15,16 +15,43 @@ export class ReconciliationService {
   ) {}
 
   async reconcilePositions(userId: string, exchangeAccountId?: string): Promise<any> {
-    // ... existing logic
-    const result = { /* ... */ };
-
-    if (result.hasDiscrepancy && this.notificationService) {
-      this.notificationService.notifyReconciliationDiscrepancy(userId, result.differences)
-        .catch(() => this.logger.warn('Failed to send reconciliation notification'));
+    if (!this.positionProvider) {
+      this.logger.warn('No position provider available for reconciliation');
+      return { success: false, message: 'Position provider not available' };
     }
 
-    return result;
+    try {
+      const exchangePositions = await this.positionProvider.getPositions(userId, exchangeAccountId);
+
+      const dbPositions = await this.prisma.position.findMany({
+        where: { userId, ...(exchangeAccountId && { exchangeAccountId }) },
+      });
+
+      const discrepancies = this.findDiscrepancies(dbPositions, exchangePositions);
+
+      const result = {
+        success: true,
+        hasDiscrepancy: discrepancies.length > 0,
+        differences: discrepancies,
+        exchangePositions,
+        dbPositions,
+      };
+
+      if (result.hasDiscrepancy && this.notificationService) {
+        this.notificationService
+          .notifyReconciliationDiscrepancy(userId, discrepancies)
+          .catch(() => this.logger.warn('Failed to send reconciliation notification'));
+      }
+
+      return result;
+    } catch (error: any) {
+      this.logger.error(`Reconciliation failed: ${error.message}`);
+      return { success: false, message: error.message };
+    }
   }
 
-  // ... rest of the class
+  private findDiscrepancies(dbPositions: any[], exchangePositions: any[]): any[] {
+    // TODO: Implement real discrepancy detection logic
+    return [];
+  }
 }
