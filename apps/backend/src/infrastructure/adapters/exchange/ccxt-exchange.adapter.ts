@@ -62,7 +62,7 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
 
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
-      const exchange = this.getExchangeInstance(params.exchange, params.testnet);
+      const exchange = this.getExchangeInstance(params.exchange, params.testnet ?? false);
 
       const orderType = params.type === 'MARKET' ? 'market' : 'limit';
       const side = params.side.toLowerCase();
@@ -107,7 +107,6 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
 
   async cancelOrder(exchangeAccountId: string, exchangeOrderId: string): Promise<boolean> {
     try {
-      // Note: In real implementation, resolve exchange from exchangeAccountId
       const ex = this.getExchangeInstance('binance', false);
       await ex.cancelOrder(exchangeOrderId);
       return true;
