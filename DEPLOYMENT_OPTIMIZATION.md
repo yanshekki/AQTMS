@@ -1,42 +1,46 @@
-# AQTMS Production Deployment Optimization (Phase 6+)
+# AQTMS Production Deployment Optimization (Updated Phase E)
 
-## Secrets Management (Recommended)
-- Use `existingSecret` in Helm values
-- Prefer **External Secrets Operator** or **Sealed Secrets** in production
-- Never commit real API keys or JWT_SECRET to git
-- Rotate secrets regularly
+## CI/CD Pipeline
+- GitHub Actions workflow added for:
+  - Backend lint + type check + tests
+  - Frontend build
+  - Helm lint
+  - Docker image build (ready for registry push)
+- Recommended: Add deployment job with ArgoCD or Flux for GitOps
 
-## Security Hardening
-- Non-root containers (already in values.yaml)
-- Read-only root filesystem
-- Resource limits + requests
-- NetworkPolicies (recommended)
-- Pod Security Standards (restricted)
-
-## Monitoring & Alerting
-- Prometheus + Grafana already configured
-- Critical alerts added:
-  - BackendDown
-  - KillSwitchActive
-  - HighExecutionLatency
-  - ReconciliationDiscrepancies
-- Set up Alertmanager routes (PagerDuty / Slack / Email)
-
-## Recommended Production Values
+## External Secrets Management (Recommended for Production)
 ```yaml
-securityContext:
-  runAsNonRoot: true
-  readOnlyRootFilesystem: true
-
-secret:
-  existingSecret: aqtms-backend-secrets
-
-monitoring:
-  prometheusRule: true
+# Example using External Secrets Operator
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: aqtms-backend-secrets
+spec:
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: aqtms-backend-secrets
+  data:
+    - secretKey: JWT_SECRET
+      remoteRef:
+        key: aqtms/production
+        property: jwt_secret
+    # Add other secrets (DB, API keys, etc.)
 ```
 
-## Next Steps
-- Set up External Secrets Operator
-- Configure proper NetworkPolicies
-- Add canary/blue-green deployment strategy
-- Enable audit logging
+## Better Monitoring
+- PrometheusRule with critical alerts already included
+- Recommended additions:
+  - High memory/CPU alerts
+  - Reconciliation failure rate
+  - Order execution failure rate
+- Centralized logging with Loki + Promtail
+
+## Production Checklist
+- [ ] External Secrets Operator deployed
+- [ ] All secrets externalized (no hardcoded values)
+- [ ] CI/CD pipeline green on main
+- [ ] Resource quotas + NetworkPolicies enabled
+- [ ] Backup strategy for database
+- [ ] Disaster recovery runbook
