@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Card, CardContent, Button, TextField, Grid, Chip, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Divider, Stack } from '@mui/material';
+import { Box, Typography, Card, CardContent, Button, TextField, Grid, Chip, List, ListItem, ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Divider, Stack, CircularProgress, Alert } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -22,8 +22,9 @@ export default function Strategies() {
   const [isRunningBacktest, setIsRunningBacktest] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [versions, setVersions] = useState<StrategyVersion[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: strategies = [] } = useQuery({
+  const { data: strategies = [], isLoading, error: strategiesError } = useQuery({
     queryKey: ['strategies'],
     queryFn: async () => (await axios.get('/api/strategies')).data,
   });
@@ -33,7 +34,9 @@ export default function Strategies() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['strategies'] });
       setNewStrategy({ name: '', type: 'sma_crossover', params: '{}' });
+      setError(null);
     },
+    onError: (err: any) => setError(err.response?.data?.message || 'Failed to create strategy'),
   });
 
   const deployStrategy = useMutation({
@@ -46,6 +49,7 @@ export default function Strategies() {
   const runBacktestForStrategy = async (strategy: any) => {
     setIsRunningBacktest(true);
     setSelectedStrategy(strategy);
+    setError(null);
     try {
       const params = JSON.parse(strategy.params || '{}');
       const res = await axios.post('/api/backtest/run', {
@@ -57,30 +61,40 @@ export default function Strategies() {
         initialCapital: 10000,
       });
       setBacktestResult(res.data);
-    } catch (err) {
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Backtest failed');
       setBacktestResult({ error: 'Backtest failed' });
     } finally {
       setIsRunningBacktest(false);
     }
   };
 
+  // Improved version tracking without mock random performance
   const addVersion = (strategy: any) => {
     const newVersion: StrategyVersion = {
       id: `v${Date.now()}`,
       params: strategy.params || '{}',
       createdAt: new Date().toISOString(),
-      performance: {
-        totalReturn: Math.random() * 20 - 5,
-        winRate: 45 + Math.random() * 30,
-        sharpe: 0.5 + Math.random() * 1.5,
-      },
+      // Performance will be populated after real backtest runs
     };
     setVersions(prev => [...prev, newVersion]);
   };
 
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>Strategy Management</Typography>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+
+      {strategiesError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load strategies. Please refresh.</Alert>}
 
       <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
         <Tab label="My Strategies" />
@@ -185,14 +199,17 @@ export default function Strategies() {
           <CardContent>
             <Typography variant="h6" gutterBottom>Performance Tracking (by Version)</Typography>
             {versions.length === 0 ? (
-              <Typography color="text.secondary">No versions tracked yet. Add versions from the Strategies tab.</Typography>
+              <Typography color="text.secondary">No versions tracked yet. Add versions from the Strategies tab and run backtests for real performance data.</Typography>
             ) : (
               <List>
                 {versions.map((v, index) => (
                   <ListItem key={index} divider>
                     <ListItemText
                       primary={`Version ${index + 1} - ${new Date(v.createdAt).toLocaleDateString()}`}
-                      secondary={`Return: ${v.performance?.totalReturn.toFixed(1)}% | Win Rate: ${v.performance?.winRate.toFixed(1)}% | Sharpe: ${v.performance?.sharpe.toFixed(2)}`}
+                      secondary={v.performance 
+                        ? `Return: ${v.performance.totalReturn.toFixed(1)}% | Win Rate: ${v.performance.winRate.toFixed(1)}% | Sharpe: ${v.performance.sharpe.toFixed(2)}`
+                        : 'Performance data pending real backtest'
+                      }
                     />
                   </ListItem>
                 ))}
