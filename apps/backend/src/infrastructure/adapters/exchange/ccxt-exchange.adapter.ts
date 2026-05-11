@@ -78,7 +78,7 @@ export class CcxtExchangeAdapter implements IExchangeAdapter {
         orderParams.price = params.price;
       }
 
-      // For live trading, add safety checks
+      // Safety gate for live trading
       if (!params.testnet && process.env.ENABLE_LIVE_TRADING !== 'true') {
         this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
         return { success: false, message: 'Live trading is currently disabled for safety.' };
