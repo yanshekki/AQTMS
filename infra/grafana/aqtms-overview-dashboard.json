@@ -1,0 +1,62 @@
+{
+  "dashboard": {
+    "title": "AQTMS Overview",
+    "tags": ["aqtms", "trading"],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "title": "Backend Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"aqtms-backend\"}",
+            "legendFormat": "Up"
+          }
+        ]
+      },
+      {
+        "title": "Kill Switch Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "kill_switch_active",
+            "legendFormat": "Active"
+          }
+        ]
+      },
+      {
+        "title": "Execution Latency (P95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(execution_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95 Latency"
+          }
+        ]
+      },
+      {
+        "title": "Reconciliation Discrepancies",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(reconciliation_discrepancies_total[15m])",
+            "legendFormat": "Discrepancies"
+          }
+        ]
+      },
+      {
+        "title": "Active Positions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(position_count)",
+            "legendFormat": "Positions"
+          }
+        ]
+      }
+    ]
+  }
+}
