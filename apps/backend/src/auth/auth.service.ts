@@ -31,7 +31,7 @@ export class AuthService {
         walletAddress,
         nonce,
         role: Role.VIEWER,
-        permissions: [],
+        permissions: "[]",
       },
     });
 
@@ -74,7 +74,7 @@ export class AuthService {
       sub: user.id,
       walletAddress: user.walletAddress,
       role: user.role,
-      permissions: user.permissions || [],
+      permissions: (user.permissions || "[]") as any as string[],
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -84,7 +84,7 @@ export class AuthService {
       userId: user.id,
       walletAddress: user.walletAddress,
       role: user.role,
-      permissions: user.permissions || [],
+      permissions: (user.permissions || "[]") as any as string[],
     };
 
     return {
@@ -107,7 +107,7 @@ export class AuthService {
       userId: user.id,
       walletAddress: user.walletAddress,
       role: user.role,
-      permissions: user.permissions || [],
+      permissions: (user.permissions || "[]") as any as string[],
     };
   }
 }

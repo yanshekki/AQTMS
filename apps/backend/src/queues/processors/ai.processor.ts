@@ -2,7 +2,7 @@
 // Refactored from legacy bee-queue to NestJS @Processor class
 // TODO in next hardening: full DI integration with AIProviderRegistry + ScoringEngine
 
-import { Processor } from '@nestjs/bullmq';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { QUEUE_NAMES, type AIScoringJob } from '../jobs';
@@ -10,15 +10,15 @@ import { QUEUE_NAMES, type AIScoringJob } from '../jobs';
 
 @Processor(QUEUE_NAMES.AI_SCORING)
 @Injectable()
-export class AiScoringProcessor {
+export class AiScoringProcessor extends WorkerHost {
   private readonly logger = new Logger(AiScoringProcessor.name);
 
   // AIProviderRegistry injection ready (make @Injectable + provide in AppModule for production)
   // private readonly aiRegistry: AIProviderRegistry;
 
-  constructor() {}
+  constructor() { super(); }
 
-  async handleAIScoring(job: Job<AIScoringJob>) {
+  async process(job: Job<AIScoringJob>) {
     const { newsId, task, content, context, provider } = job.data;
     this.logger.log(`Processing AI scoring job ${newsId} task=${task} (provider: ${provider || 'default'})`);
 
