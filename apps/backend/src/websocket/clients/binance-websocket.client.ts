@@ -17,12 +17,12 @@ export class BinanceWebsocketClient {
   private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private reconnectAttempts = 0;
   private readonly baseUrl = 'wss://stream.binance.com:9443/ws';
+  private reconnectTimer: NodeJS.Timeout | null = null;
 
   private messageCallback?: (data: any) => void;
   private errorCallback?: (error: Error) => void;
   private closeCallback?: () => void;
 
-  // Track subscribed streams to avoid duplicates
   private subscribedStreams = new Set<string>();
 
   constructor(
@@ -44,6 +44,8 @@ export class BinanceWebsocketClient {
   }
 
   async connect(): Promise<void> {
+    if (this.connectionState === ConnectionState.CONNECTED) return;
+
     this.setState(ConnectionState.CONNECTING);
     this.structuredLogger.log('Connecting to Binance WebSocket...');
 
@@ -93,9 +95,40 @@ export class BinanceWebsocketClient {
     });
   }
 
-  /**
-   * Subscribe to miniTicker for specific symbols (dynamic subscription)
-   */
+  disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      this.ws.close();
+      this.ws = null;
+    }
+
+    this.setState(ConnectionState.DISCONNECTED);
+    this.structuredLogger.log('WebSocket manually disconnected');
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) return;
+
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    this.reconnectAttempts++;
+
+    this.structuredLogger.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.connectionState !== ConnectionState.CONNECTED) {
+        this.connect().catch(err => {
+          this.structuredLogger.error('Reconnect failed', err);
+        });
+      }
+    }, delay);
+  }
+
   subscribeToMiniTicker(symbols: string[]) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.structuredLogger.warn('WebSocket not connected, cannot subscribe yet');
@@ -103,7 +136,6 @@ export class BinanceWebsocketClient {
     }
 
     const streams = symbols.map(s => `${s.toLowerCase()}@miniTicker`);
-
     const newStreams = streams.filter(s => !this.subscribedStreams.has(s));
     if (newStreams.length === 0) return;
 
@@ -114,7 +146,6 @@ export class BinanceWebsocketClient {
     };
 
     this.ws.send(JSON.stringify(payload));
-
     newStreams.forEach(s => this.subscribedStreams.add(s));
     this.structuredLogger.log(`Subscribed to miniTicker: ${newStreams.join(', ')}`);
   }
@@ -140,17 +171,15 @@ export class BinanceWebsocketClient {
   }
 
   private resubscribeStreams() {
-    if (this.subscribedStreams.size > 0) {
+    if (this.subscribedStreams.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
       const streams = Array.from(this.subscribedStreams);
       const payload = {
         method: 'SUBSCRIBE',
         params: streams,
         id: Date.now(),
       };
-      this.ws?.send(JSON.stringify(payload));
+      this.ws.send(JSON.stringify(payload));
       this.structuredLogger.log(`Resubscribed to streams: ${streams.join(', ')}`);
     }
   }
-
-  // ... other existing methods ...
 }
