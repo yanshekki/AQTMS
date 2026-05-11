@@ -23,12 +23,33 @@ const DEFAULT_AUTH: AuthState = {
 // Load persisted state from localStorage
 function loadPersistedAuth(): AuthState {
   try {
+    // Check for structured auth state first
     const raw = localStorage.getItem('aqtms_auth');
     if (raw) {
       const parsed = JSON.parse(raw) as AuthState;
       if (parsed && typeof parsed.isAuthenticated === 'boolean') {
         return parsed;
       }
+    }
+    // Fallback: parse raw JWT token
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const base64 = token.split('.')[1];
+        const decoded = JSON.parse(atob(base64));
+        if (decoded.sub) {
+          const state: AuthState = {
+            isAuthenticated: true,
+            token,
+            userId: decoded.sub || '',
+            walletAddress: decoded.walletAddress || '',
+            role: decoded.role || 'VIEWER',
+            permissions: decoded.permissions || [],
+          };
+          persistAuth(state);
+          return state;
+        }
+      } catch { /* ignore corrupt token */ }
     }
   } catch {
     // ignore corrupt data
