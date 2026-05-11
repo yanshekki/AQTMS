@@ -21,8 +21,8 @@ export class MarketDataService implements OnModuleInit {
       try {
         await this.startPriceStreaming(symbol, 'binance', 3000);
         this.logger.log(`Auto-started real-time streaming for ${symbol}`);
-      } catch (error) {
-        this.logger.warn(`Failed to auto-start streaming for ${symbol}: ${error.message}`);
+      } catch (error: any) {
+        this.logger.warn(`Failed to auto-start streaming for ${symbol}: ${error?.message}`);
       }
     }
   }
@@ -71,8 +71,8 @@ export class MarketDataService implements OnModuleInit {
         if (price > 0 && this.websocketGateway) {
           this.websocketGateway.pushPriceUpdate(symbol, price, Date.now());
         }
-      } catch (error) {
-        this.logger.error(`Error in price stream for ${symbol}: ${error.message}`);
+      } catch (error: any) {
+        this.logger.error(`Error in price stream for ${symbol}: ${error?.message}`);
       }
     }, intervalMs);
 
@@ -88,9 +88,6 @@ export class MarketDataService implements OnModuleInit {
     }
   }
 
-  /**
-   * Update price in cache (used by WebSocket or external updates)
-   */
   async updatePrice(symbol: string, price: number, exchange: string = 'binance') {
     const cacheKey = this.getCacheKey('price', symbol, exchange);
     this.setCache(cacheKey, price);
@@ -100,7 +97,6 @@ export class MarketDataService implements OnModuleInit {
   }
 
   async getRecentPrices(symbol: string, limit: number = 30, exchange: string = 'binance'): Promise<number[]> {
-    // ... existing implementation ...
     return [];
   }
 
@@ -109,43 +105,46 @@ export class MarketDataService implements OnModuleInit {
     const cached = this.getFromCache<number>(cacheKey);
     if (cached) return cached;
 
+    if (!this.ccxtAdapter) {
+      throw new Error('CcxtExchangeAdapter not available');
+    }
+
     try {
-      if (!this.ccxtAdapter) throw new Error('CcxtExchangeAdapter not available');
-      const price = await this.withRetry(async () => {
-        await this.ccxtAdapter.initialize({ exchange: exchange as any });
-        const ticker = await this.ccxtAdapter.getTicker(symbol);
-        return ticker?.last || ticker?.close || 0;
-      });
+      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      const ticker = await this.ccxtAdapter.getTicker(symbol);
+      const price = ticker?.last || ticker?.close || 0;
       this.setCache(cacheKey, price);
       return price;
-    } catch (error) {
-      this.logger.error(`Failed to get real price for ${symbol}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to get real price for ${symbol}: ${error?.message}`);
       throw error;
     }
   }
 
   async getCandles(symbol: string, timeframe = '1h', limit = 100, exchange = 'binance') {
+    if (!this.ccxtAdapter) {
+      throw new Error('CcxtExchangeAdapter not available');
+    }
+
     try {
-      if (!this.ccxtAdapter) throw new Error('CcxtExchangeAdapter not available');
-      return await this.withRetry(async () => {
-        await this.ccxtAdapter.initialize({ exchange: exchange as any });
-        return await this.ccxtAdapter.getOHLCV(symbol, timeframe, limit);
-      });
-    } catch (error) {
-      this.logger.error(`Failed to get real candles for ${symbol}: ${error.message}`);
+      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      return await this.ccxtAdapter.getOHLCV(symbol, timeframe, limit);
+    } catch (error: any) {
+      this.logger.error(`Failed to get real candles for ${symbol}: ${error?.message}`);
       throw error;
     }
   }
 
   async getTicker(symbol: string, exchange = 'binance') {
+    if (!this.ccxtAdapter) {
+      throw new Error('CcxtExchangeAdapter not available');
+    }
+
     try {
-      if (!this.ccxtAdapter) throw new Error('CcxtExchangeAdapter not available');
-      return await this.withRetry(async () => {
-        await this.ccxtAdapter.initialize({ exchange: exchange as any });
-        return await this.ccxtAdapter.getTicker(symbol);
-      });
-    } catch (error) {
-      this.logger.error(`Failed to get real ticker: ${error.message}`);
+      await this.ccxtAdapter.initialize({ exchange: exchange as any });
+      return await this.ccxtAdapter.getTicker(symbol);
+    } catch (error: any) {
+      this.logger.error(`Failed to get real ticker: ${error?.message}`);
       throw error;
     }
   }
