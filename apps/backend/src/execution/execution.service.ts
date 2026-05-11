@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RiskService } from '../risk/risk.service';
 import { PaperTradingService } from '../paper-trading/paper-trading.service';
@@ -7,6 +7,7 @@ import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-ex
 import { withRetry } from '../common/utils/retry.util';
 import { CircuitBreaker } from '../common/utils/circuit-breaker';
 import { NotificationService } from '../notification/notification.service';
+import { WebsocketGateway } from '../websocket/websocket.gateway';
 
 @Injectable()
 export class ExecutionService {
@@ -20,6 +21,7 @@ export class ExecutionService {
     @Optional() private readonly encryptionService?: EncryptionService,
     @Optional() private readonly ccxtAdapter?: CcxtExchangeAdapter,
     @Optional() private readonly notificationService?: NotificationService,
+    @Optional() @Inject(forwardRef(() => WebsocketGateway)) private readonly websocketGateway?: WebsocketGateway,
   ) {}
 
   async executeOrder(orderData: any, authenticatedUserId?: string): Promise<any> {
@@ -45,19 +47,33 @@ export class ExecutionService {
       }
     }
 
+    let result;
+
     if (isPaper && this.paperTradingService) {
-      const result = await this.executePaperOrder(orderData, userId);
+      result = await this.executePaperOrder(orderData, userId);
       await this.syncPositionAfterExecution(result, orderData, userId);
-      return result;
+    } else {
+      result = await this.executeRealOrder(orderData, isTestnet ? 'TESTNET' : 'LIVE', userId);
+      await this.syncPositionAfterExecution(result, orderData, userId);
     }
 
-    if (!isPaper) {
-      const result = await this.executeRealOrder(orderData, isTestnet ? 'TESTNET' : 'LIVE', userId);
-      await this.syncPositionAfterExecution(result, orderData, userId);
-      return result;
+    // Push real-time updates via WebSocket
+    if (this.websocketGateway) {
+      this.websocketGateway.pushOrderUpdate(userId, result);
+      const updatedPosition = await this.prisma.position.findUnique({
+        where: {
+          exchangeAccountId_symbol: {
+            exchangeAccountId: orderData.exchangeAccountId || 'demo-paper',
+            symbol: orderData.symbol,
+          },
+        },
+      });
+      if (updatedPosition) {
+        this.websocketGateway.pushPositionUpdate(userId, updatedPosition);
+      }
     }
 
-    return { success: false, message: 'No execution path' };
+    return result;
   }
 
   private async executePaperOrder(orderData: any, userId: string) {
@@ -65,11 +81,7 @@ export class ExecutionService {
 
     await this.prisma.order.upsert({
       where: { id: orderId },
-      update: {
-        status: 'FILLED',
-        filledQuantity: orderData.quantity,
-        updatedAt: new Date(),
-      },
+      update: { status: 'FILLED', filledQuantity: orderData.quantity, updatedAt: new Date() },
       create: {
         id: orderId,
         userId,
@@ -85,7 +97,7 @@ export class ExecutionService {
       },
     });
 
-    return { success: true, mode: 'PAPER', orderId };
+    return { success: true, mode: 'PAPER', orderId, symbol: orderData.symbol };
   }
 
   private async executeRealOrder(orderData: any, mode: string, userId: string) {
@@ -106,7 +118,7 @@ export class ExecutionService {
       },
     });
 
-    return { success: true, mode, orderId };
+    return { success: true, mode, orderId, symbol: orderData.symbol };
   }
 
   private async syncPositionAfterExecution(result: any, orderData: any, userId: string) {
