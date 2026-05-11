@@ -48,13 +48,17 @@ env:
   NODE_ENV: production
   LOG_LEVEL: info
   CORS_ORIGIN: "*"
-  ENABLE_TESTNET: "false"   # Set to true only in staging
+  ENABLE_TESTNET: "false"
   ENABLE_PAPER_TRADING: "true"
   ENABLE_KILL_SWITCH: "true"
+  # Observability
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+  OTEL_SERVICE_NAME: aqtms-backend
+  OTEL_TRACES_SAMPLER: always_on
 
 secret:
   enabled: true
-  existingSecret: aqtms-backend-secrets   # Recommended: manage via External Secrets Operator or SealedSecrets
+  existingSecret: aqtms-backend-secrets   # Use External Secrets Operator in production
   keys:
     - JWT_SECRET
     - ENCRYPTION_SECRET
@@ -78,6 +82,11 @@ monitoring:
   enabled: true
   serviceMonitor: true
   prometheusRule: true
+  # Observability stack
+  loki:
+    enabled: true
+  tempo:
+    enabled: true
 
 config:
   testnet:
@@ -85,3 +94,4 @@ config:
   production:
     enableResourceQuotas: true
     enableNetworkPolicies: true
+    enablePodDisruptionBudget: true
