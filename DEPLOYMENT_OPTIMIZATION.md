@@ -1,33 +1,18 @@
-# AQTMS Production Deployment Optimization (Phase C - Full Observability)
+# AQTMS Production Deployment Optimization (Phase E - Advanced)
 
-## Grafana Dashboards
-- Basic overview: `infra/grafana/aqtms-overview-dashboard.json`
-- Full observability (metrics + logs + traces): `infra/grafana/aqtms-full-observability-dashboard.json`
+## Compliance & Audit Logging
+- Added `AuditService` (global module)
+- Automatically logs key events: Order execution, Risk rejections, Kill Switch blocks
+- In production: Extend to persist in database or forward to SIEM / compliance system
 
-## Loki (Logs)
-1. Install Loki + Promtail via Helm
-2. Configure Promtail to scrape backend logs
-3. Add Loki datasource in Grafana
-4. Use LogQL queries in dashboards
+## Performance Optimizations
+- Use Redis for caching frequently accessed data (positions, market data, strategy state)
+- Connection pooling already handled by Prisma + BullMQ
+- Consider adding response caching middleware for read-heavy endpoints
+- Monitor with the observability stack (Prometheus + Grafana)
 
-## Distributed Tracing (Tempo / Jaeger)
-### Backend Configuration
-Add to your backend `.env` or Helm values:
-```env
-OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
-OTEL_SERVICE_NAME=aqtms-backend
-OTEL_TRACES_SAMPLER=always_on
-```
-
-### Recommended Setup
-- Use OpenTelemetry Collector as sidecar or daemonset
-- Export traces to Tempo (Grafana) or Jaeger
-- Instrument NestJS with `@opentelemetry/auto-instrumentations-node`
-
-## Full Observability Stack Recommendation
-- **Metrics**: Prometheus + Grafana
-- **Logs**: Loki + Promtail
-- **Traces**: Tempo (or Jaeger)
-- **Alerting**: Alertmanager + PagerDuty / Slack
-
-This gives you complete visibility into trading execution, risk decisions, and system health.
+## Recommended Production Hardening
+- Enable Audit logging to persistent storage
+- Add rate limiting + DDoS protection at ingress
+- Regular security audits + dependency updates
+- Load testing before going live with real capital
