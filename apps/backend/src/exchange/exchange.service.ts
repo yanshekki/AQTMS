@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BinanceAdapter } from './adapters/binance.adapter';
 import { BybitAdapter } from './adapters/bybit.adapter';
@@ -6,6 +6,7 @@ import { IExchangeAdapter, PlaceOrderParams, OrderResult } from './interfaces/ex
 
 @Injectable()
 export class ExchangeService implements IExchangeAdapter {
+  private readonly logger = new Logger(ExchangeService.name);
   private readonly activeAdapter: IExchangeAdapter;
 
   constructor(
@@ -17,10 +18,10 @@ export class ExchangeService implements IExchangeAdapter {
 
     if (provider === 'BYBIT') {
       this.activeAdapter = this.bybitAdapter;
-      console.log('[ExchangeService] Using BybitAdapter');
+      this.logger.log('Using BybitAdapter');
     } else {
       this.activeAdapter = this.binanceAdapter;
-      console.log('[ExchangeService] Using BinanceAdapter');
+      this.logger.log('Using BinanceAdapter');
     }
   }
 
