@@ -175,12 +175,17 @@ async function queueConnectionTest(
     await repo.updateStatus(id, userId, 'TESTING');
     let success = false;
 
-    if (exchange === 'BINANCE') {
-      const adapter = new BinanceAdapter({ apiKey, apiSecret, testnet });
-      success = await adapter.testConnection();
-    } else if (exchange === 'BYBIT') {
-      const adapter = new BybitAdapter({ apiKey, apiSecret, testnet });
-      success = await adapter.testConnection();
+    try {
+      const adapter = new CcxtExchangeAdapter();
+      await adapter.initialize({
+        exchange: exchange.toLowerCase(),
+        apiKey,
+        apiSecret,
+        testnet,
+      });
+      success = await adapter.testConnection(exchange.toLowerCase(), testnet);
+    } catch (e) {
+      success = false;
     }
 
     const status = success ? 'CONNECTED' : 'ERROR';
