@@ -52,7 +52,7 @@ export class CircuitBreaker {
       this.successCount++;
       if (this.successCount >= this.options.successThreshold!) {
         this.state = CircuitState.CLOSED;
-        console.log('[CircuitBreaker] State changed to CLOSED');
+        // [CircuitBreaker] State changed to CLOSED (debug log removed for prod)
       }
     }
   }
@@ -66,12 +66,12 @@ export class CircuitBreaker {
       this.failureCount >= this.options.failureThreshold!
     ) {
       this.state = CircuitState.OPEN;
-      console.warn('[CircuitBreaker] State changed to OPEN');
+      // [CircuitBreaker] State changed to OPEN (debug log removed for prod)
     }
 
     if (this.state === CircuitState.HALF_OPEN) {
       this.state = CircuitState.OPEN;
-      console.warn('[CircuitBreaker] State changed back to OPEN from HALF_OPEN');
+      // [CircuitBreaker] State changed back to OPEN from HALF_OPEN (debug)
     }
   }
 
@@ -83,6 +83,6 @@ export class CircuitBreaker {
     this.state = CircuitState.CLOSED;
     this.failureCount = 0;
     this.successCount = 0;
-    console.log('[CircuitBreaker] Manually reset to CLOSED');
+    // [CircuitBreaker] Manually reset to CLOSED (debug log removed for prod)
   }
 }

@@ -36,7 +36,7 @@ export class HistoricalDataService {
         volume: parseFloat(k[5]),
       }));
     } catch (error) {
-      console.error('[HistoricalDataService] Failed to fetch Binance klines:', error);
+      this.logger.error(`Failed to fetch Binance klines for ${symbol}`, (error as Error).stack);
       throw error;
     }
   }

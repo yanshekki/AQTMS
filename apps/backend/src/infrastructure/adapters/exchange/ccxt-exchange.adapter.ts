@@ -14,6 +14,7 @@ interface ExchangeConfig {
   testnet?: boolean;
   options?: Record<string, any>; // Extra CCXT options
   enableRateLimit?: boolean;
+  features?: Record<string, boolean>; // Per-exchange feature flags (e.g. { stopLoss: true, takeProfit: true, leverage: false })
 }
 
 @Injectable()
@@ -32,6 +33,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
   private defaultExchange = 'binance';
+  private defaultTestnet = false;
 
   /**
    * Sets the default exchange used by methods that do not accept an explicit exchange parameter.
@@ -95,12 +97,22 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         );
 
         // Production readiness: async connectivity verification (non-blocking)
+        // MethodMaster: better error handling with CCXT error categorization for fetchTime failures
         exchange
           .fetchTime()
           .then(() => this.logger.log(`${exchangeName} connectivity verified`))
-          .catch((e: any) =>
-            this.logger.warn(`${exchangeName} connectivity check failed: ${e?.message || e}`),
-          );
+          .catch((e: any) => {
+            const msg = e?.message || String(e);
+            if (e instanceof ccxt.NetworkError || msg.toLowerCase().includes('network') || msg.includes('timeout') || msg.includes('ECONNRESET')) {
+              this.logger.warn(`[NETWORK] ${exchangeName} connectivity check failed: ${msg}`);
+            } else if (e instanceof ccxt.AuthenticationError || msg.toLowerCase().includes('apikey') || msg.toLowerCase().includes('authentication')) {
+              this.logger.warn(`[CREDENTIALS] ${exchangeName} connectivity check failed: ${msg}`);
+            } else if (e instanceof ccxt.RateLimitExceeded || msg.toLowerCase().includes('rate limit')) {
+              this.logger.warn(`[RATE LIMIT] ${exchangeName} connectivity check failed: ${msg}`);
+            } else {
+              this.logger.warn(`${exchangeName} connectivity check failed: ${msg}`);
+            }
+          });
       } else {
         throw new Error(`Exchange class not found for: ${config.exchange}`);
       }
@@ -113,7 +125,9 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       // Graceful degradation: do not throw for transient errors (network/creds), only for unsupported exchange
       if (err.message.includes('not found')) {
         throw new Error(
-          `Unsupported exchange: ${config.exchange}. Supported via CCXT: binance, bybit, okx, coinbase, etc.`,
+          `Unsupported exchange: '${config.exchange}'. '${exchangeName}' is not a valid CCXT exchange class. ` +
+          `Supported examples: binance, bybit, okx, coinbase, kraken, kucoin, huobi, gateio, mexc, etc. ` +
+          `Check full list with: const ccxt = require('ccxt'); console.log(ccxt.exchanges);`,
         );
       }
       this.logger.warn(`Continuing in degraded mode for ${exchangeName} (init failed)`);
@@ -127,11 +141,16 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     );
   }
 
-  private getExchangeInstance(exchangeName: string, testnet = false): any {
-    const cacheKey = `${exchangeName.toLowerCase()}-${testnet ? 'testnet' : 'mainnet'}`;
+  private getExchangeInstance(exchangeName: string, testnet?: boolean): any {
+    const effectiveTestnet = testnet ?? this.defaultTestnet;
+    const cacheKey = `${exchangeName.toLowerCase()}-${effectiveTestnet ? 'testnet' : 'mainnet'}`;
     const instance = this.exchangeInstances.get(cacheKey);
 
     if (!instance) {
+      const availableKeys = Array.from(this.exchangeInstances.keys()).join(', ') || 'none';
+      this.logger.error(
+        `Exchange ${exchangeName} not initialized (cacheKey=${cacheKey}, effectiveTestnet=${effectiveTestnet}). Available initialized exchanges: [${availableKeys}]. Call initialize() first.`,
+      );
       throw new Error(`Exchange ${exchangeName} not initialized. Call initialize() first.`);
     }
     return instance;
@@ -141,13 +160,30 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async createOrder(request: OrderRequest): Promise<Trade> {
     try {
+      if (!request || !request.symbol || !request.side || !request.type || !request.quantity || request.quantity <= 0) {
+        throw new Error('Invalid order request: symbol, side, type and positive quantity are required');
+      }
       const ex = this.getExchangeInstance(this.defaultExchange);
+
+      // Production refinement: properly support SL/TP/stop orders via CCXT params
+      const orderParams: any = {
+        timeInForce: request.timeInForce || 'GTC',
+      };
+      if (request.stopPrice) {
+        orderParams.stopPrice = request.stopPrice;
+      }
+      if (['STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'].includes(request.type)) {
+        // CCXT unified stop order handling
+        orderParams.stopPrice = request.stopPrice || request.price;
+      }
+
       const order = await ex.createOrder(
         request.symbol,
-        request.type.toLowerCase(),
+        request.type.toLowerCase().replace('_', '-'), // e.g. stop_loss
         request.side.toLowerCase(),
         request.quantity,
-        request.price
+        request.price,
+        Object.keys(orderParams).length > 0 ? orderParams : undefined,
       );
 
       const now = new Date();
@@ -169,7 +205,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         updatedAt: now,
       };
     } catch (error) {
-      this.handleError(error, 'createOrder');
+      this.handleCcxtError(error, 'createOrder');
     }
   }
 
@@ -197,7 +233,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         updatedAt: now,
       };
     } catch (error) {
-      this.handleError(error, 'cancelOrder');
+      this.handleCcxtError(error, 'cancelOrder');
     }
   }
 
@@ -225,7 +261,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         updatedAt: now,
       };
     } catch (error: any) {
-      this.handleError(error, 'getOrder');
+      this.handleCcxtError(error, 'getOrder');
     }
   }
 
@@ -265,15 +301,22 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   async getBalances(): Promise<Balance[]> {
     try {
       const ex = this.getExchangeInstance(this.defaultExchange, false);
-      const balance = await ex.fetchBalance();
-      return Object.keys(balance.total || {}).map(asset => ({
+      const balance = await ex.fetchBalance().catch(() => ({ total: {}, free: {}, used: {} }));
+      const assets = Object.keys(balance.total || {});
+      if (assets.length === 0) {
+        this.logger.warn(`getBalances returned no assets for ${this.defaultExchange}`);
+        return [];
+      }
+      return assets.map(asset => ({
         asset,
-        free: String(balance.free?.[asset] || 0),
-        locked: String(balance.used?.[asset] || 0),
+        free: String(balance.free?.[asset] ?? balance.total?.[asset] ?? 0),
+        locked: String(balance.used?.[asset] ?? 0),
       }));
     } catch (error: any) {
       this.logger.error(`getBalances failed: ${error.message}`);
       return [];
+    }
+  }
     }
   }
 
@@ -281,17 +324,20 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     try {
       const ex = this.getExchangeInstance(this.defaultExchange, false);
       const positions = await ex.fetchPositions().catch(() => []);
-      return (positions || []).map((p: any) => ({
-        symbol: p.symbol,
-        side: (p.side?.toUpperCase() || 'BUY') as 'BUY' | 'SELL',
-        quantity: p.contracts || p.amount || 0,
-        entryPrice: p.entryPrice || 0,
-        markPrice: p.markPrice || p.lastPrice || 0,
-        unrealizedPnl: { amount: p.unrealizedPnl || 0, currency: 'USDT' } as any,
+      const validPositions = (positions || []).filter((p: any) => p && (p.contracts || p.amount || p.size));
+      return validPositions.map((p: any) => ({
+        symbol: p.symbol || p.info?.symbol || "UNKNOWN",
+        side: (p.side?.toUpperCase() || (p.contracts > 0 || p.amount > 0 ? "BUY" : "SELL")) as "BUY" | "SELL",
+        quantity: Math.abs(p.contracts || p.amount || p.size || 0),
+        entryPrice: p.entryPrice || p.entry_price || 0,
+        markPrice: p.markPrice || p.mark_price || p.lastPrice || 0,
+        unrealizedPnl: { amount: p.unrealizedPnl || p.unrealized_pnl || 0, currency: "USDT" } as any,
       }));
     } catch (error: any) {
       this.logger.error(`getPositions failed: ${error.message}`);
       return [];
+    }
+  }
     }
   }
 
@@ -300,10 +346,10 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     try {
       const ex = this.getExchangeInstance(this.defaultExchange, false);
       const positions = await ex.fetchPositions().catch(() => []);
-      return (positions || []).map((p: any) => ({
+      return (positions || []).filter((p: any) => p && (p.contracts || p.amount)).map((p: any) => ({
         accountId: exchangeAccountId,
         symbol: p.symbol,
-        side: p.side?.toUpperCase() || 'BUY',
+        side: p.side?.toUpperCase() || "BUY",
         quantity: p.contracts || p.amount || 0,
         entryPrice: p.entryPrice || 0,
         unrealizedPnl: p.unrealizedPnl || 0,
@@ -311,6 +357,8 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     } catch (error: any) {
       this.logger.error(`getPositions(${exchangeAccountId}) failed: ${error.message}`);
       return [];
+    }
+  }
     }
   }
 
@@ -354,14 +402,37 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
-      const exchange = this.getExchangeInstance(params.exchange || this.defaultExchange, params.testnet ?? false);
+      if (!params || !params.symbol || !params.side || !params.type || !params.quantity || params.quantity <= 0) {
+        return { success: false, message: 'Invalid order parameters: symbol, side, type and positive quantity are required' };
+      }
+      // Symbol validation (MethodMaster requirement)
+      const symbol = typeof params.symbol === 'string' ? params.symbol.trim().toUpperCase() : '';
+      if (!symbol || !/^[A-Z0-9._-]+\/[A-Z0-9._-]+$/.test(symbol)) {
+        return { success: false, message: 'Invalid symbol: must be non-empty string in format BASE/QUOTE (e.g. BTC/USDT)' };
+      }
 
-      const orderType = params.type === 'MARKET' ? 'market' : 'limit';
+      const exchangeName = params.exchange || this.defaultExchange;
+      const exchange = this.getExchangeInstance(exchangeName, params.testnet ?? false);
+
+      // Map order type, supporting advanced stop orders
+      let orderType = params.type === 'MARKET' ? 'market' : params.type === 'LIMIT' ? 'limit' : params.type.toLowerCase().replace('_', '-');
       const side = params.side.toLowerCase();
 
+      // Live trading safety guard (unchanged behavior)
       if (!params.testnet && (typeof process !== 'undefined' ? process.env.ENABLE_LIVE_TRADING : '') !== 'true') {
         this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
         return { success: false, message: 'Live trading is currently disabled for safety.' };
+      }
+
+      // Build params for SL/TP/stop orders (robustness improvement)
+      const orderParams: any = {};
+      if (params.stopLoss) {
+        orderParams.stopPrice = params.stopLoss;
+        if (!['stop-loss', 'stop_loss_limit'].includes(orderType)) orderType = 'stop-loss';
+      }
+      if (params.takeProfit) {
+        orderParams.stopPrice = params.takeProfit;
+        if (!['take-profit'].includes(orderType)) orderType = 'take-profit';
       }
 
       const result = await exchange.createOrder(
@@ -370,6 +441,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         side,
         params.quantity,
         params.price,
+        Object.keys(orderParams).length > 0 ? orderParams : undefined,
       );
 
       return {
@@ -381,11 +453,15 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         filledPrice: result.average || result.price,
       };
     } catch (error: any) {
-      this.logger.error(`placeOrder failed on ${params.exchange}: ${error.message}`);
+      this.logger.error(`placeOrder failed on ${params?.exchange || this.defaultExchange}: ${error.message}`);
+      try {
+        this.handleCcxtError(error, 'placeOrder', params?.exchange || this.defaultExchange);
+      } catch (handledErr: any) {
+        return { success: false, message: handledErr.message };
+      }
       return { success: false, message: error.message };
     }
   }
-
   async getBalance(exchangeAccountId: string): Promise<number> {
     try {
       const ex = this.getExchangeInstance(this.defaultExchange, false);
@@ -476,6 +552,18 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
     if (msg.toLowerCase().includes('invalid order') || msg.toLowerCase().includes('order not found')) {
       throw new Error(`Order error on ${exchangeName}: ${msg}`);
+    }
+
+    // Better handling for unknown / unclassified CCXT error types (MethodMaster)
+    // Covers other CCXT subclasses (ExchangeError, DDoSProtection, InvalidNonce, etc.)
+    // or any error whose constructor name indicates a CCXT origin.
+    const isCcxtError =
+      error instanceof (ccxt as any).BaseError ||
+      (error && typeof error.constructor?.name === 'string' && error.constructor.name.endsWith('Error'));
+    if (isCcxtError) {
+      const errorType = error?.constructor?.name || 'UnknownCCXTError';
+      this.logger.error(`[CCXT ${errorType}] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`[${errorType}] ${operation} failed on ${exchangeName}: ${msg}`);
     }
 
     // Fallback to base or generic enhanced message

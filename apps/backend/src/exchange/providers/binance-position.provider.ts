@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ExchangePosition, ExchangePositionProvider } from '../interfaces/exchange-position.provider';
 
 /**
@@ -8,12 +8,14 @@ import { ExchangePosition, ExchangePositionProvider } from '../interfaces/exchan
  */
 @Injectable()
 export class BinancePositionProvider implements ExchangePositionProvider {
+  private readonly logger = new Logger(BinancePositionProvider.name);
+
   getExchangeName(): string {
     return 'BINANCE';
   }
 
   async getPositions(userId: string): Promise<ExchangePosition[]> {
-    console.log(`[BinancePositionProvider] Fetching positions for user: ${userId}`);
+    this.logger.debug(`Fetching positions for user: ${userId}`);
 
     // TODO: 這裡應該呼叫真實的 Binance API
     // 例如使用 ccxt 或官方 SDK：

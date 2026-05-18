@@ -16,7 +16,7 @@ export class PrismaOrderRepository {
     // });
     // return order ? this.mapToOrder(order) : null;
 
-    console.log(`[PrismaOrderRepository] findByExchangeOrderId: ${exchangeOrderId} (TODO)`);
+    // TODO: implement findByExchangeOrderId with Prisma
     return null;
   }
 

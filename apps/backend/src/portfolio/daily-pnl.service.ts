@@ -29,7 +29,7 @@ export class DailyPnLService {
     //   create: { userId, date: today, pnl },
     // });
 
-    console.log(`[DailyPnLService] Updated PnL for ${userId} on ${today}: ${pnl}`);
+    // TODO: persist PnL to DB when model is ready
   }
 
   async getTodayPnL(userId: string): Promise<number> {
@@ -49,6 +49,6 @@ export class DailyPnLService {
     //   where: { userId, date: today },
     //   data: { pnl: 0 },
     // });
-    console.log(`[DailyPnLService] Reset PnL for ${userId}`);
+    // TODO: persist reset to DB when model is ready
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ExchangePosition, ExchangePositionProvider } from '../interfaces/exchange-position.provider';
 
 /**
@@ -6,12 +6,14 @@ import { ExchangePosition, ExchangePositionProvider } from '../interfaces/exchan
  */
 @Injectable()
 export class BybitPositionProvider implements ExchangePositionProvider {
+  private readonly logger = new Logger(BybitPositionProvider.name);
+
   getExchangeName(): string {
     return 'BYBIT';
   }
 
   async getPositions(userId: string): Promise<ExchangePosition[]> {
-    console.log(`[BybitPositionProvider] Fetching positions for user: ${userId}`);
+    this.logger.debug(`Fetching positions for user: ${userId}`);
 
     // TODO: 之後替換成真實 Bybit API 呼叫
     // 例如使用 ccxt 或 Bybit 官方 SDK

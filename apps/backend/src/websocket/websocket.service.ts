@@ -4,17 +4,19 @@ import { BybitWebsocketClient } from './clients/bybit-websocket.client';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(WebsocketService.name);
+
   constructor(
     private readonly binanceClient: BinanceWebsocketClient,
     private readonly bybitClient: BybitWebsocketClient,
   ) {}
 
   async onModuleInit() {
-    console.log('[WebsocketService] Initializing WebSocket connections...');
+    this.logger.log('Initializing WebSocket connections...');
   }
 
   onModuleDestroy() {
-    console.log('[WebsocketService] Closing WebSocket connections...');
+    this.logger.log('Closing WebSocket connections...');
     this.binanceClient.disconnect();
     this.bybitClient.disconnect();
   }
