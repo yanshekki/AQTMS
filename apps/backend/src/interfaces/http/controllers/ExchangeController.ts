@@ -117,12 +117,17 @@ export class ExchangeController {
       if (!creds) throw new NotFoundError('Exchange account not found');
 
       let success = false;
-      if (creds.exchange === 'BINANCE') {
-        const adapter = new BinanceAdapter({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet });
-        success = await adapter.testConnection();
-      } else if (creds.exchange === 'BYBIT') {
-        const adapter = new BybitAdapter({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet });
-        success = await adapter.testConnection();
+      try {
+        const adapter = new CcxtExchangeAdapter();
+        await adapter.initialize({
+          exchange: creds.exchange.toLowerCase(),
+          apiKey: creds.apiKey,
+          apiSecret: creds.apiSecret,
+          testnet: creds.testnet,
+        });
+        success = await adapter.testConnection(creds.exchange.toLowerCase(), creds.testnet);
+      } catch (e) {
+        success = false;
       }
 
       const status = success ? 'CONNECTED' : 'ERROR';
