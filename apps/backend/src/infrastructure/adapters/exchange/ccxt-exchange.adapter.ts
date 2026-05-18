@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import { IExchangeAdapter, PlaceOrderParams, PlaceOrderResult, OrderStatusResult } from './exchange.adapter.interface';
+import { BaseTradingAdapter, OrderRequest, CancelOrderRequest, Trade } from '../exchanges/BaseTradingAdapter';
 
 interface ExchangeConfig {
   exchange: string;
@@ -10,7 +11,7 @@ interface ExchangeConfig {
 }
 
 @Injectable()
-export class CcxtExchangeAdapter implements IExchangeAdapter {
+export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchangeAdapter {
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
 
