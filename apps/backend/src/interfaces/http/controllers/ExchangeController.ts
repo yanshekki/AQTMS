@@ -4,8 +4,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { ExchangeConnectRequestSchema } from '../dto';
 import { ValidationError, NotFoundError, ForbiddenError } from '../../../shared/errors';
 import { ExchangeAccountRepository } from '../../../infrastructure/persistence/ExchangeAccountRepository';
-import { BinanceAdapter } from '../../../infrastructure/adapters/exchanges/BinanceAdapter';
-import { BybitAdapter } from '../../../infrastructure/adapters/exchanges/BybitAdapter';
+import { CcxtExchangeAdapter } from '../../../infrastructure/adapters/exchange/ccxt-exchange.adapter';
 import { logger } from '../../../shared/logger';
 import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
 
