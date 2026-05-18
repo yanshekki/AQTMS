@@ -51,6 +51,34 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     this.logger.log(`Initialized ${config.exchange} adapter (testnet=${config.testnet})`);
   }
 
+  async createOrder(request: OrderRequest): Promise<any> {
+    try {
+      const ex = this.getExchangeInstance('binance'); // placeholder - will improve later
+      const order = await ex.createOrder(
+        request.symbol,
+        request.type.toLowerCase(),
+        request.side.toLowerCase(),
+        request.quantity,
+        request.price
+      );
+
+      return {
+        id: order.id,
+        exchangeOrderId: order.id,
+        symbol: request.symbol,
+        side: request.side,
+        type: request.type,
+        quantity: request.quantity,
+        price: request.price || 0,
+        status: order.status || 'PENDING',
+        createdAt: new Date(),
+      };
+    } catch (error) {
+      this.handleError(error, 'createOrder');
+    }
+  }
+
+
   private getExchangeInstance(exchangeName: string, testnet = false): any {
     const cacheKey = `${exchangeName.toLowerCase()}-${testnet ? 'testnet' : 'mainnet'}`;
     const instance = this.exchangeInstances.get(cacheKey);
