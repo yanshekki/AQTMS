@@ -75,7 +75,8 @@ export class OllamaProvider extends BaseAIProvider {
     );
     try {
       return JSON.parse(response.content.match(/\{[\s\S]*\}/)?.[0] ?? '{"action":"HOLD","confidence":0}') as { action: string; confidence: number; reasoning: string };
-    } catch {
+    } catch (error) {
+      this.logger?.warn(`Ollama makeDecision JSON parse failed: ${error instanceof Error ? error.message : error}`);
       return { action: 'HOLD', confidence: 0, reasoning: 'Parse failed' };
     }
   }
@@ -83,7 +84,8 @@ export class OllamaProvider extends BaseAIProvider {
   private parse(raw: string): AIScoringResult {
     try {
       return JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as AIScoringResult;
-    } catch {
+    } catch (error) {
+      this.logger?.warn(`Ollama parse JSON parse failed: ${error instanceof Error ? error.message : error}`);
       return { truthScore: 50, sentimentScore: 0, relevanceScore: 50, confidenceScore: 30, reasoning: raw.slice(0, 500), affectedAssets: [], suggestedAction: 'HOLD', urgency: 'LOW' };
     }
   }

@@ -64,7 +64,8 @@ export class GeminiProvider extends BaseAIProvider {
     );
     try {
       return JSON.parse(response.content.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as { action: string; confidence: number; reasoning: string };
-    } catch {
+    } catch (error) {
+      this.logger?.warn(`Gemini makeDecision JSON parse failed: ${error instanceof Error ? error.message : error}`);
       return { action: 'HOLD', confidence: 0, reasoning: 'Failed to parse' };
     }
   }
@@ -73,7 +74,8 @@ export class GeminiProvider extends BaseAIProvider {
     try {
       const match = raw.match(/\{[\s\S]*\}/);
       return match ? JSON.parse(match[0]) as AIScoringResult : this.defaultResult(raw);
-    } catch {
+    } catch (error) {
+      this.logger?.warn(`Gemini parseResult JSON parse failed: ${error instanceof Error ? error.message : error}`);
       return this.defaultResult(raw);
     }
   }

@@ -64,7 +64,8 @@ export class OpenAIProvider extends BaseAIProvider {
     try {
       const result = JSON.parse(response.content) as { action: string; confidence: number; reasoning: string };
       return result;
-    } catch {
+    } catch (error) {
+      this.logger?.warn(`OpenAI makeDecision JSON parse failed: ${error instanceof Error ? error.message : error}`);
       return { action: 'HOLD', confidence: 0, reasoning: 'Failed to parse AI response' };
     }
   }
