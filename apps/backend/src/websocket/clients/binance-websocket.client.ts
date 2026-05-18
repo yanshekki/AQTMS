@@ -166,7 +166,7 @@ export class BinanceWebsocketClient {
         }
       }
     } catch (error) {
-      // ignore non-price messages
+      this.structuredLogger.debug('Ignored non-price WebSocket message', { error: error instanceof Error ? error.message : error });
     }
   }
 

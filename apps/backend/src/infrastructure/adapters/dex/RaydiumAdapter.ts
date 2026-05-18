@@ -126,7 +126,8 @@ export class RaydiumAdapter extends BaseDEXAdapter {
       });
       const data = (await response.json()) as { result?: string };
       return data.result === 'ok';
-    } catch {
+    } catch (error) {
+      this.logger?.warn?.(`Raydium testConnection failed: ${error instanceof Error ? error.message : error}`);
       return false;
     }
   }

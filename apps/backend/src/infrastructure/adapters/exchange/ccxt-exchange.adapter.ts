@@ -16,6 +16,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   public readonly exchangeName = 'CCXT';
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
+  private defaultExchange = 'binance';
 
   async initialize(config: ExchangeConfig): Promise<void> {
     const cacheKey = `${config.exchange.toLowerCase()}-${config.testnet ? 'testnet' : 'mainnet'}`;
@@ -35,18 +36,19 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
     const exchangeName = config.exchange.toLowerCase();
 
-    if (exchangeName === 'binance') {
-      exchange = new ccxt.binance({
-        ...commonOptions,
-        options: { defaultType: 'spot' },
-      });
-    } else if (exchangeName === 'bybit') {
-      exchange = new ccxt.bybit({
-        ...commonOptions,
-        options: { defaultType: 'spot' },
-      });
-    } else {
-      throw new Error(`Unsupported exchange: ${config.exchange}. Supported: binance, bybit`);
+    try {
+      const ExchangeClass = (ccxt as any)[exchangeName];
+      if (typeof ExchangeClass === 'function') {
+        exchange = new ExchangeClass({
+          ...commonOptions,
+          options: { defaultType: 'spot' },
+        });
+      } else {
+        throw new Error(`Exchange class not found for: ${config.exchange}`);
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to initialize ${config.exchange}: ${err.message}`);
+      throw new Error(`Unsupported or invalid exchange: ${config.exchange}. Supported via CCXT: binance, bybit, and others.`);
     }
 
     this.exchangeInstances.set(cacheKey, exchange);
@@ -67,7 +69,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async createOrder(request: OrderRequest): Promise<Trade> {
     try {
-      const ex = this.getExchangeInstance('binance');
+      const ex = this.getExchangeInstance(this.defaultExchange);
       const order = await ex.createOrder(
         request.symbol,
         request.type.toLowerCase(),
@@ -101,7 +103,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async cancelOrder(request: CancelOrderRequest): Promise<Trade> {
     try {
-      const ex = this.getExchangeInstance('binance');
+      const ex = this.getExchangeInstance(this.defaultExchange);
       await ex.cancelOrder(request.exchangeOrderId, request.symbol);
 
       const now = new Date();
@@ -129,7 +131,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async getOrder(exchangeOrderId: string, symbol: string): Promise<Trade> {
     try {
-      const ex = this.getExchangeInstance('binance', false);
+      const ex = this.getExchangeInstance(this.defaultExchange, false);
       const order = await ex.fetchOrder(exchangeOrderId, symbol);
 
       const now = new Date();
@@ -157,8 +159,11 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async getOpenOrders(symbol?: string): Promise<Trade[]> {
     try {
-      const ex = this.getExchangeInstance('binance', false);
-      const orders = await ex.fetchOpenOrders(symbol).catch(() => []);
+      const ex = this.getExchangeInstance(this.defaultExchange, false);
+      const orders = await ex.fetchOpenOrders(symbol).catch((err) => {
+        this.logger?.warn?.(`fetchOpenOrders failed: ${err?.message || err}`);
+        return [];
+      });
       return orders.map((order: any) => {
         const now = new Date();
         return {
@@ -187,7 +192,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async getBalances(): Promise<Balance[]> {
     try {
-      const ex = this.getExchangeInstance('binance', false);
+      const ex = this.getExchangeInstance(this.defaultExchange, false);
       const balance = await ex.fetchBalance();
       return Object.keys(balance.total || {}).map(asset => ({
         asset,
@@ -202,8 +207,11 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
 
   async getPositions(): Promise<Position[]> {
     try {
-      const ex = this.getExchangeInstance('binance', false);
+      const ex = this.getExchangeInstance(this.defaultExchange, false);
       const positions = await ex.fetchPositions().catch(() => []);
+      return positions.map((p: any) => ({
+        return [];
+      });
       return positions.map((p: any) => ({
         symbol: p.symbol,
         side: (p.side?.toUpperCase() || 'BUY') as 'BUY' | 'SELL',

@@ -105,6 +105,6 @@ export class UniswapV3Adapter extends BaseDEXAdapter {
   }
 
   async testConnection(): Promise<boolean> {
-    try { await this.provider.getBlockNumber(); return true; } catch { return false; }
+    try { await this.provider.getBlockNumber(); return true; } catch (error) { this.logger?.warn?.(`Uniswap testConnection failed: ${error instanceof Error ? error.message : error}`); return false; }
   }
 }
