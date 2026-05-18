@@ -8,6 +8,22 @@ interface ExchangeConfig {
   apiKey: string;
   apiSecret?: string;
   testnet?: boolean;
+
+  async getBalances(): Promise<any[]> {
+    try {
+      const ex = this.getExchangeInstance('binance');
+      const balance = await ex.fetchBalance();
+      return Object.keys(balance.total || {}).map(asset => ({
+        asset,
+        free: String(balance.free?.[asset] || 0),
+        locked: String(balance.used?.[asset] || 0),
+      }));
+    } catch (error) {
+      this.logger.error(`getBalances failed: ${error}`);
+      return [];
+    }
+  }
+
 }
 
 @Injectable()
