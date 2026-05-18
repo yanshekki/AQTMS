@@ -17,7 +17,8 @@ export class RedisCache {
     try {
       const data = await redis.get(key);
       return data ? (JSON.parse(data) as T) : null;
-    } catch {
+    } catch (error) {
+      logger.warn({ error, key }, 'Redis cache get failed');
       return null;
     }
   }
