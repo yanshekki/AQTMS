@@ -61,7 +61,7 @@ export const exchangeApi = {
   },
 
   async deleteExchange(exchangeId: string): Promise<void> {
-    await safeDelete(`/api/v1/exchanges/${exchangeId}`);
+    await safeDelete(`/api/v1/exchanges/${exchangeId}`, {}, {} as any);
   },
 
   // 新增：更新交易所帳戶設定（例如開啟/關閉 Paper Trading）

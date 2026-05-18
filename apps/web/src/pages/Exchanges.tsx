@@ -16,7 +16,6 @@ import type { ConnectExchangeForm } from '@/features/exchange-connect/lib/schema
 
 import { safeGet } from '@/shared/api';
 
-import { io, Socket } from 'socket.io-client';
 import { useEffect } from 'react';
 
 interface PaperPosition {

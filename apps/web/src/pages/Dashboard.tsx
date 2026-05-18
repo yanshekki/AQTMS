@@ -8,8 +8,8 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
-import { io, Socket } from 'socket.io-client';
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
+import { io, Socket } from 'socket.io-client';
 
 interface OrderForm {
   symbol: string;
@@ -46,7 +46,7 @@ export default function Dashboard() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const socket = io('http://localhost:3000/trading', {
+    const socket = io(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3000/trading`, {
       transports: ['websocket'],
       autoConnect: true,
     });

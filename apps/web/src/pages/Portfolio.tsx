@@ -7,7 +7,7 @@ import { Container, Typography, Box, Button, Chip, Alert, Stack, Grid, Card, Car
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 
 export function PortfolioPage() {
   const { summary, positions, isLoading, lastUpdated, refresh, error } = usePortfolio();

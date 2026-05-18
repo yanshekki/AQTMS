@@ -39,6 +39,6 @@ export const dataSourceApi = {
   },
 
   async deleteDataSource(id: string) {
-    await safeDelete(`/api/v1/data-sources/${id}`);
+    await safeDelete(`/api/v1/data-sources/${id}`, {}, {} as any);
   },
 };
