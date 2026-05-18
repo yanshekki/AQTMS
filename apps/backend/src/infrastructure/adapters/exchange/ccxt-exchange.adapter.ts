@@ -228,4 +228,49 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       return [];
     }
   }
+
+  // ── BaseTradingAdapter implementations using CCXT ──
+
+  async getOrder(exchangeOrderId: string, symbol: string): Promise<any> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const order = await ex.fetchOrder(exchangeOrderId, symbol);
+      return order;
+    } catch (error: any) {
+      this.handleError(error, 'getOrder');
+    }
+  }
+
+  async getOpenOrders(symbol?: string): Promise<any[]> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      return await ex.fetchOpenOrders(symbol).catch(() => []);
+    } catch (error: any) {
+      this.logger.error(`getOpenOrders failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  getAssetType(): 'crypto' | 'stock' | 'futures' | 'option' | 'dex' {
+    return 'crypto';
+  }
+
+  supportsLeverage(): boolean {
+    return false; // spot by default; futures would be true via options
+  }
+
+  getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
+    return ['MARKET', 'LIMIT', 'STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'];
+  }
+
+  async getExchangeInfo(): Promise<Record<string, unknown>> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const markets = await ex.fetchMarkets();
+      return { markets, exchange: ex.id, has: ex.has };
+    } catch (error: any) {
+      this.logger.error(`getExchangeInfo failed: ${error.message}`);
+      return {};
+    }
+  }
 }
