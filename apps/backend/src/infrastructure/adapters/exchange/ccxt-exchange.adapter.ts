@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import { IExchangeAdapter, PlaceOrderParams, PlaceOrderResult, OrderStatusResult } from './exchange.adapter.interface';
-import { BaseTradingAdapter, OrderRequest, CancelOrderRequest, Trade, Balance, Position } from '../exchanges/BaseTradingAdapter';
+import { BaseTradingAdapter, OrderRequest, CancelOrderRequest, Balance, Position } from '../exchanges/BaseTradingAdapter';
+import type { Trade } from '../../../domain/entities/Trade';
 
 interface ExchangeConfig {
   exchange: string;
@@ -101,7 +102,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   async cancelOrder(request: CancelOrderRequest): Promise<Trade> {
     try {
       const ex = this.getExchangeInstance('binance');
-      const result = await ex.cancelOrder(request.exchangeOrderId, request.symbol);
+      await ex.cancelOrder(request.exchangeOrderId, request.symbol);
 
       const now = new Date();
       return {
@@ -251,7 +252,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     }
   }
 
-  // ── IExchangeAdapter legacy methods (kept for compatibility) ──
+  // ── IExchangeAdapter methods (non-conflicting names only) ──
 
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
@@ -260,7 +261,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       const orderType = params.type === 'MARKET' ? 'market' : 'limit';
       const side = params.side.toLowerCase();
 
-      if (!params.testnet && process.env.ENABLE_LIVE_TRADING !== 'true') {
+      if (!params.testnet && (typeof process !== 'undefined' ? process.env.ENABLE_LIVE_TRADING : '') !== 'true') {
         this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
         return { success: false, message: 'Live trading is currently disabled for safety.' };
       }
@@ -287,30 +288,15 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     }
   }
 
-  async cancelOrder(exchangeAccountId: string, exchangeOrderId: string): Promise<boolean> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      await ex.cancelOrder(exchangeOrderId);
-      return true;
-    } catch (error: any) {
-      this.logger.error(`cancelOrder failed: ${error.message}`);
-      return false;
-    }
-  }
-
   async getBalance(exchangeAccountId: string): Promise<number> {
     try {
       const ex = this.getExchangeInstance('binance', false);
       const balance = await ex.fetchBalance();
-      return balance.total?.USDT || balance.total || 0;
+      return balance.total?.USDT || 0;
     } catch (error: any) {
       this.logger.error(`getBalance failed: ${error.message}`);
       return 0;
     }
-  }
-
-  async getPositionsLegacy(exchangeAccountId: string): Promise<any[]> {  // renamed to avoid conflict
-    return this.getPositions() as any;
   }
 
   async getOrderStatus(exchangeAccountId: string, exchangeOrderId: string): Promise<OrderStatusResult | null> {
