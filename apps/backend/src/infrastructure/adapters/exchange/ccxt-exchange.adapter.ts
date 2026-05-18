@@ -28,6 +28,7 @@ interface ExchangeConfig {
 
 @Injectable()
 export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchangeAdapter {
+  public readonly exchangeName = 'CCXT';
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
 
