@@ -100,7 +100,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const res = await axios.get('/api/portfolio/summary');
       setLastUpdated(new Date());
-      return res.data;
+      return Array.isArray(res.data) ? res.data : [];
     },
     refetchInterval: 15000,
     retry: 2,
@@ -111,7 +111,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const res = await axios.get('/api/portfolio/positions');
       setLastUpdated(new Date());
-      return res.data;
+      return Array.isArray(res.data) ? res.data : [];
     },
     refetchInterval: 10000,
     retry: 2,
@@ -152,6 +152,7 @@ export default function Dashboard() {
       chartRef.current.remove();
     }
 
+    if (!chartContainerRef.current) return;
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: 320,
