@@ -32,7 +32,7 @@ export class RiskService {
         reasons,
         order,
         riskScore,
-      }).catch((err) => this.logger.error('Risk breach notification failed', err));
+      }).catch((err: any) => this.logger.error('Risk breach notification failed', err));
     }
 
     if (passed) {

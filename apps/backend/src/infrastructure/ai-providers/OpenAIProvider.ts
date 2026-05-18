@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 // ── OpenAI Provider ──
 
 import OpenAI from 'openai';
@@ -5,6 +6,7 @@ import { BaseAIProvider, type AIProviderConfig, type AIResponse, type AIScoringR
 import { InfraError } from '../../shared/errors';
 
 export class OpenAIProvider extends BaseAIProvider {
+  private readonly logger = new Logger(OpenAIProvider.name);
   public readonly providerName: string = 'OPENAI';
   private client: OpenAI;
 

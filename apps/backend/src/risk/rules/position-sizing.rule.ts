@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { RiskCheckContext, RiskCheckResult, RiskRule } from '../interfaces/risk-rule.interface';
 
 /**
@@ -9,6 +10,7 @@ import { RiskCheckContext, RiskCheckResult, RiskRule } from '../interfaces/risk-
  * - 如果沒有 accountBalance，則跳過調整
  */
 export class PositionSizingRule implements RiskRule {
+  private readonly logger = new Logger(PositionSizingRule.name);
   name = 'PositionSizing';
 
   // Phase 1 先寫死 1%，之後可以從用戶設定讀取

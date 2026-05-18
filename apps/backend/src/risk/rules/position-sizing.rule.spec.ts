@@ -12,7 +12,7 @@ describe('PositionSizingRule', () => {
   });
 
   it('should pass when position size is within limit (1% of balance)', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',
@@ -28,7 +28,7 @@ describe('PositionSizingRule', () => {
   });
 
   it('should fail when position size exceeds 2% of balance', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',
@@ -45,7 +45,7 @@ describe('PositionSizingRule', () => {
   });
 
   it('should suggest adjusted quantity when position is too large', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',

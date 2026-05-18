@@ -197,7 +197,7 @@ export class PaperTradingService {
               where: { id: p.id },
               data: { unrealizedPnl },
             })
-            .catch((err) => this.logger.warn('Failed to persist unrealizedPnL update', err?.message));
+            .catch((err: any) => this.logger.warn('Failed to persist unrealizedPnL update', err?.message));
         }
 
         return {

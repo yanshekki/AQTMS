@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 // ── Scoring Engine ──
 // Aggregates multi-AI scoring results into a composite score.
 // Routes tasks to specialized AI models (Grok→verify, Gemini→score, DeepSeek→decide).
@@ -28,7 +29,6 @@ export interface CompositeScore {
 }
 
 export class ScoringEngine {
-  private readonly logger = new Logger(ScoringEngine.name);
   constructor(
     private readonly aiRegistry: AIProviderRegistry,
     private readonly compositeThreshold = 80,

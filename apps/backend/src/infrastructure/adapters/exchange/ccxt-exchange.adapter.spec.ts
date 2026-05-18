@@ -1346,3 +1346,6 @@ describe('CcxtExchangeAdapter', () => {
     });
   });
 });
+
+}
+}

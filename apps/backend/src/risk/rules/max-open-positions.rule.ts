@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { RiskCheckContext, RiskCheckResult, RiskRule } from '../interfaces/risk-rule.interface';
 
 /**
@@ -8,6 +9,7 @@ import { RiskCheckContext, RiskCheckResult, RiskRule } from '../interfaces/risk-
  * - 如果已開倉位數量達到上限，則禁止開新倉
  */
 export class MaxOpenPositionsRule implements RiskRule {
+  private readonly logger = new Logger(MaxOpenPositionsRule.name);
   name = 'MaxOpenPositions';
 
   // Phase 1 先寫死上限，之後可以從用戶設定讀取

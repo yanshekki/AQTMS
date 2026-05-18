@@ -12,7 +12,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should pass when current daily loss is within limit', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',
@@ -30,7 +30,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should pass when no account data provided (graceful default)', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       symbol: 'BTCUSDT',
     };
@@ -41,7 +41,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should fail when daily loss exceeds limit (3% of balance)', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',
@@ -60,7 +60,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should pass at exact limit boundary', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       accountBalance: 100000,
       currentDailyLoss: -3000, // exactly 3%
@@ -71,7 +71,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should handle zero balance edge case', async () => {
-    const context = {
+    const context: any = {
       accountBalance: 0,
       currentDailyLoss: -100,
     };
@@ -82,7 +82,7 @@ describe('MaxDailyLossRule', () => {
   });
 
   it('should handle missing currentDailyLoss gracefully', async () => {
-    const context = {
+    const context: any = {
       accountBalance: 50000,
     };
 

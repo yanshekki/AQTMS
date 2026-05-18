@@ -2,7 +2,7 @@
 // All exchange adapters MUST extend this class. Core domain code only depends on this interface.
 
 import type { Money } from '../../../domain/value-objects/Money';
-import type { Trade } from '../../../domain/entities/Trade';
+import { Trade } from '../../../domain/entities/Trade';
 
 export interface OrderRequest {
   symbol: string;

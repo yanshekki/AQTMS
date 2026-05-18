@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 // ── Raydium DEX Adapter (Solana) ──
 // Solana-based DEX. Uses RPC provider (Helius, QuickNode, or public).
 // Requires @solana/web3.js for full functionality (stub for now).
@@ -14,6 +15,7 @@ export interface RaydiumAdapterConfig {
 }
 
 export class RaydiumAdapter extends BaseDEXAdapter {
+  private readonly logger = new Logger(RaydiumAdapter.name);
   public readonly dexName = 'RAYDIUM';
   public readonly chain = 'SOLANA';
   private readonly rpcUrl: string;

@@ -1,9 +1,11 @@
+import { Logger } from '@nestjs/common';
 // ── Ollama Provider (Local LLM) ──
 
 import { BaseAIProvider, type AIProviderConfig, type AIResponse, type AIScoringResult } from './BaseAIProvider';
 import { InfraError } from '../../shared/errors';
 
 export class OllamaProvider extends BaseAIProvider {
+  private readonly logger = new Logger(OllamaProvider.name);
   public readonly providerName = 'OLLAMA';
   private readonly baseURL: string;
 

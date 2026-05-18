@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { io, Socket } from 'socket.io-client';
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 
 interface OrderForm {
   symbol: string;

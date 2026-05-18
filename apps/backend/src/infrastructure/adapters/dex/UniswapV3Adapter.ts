@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 // ── Uniswap V3 DEX Adapter ──
 // Supports Ethereum, Arbitrum, Base, Optimism, Polygon.
 
@@ -23,6 +24,7 @@ export interface UniswapV3Config {
 }
 
 export class UniswapV3Adapter extends BaseDEXAdapter {
+  private readonly logger = new Logger(UniswapV3Adapter.name);
   public readonly dexName = 'UNISWAP_V3';
   public readonly chain: string;
   private readonly provider: ethers.JsonRpcProvider;

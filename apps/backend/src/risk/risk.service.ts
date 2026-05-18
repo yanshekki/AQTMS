@@ -220,7 +220,7 @@ export class RiskService {
         action: { contains: 'RISK_BLOCKED' },
         timestamp: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
-    }).catch((err) => {
+    }).catch((err: any) => {
       this.logger.warn('Failed to count recent risk blocks for kill switch', err?.message);
       return 0;
     });

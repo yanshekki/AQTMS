@@ -1,11 +1,12 @@
+import { Logger } from '@nestjs/common';
 // ── Google Gemini Provider ──
 
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
-import { Logger } from '@nestjs/common';
 import { BaseAIProvider, type AIProviderConfig, type AIResponse, type AIScoringResult } from './BaseAIProvider';
 import { InfraError } from '../../shared/errors';
 
 export class GeminiProvider extends BaseAIProvider {
+  private readonly logger = new Logger(GeminiProvider.name);
   public readonly providerName = 'GEMINI';
   private model: GenerativeModel;
 

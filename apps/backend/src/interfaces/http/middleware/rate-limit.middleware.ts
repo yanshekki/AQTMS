@@ -105,5 +105,6 @@ export async function authRateLimitMiddleware(req: Request, res: Response, next:
     next();
   } catch (error) {
     rateLimitLogger.warn(`Rate limit check failed (IP): ${error?.message || error}`);
-    // allow request through on Redis failure next(); }
+    next(); // allow request through on Redis failure
+}
 }

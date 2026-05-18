@@ -12,7 +12,7 @@ describe('MaxOpenPositionsRule', () => {
   });
 
   it('should pass when current open positions are within limit', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'BTCUSDT',
@@ -29,7 +29,7 @@ describe('MaxOpenPositionsRule', () => {
   });
 
   it('should fail when user already has maximum open positions', async () => {
-    const context = {
+    const context: any = {
       userId: 'user-1',
       exchange: 'BINANCE',
       symbol: 'ETHUSDT',
