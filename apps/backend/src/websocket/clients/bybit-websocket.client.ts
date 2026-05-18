@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import WebSocket from 'ws';
 import * as crypto from 'crypto';
 
@@ -17,6 +17,7 @@ export class BybitWebsocketClient {
   private readonly privateUrl: string;
   private readonly apiKey: string;
   private readonly apiSecret: string;
+  private readonly logger = new Logger(BybitWebsocketClient.name);
 
   constructor() {
     this.baseUrl = process.env.BYBIT_TESTNET === 'true'
@@ -41,7 +42,7 @@ export class BybitWebsocketClient {
       this.privateWs = new WebSocket(this.privateUrl);
 
       this.privateWs.on('open', () => {
-        console.log('[BybitWebsocket] Private stream connected, sending auth...');
+        this.logger.log('Private stream connected, sending auth...');
         this.sendAuth();
         resolve();
       });
@@ -52,9 +53,9 @@ export class BybitWebsocketClient {
 
           if (parsed.op === 'auth') {
             if (parsed.success) {
-              console.log('[BybitWebsocket] Private stream authenticated successfully');
+              this.logger.log('Private stream authenticated successfully');
             } else {
-              console.error('[BybitWebsocket] Private stream auth failed:', parsed);
+              this.logger.error(`Private stream auth failed: ${JSON.stringify(parsed)}`);
             }
           }
 
@@ -62,17 +63,17 @@ export class BybitWebsocketClient {
             this.messageCallback(parsed);
           }
         } catch (e) {
-          console.error('[BybitWebsocket] Failed to parse private message');
+          this.logger.error('Failed to parse private message', e as Error);
         }
       });
 
       this.privateWs.on('error', (error) => {
-        console.error('[BybitWebsocket] Private stream error:', error);
+        this.logger.error('Private stream error', error as Error);
         if (this.errorCallback) this.errorCallback(error as Error);
       });
 
       this.privateWs.on('close', () => {
-        console.log('[BybitWebsocket] Private stream closed');
+        this.logger.log('Private stream closed');
         if (this.closeCallback) this.closeCallback();
       });
     });
@@ -105,7 +106,7 @@ export class BybitWebsocketClient {
    */
   subscribePrivate(topic: string) {
     if (!this.privateWs || this.privateWs.readyState !== WebSocket.OPEN) {
-      console.warn('[BybitWebsocket] Private stream not connected or not authenticated');
+      this.logger.warn('Private stream not connected or not authenticated');
       return;
     }
 
@@ -115,7 +116,7 @@ export class BybitWebsocketClient {
     };
 
     this.privateWs.send(JSON.stringify(payload));
-    console.log(`[BybitWebsocket] Subscribed to private topic: ${topic}`);
+    this.logger.log(`Subscribed to private topic: ${topic}`);
   }
 
   // ... keep existing public methods and disconnect ...

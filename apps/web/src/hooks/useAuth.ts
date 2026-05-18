@@ -26,7 +26,8 @@ function parseJwt(token: string): AuthUser | null {
       role: decoded.role || '',
       permissions: decoded.permissions || [],
     };
-  } catch {
+  } catch (err) {
+    console.warn('Failed to parse JWT token:', err);
     return null;
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional, Logger } from '@nestjs/common';
 import { EncryptionService } from '../../infrastructure/shared/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CcxtExchangeAdapter } from '../../infrastructure/adapters/exchange/ccxt-exchange.adapter';
@@ -6,6 +6,8 @@ import { ExchangePositionProvider, ExchangePosition } from '../interfaces/exchan
 
 @Injectable()
 export class CcxtPositionProvider implements ExchangePositionProvider {
+  private readonly logger = new Logger(CcxtPositionProvider.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly encryptionService?: EncryptionService,
@@ -26,7 +28,7 @@ export class CcxtPositionProvider implements ExchangePositionProvider {
     }
 
     if (!this.encryptionService || !this.ccxtAdapter) {
-      console.warn('CcxtPositionProvider: Missing encryption or ccxt adapter');
+      this.logger.warn('Missing encryption or ccxt adapter');
       return [];
     }
 
@@ -56,7 +58,10 @@ export class CcxtPositionProvider implements ExchangePositionProvider {
         unrealizedPnl: pos.unrealizedPnl,
       })) as ExchangePosition[];
     } catch (error) {
-      console.error('CcxtPositionProvider failed to fetch positions:', error);
+      this.logger.error(
+        `Failed to fetch positions: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return [];
     }
   }

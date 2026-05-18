@@ -22,7 +22,8 @@ export class MaxDailyLossRule implements RiskRule {
 
     const maxAllowedLoss = accountBalance * this.maxDailyLossPercent;
 
-    if (currentDailyLoss > maxAllowedLoss) {
+    // Safety: use abs() to handle negative loss values consistently
+    if (Math.abs(currentDailyLoss) > maxAllowedLoss) {
       return {
         passed: false,
         reason: `今日虧損已達上限（${maxAllowedLoss.toFixed(2)}），暫停交易`,

@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { Candle } from '../backtest/interfaces/strategy.interface';
 
 @Injectable()
 export class HistoricalDataService {
+  private readonly logger = new Logger(HistoricalDataService.name);
   /**
    * 從 Binance 獲取 K 線數據
    */

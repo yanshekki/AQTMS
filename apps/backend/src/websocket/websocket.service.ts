@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { BinanceWebsocketClient } from './clients/binance-websocket.client';
 import { BybitWebsocketClient } from './clients/bybit-websocket.client';
 
