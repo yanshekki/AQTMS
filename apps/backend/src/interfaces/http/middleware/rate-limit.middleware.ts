@@ -6,6 +6,9 @@ import type { Request, Response, NextFunction } from 'express';
 import redis from '../../../shared/redis';
 import { detectLang, t } from '../../../shared/i18n';
 import { AuthenticatedUser } from '../../../types/authenticated-user.interface';
+import { Logger } from '@nestjs/common';
+
+const rateLimitLogger = new Logger('RateLimitMiddleware');
 
 const WINDOW_SEC = 60;
 const MAX_REQUESTS_PER_IP = 100;
@@ -49,7 +52,9 @@ export async function rateLimitMiddleware(req: Request, res: Response, next: Nex
     }
 
     next();
-  } catch {
+  } catch (error) {
+    rateLimitLogger.warn(`Rate limit check failed (IP): ${error?.message || error}`);
+    // allow request through on Redis failure
     // Redis failed — allow request through
     next();
   }
@@ -74,7 +79,9 @@ export async function strictRateLimitMiddleware(req: Request, res: Response, nex
       return;
     }
     next();
-  } catch {
+  } catch (error) {
+    rateLimitLogger.warn(`Rate limit check failed (IP): ${error?.message || error}`);
+    // allow request through on Redis failure
     next();
   }
 }
@@ -96,5 +103,7 @@ export async function authRateLimitMiddleware(req: Request, res: Response, next:
       return;
     }
     next();
-  } catch { next(); }
+  } catch (error) {
+    rateLimitLogger.warn(`Rate limit check failed (IP): ${error?.message || error}`);
+    // allow request through on Redis failure next(); }
 }
