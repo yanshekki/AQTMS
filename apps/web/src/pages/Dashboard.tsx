@@ -10,6 +10,7 @@ import axios from 'axios';
 import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 import { io, Socket } from 'socket.io-client';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 interface OrderForm {
   symbol: string;
@@ -171,6 +172,7 @@ export default function Dashboard() {
   const totalUnrealizedPnl = safePositions.reduce((sum: number, p: any) => sum + (p.unrealizedPnl || 0), 0);
 
   return (
+    <ErrorBoundary fallbackMessage="Dashboard 發生錯誤">
     <Box sx={{ p: 3, backgroundColor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h4" sx={{ color: '#fff' }}>Trading Terminal</Typography>
@@ -321,5 +323,6 @@ export default function Dashboard() {
 
       <Snackbar open={snackbar.open} autoHideDuration={4500} onClose={() => setSnackbar({ ...snackbar, open: false })} message={snackbar.message} />
     </Box>
+    </ErrorBoundary>
   );
 }
