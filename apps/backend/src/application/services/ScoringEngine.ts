@@ -28,6 +28,7 @@ export interface CompositeScore {
 }
 
 export class ScoringEngine {
+  private readonly logger = new Logger(ScoringEngine.name);
   constructor(
     private readonly aiRegistry: AIProviderRegistry,
     private readonly compositeThreshold = 80,
