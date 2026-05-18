@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as ccxt from 'ccxt';
 import { IExchangeAdapter, PlaceOrderParams, PlaceOrderResult, OrderStatusResult } from './exchange.adapter.interface';
-import { BaseTradingAdapter, OrderRequest, CancelOrderRequest, Trade } from '../exchanges/BaseTradingAdapter';
+import { BaseTradingAdapter, OrderRequest, CancelOrderRequest, Trade, Balance, Position } from '../exchanges/BaseTradingAdapter';
 
 interface ExchangeConfig {
   exchange: string;
@@ -52,34 +52,6 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     this.logger.log(`Initialized ${config.exchange} adapter (testnet=${config.testnet})`);
   }
 
-  async createOrder(request: OrderRequest): Promise<any> {
-    try {
-      const ex = this.getExchangeInstance('binance'); // placeholder - will improve later
-      const order = await ex.createOrder(
-        request.symbol,
-        request.type.toLowerCase(),
-        request.side.toLowerCase(),
-        request.quantity,
-        request.price
-      );
-
-      return {
-        id: order.id,
-        exchangeOrderId: order.id,
-        symbol: request.symbol,
-        side: request.side,
-        type: request.type,
-        quantity: request.quantity,
-        price: request.price || 0,
-        status: order.status || 'PENDING',
-        createdAt: new Date(),
-      };
-    } catch (error) {
-      this.handleError(error, 'createOrder');
-    }
-  }
-
-
   private getExchangeInstance(exchangeName: string, testnet = false): any {
     const cacheKey = `${exchangeName.toLowerCase()}-${testnet ? 'testnet' : 'mainnet'}`;
     const instance = this.exchangeInstances.get(cacheKey);
@@ -90,6 +62,197 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     return instance;
   }
 
+  // ── BaseTradingAdapter implementations ──
+
+  async createOrder(request: OrderRequest): Promise<Trade> {
+    try {
+      const ex = this.getExchangeInstance('binance');
+      const order = await ex.createOrder(
+        request.symbol,
+        request.type.toLowerCase(),
+        request.side.toLowerCase(),
+        request.quantity,
+        request.price
+      );
+
+      const now = new Date();
+      return {
+        id: order.id || `trade-${Date.now()}`,
+        exchangeOrderId: order.id || null,
+        exchangeAccountId: 'default',
+        symbol: request.symbol,
+        side: request.side,
+        type: request.type,
+        quantity: request.quantity,
+        price: request.price || null,
+        stopPrice: request.stopPrice || null,
+        timeInForce: request.timeInForce || 'GTC',
+        status: (order.status?.toUpperCase() || 'PENDING') as any,
+        filledQuantity: order.filled || 0,
+        idempotencyKey: request.idempotencyKey,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } catch (error) {
+      this.handleError(error, 'createOrder');
+    }
+  }
+
+  async cancelOrder(request: CancelOrderRequest): Promise<Trade> {
+    try {
+      const ex = this.getExchangeInstance('binance');
+      const result = await ex.cancelOrder(request.exchangeOrderId, request.symbol);
+
+      const now = new Date();
+      return {
+        id: `cancel-${request.exchangeOrderId}`,
+        exchangeOrderId: request.exchangeOrderId,
+        exchangeAccountId: 'default',
+        symbol: request.symbol,
+        side: 'SELL' as any,
+        type: 'LIMIT' as any,
+        quantity: 0,
+        price: null,
+        stopPrice: null,
+        timeInForce: 'GTC',
+        status: 'CANCELLED' as any,
+        filledQuantity: 0,
+        idempotencyKey: `cancel-${Date.now()}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } catch (error) {
+      this.handleError(error, 'cancelOrder');
+    }
+  }
+
+  async getOrder(exchangeOrderId: string, symbol: string): Promise<Trade> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const order = await ex.fetchOrder(exchangeOrderId, symbol);
+
+      const now = new Date();
+      return {
+        id: order.id,
+        exchangeOrderId: order.id,
+        exchangeAccountId: 'default',
+        symbol: order.symbol || symbol,
+        side: order.side?.toUpperCase() as any || 'BUY',
+        type: order.type?.toUpperCase() as any || 'MARKET',
+        quantity: order.amount || 0,
+        price: order.price || null,
+        stopPrice: null,
+        timeInForce: 'GTC',
+        status: (order.status?.toUpperCase() || 'PENDING') as any,
+        filledQuantity: order.filled || 0,
+        idempotencyKey: '',
+        createdAt: order.datetime ? new Date(order.datetime) : now,
+        updatedAt: now,
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getOrder');
+    }
+  }
+
+  async getOpenOrders(symbol?: string): Promise<Trade[]> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const orders = await ex.fetchOpenOrders(symbol).catch(() => []);
+      return orders.map((order: any) => {
+        const now = new Date();
+        return {
+          id: order.id,
+          exchangeOrderId: order.id,
+          exchangeAccountId: 'default',
+          symbol: order.symbol,
+          side: order.side?.toUpperCase() as any,
+          type: order.type?.toUpperCase() as any,
+          quantity: order.amount || 0,
+          price: order.price || null,
+          stopPrice: null,
+          timeInForce: order.timeInForce || 'GTC',
+          status: (order.status?.toUpperCase() || 'OPEN') as any,
+          filledQuantity: order.filled || 0,
+          idempotencyKey: '',
+          createdAt: order.datetime ? new Date(order.datetime) : now,
+          updatedAt: now,
+        };
+      });
+    } catch (error: any) {
+      this.logger.error(`getOpenOrders failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  async getBalances(): Promise<Balance[]> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const balance = await ex.fetchBalance();
+      return Object.keys(balance.total || {}).map(asset => ({
+        asset,
+        free: String(balance.free?.[asset] || 0),
+        locked: String(balance.used?.[asset] || 0),
+      }));
+    } catch (error: any) {
+      this.logger.error(`getBalances failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  async getPositions(): Promise<Position[]> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const positions = await ex.fetchPositions().catch(() => []);
+      return positions.map((p: any) => ({
+        symbol: p.symbol,
+        side: (p.side?.toUpperCase() || 'BUY') as 'BUY' | 'SELL',
+        quantity: p.contracts || p.amount || 0,
+        entryPrice: p.entryPrice || 0,
+        markPrice: p.markPrice || p.lastPrice || 0,
+        unrealizedPnl: { amount: p.unrealizedPnl || 0, currency: 'USDT' } as any,
+      }));
+    } catch (error: any) {
+      this.logger.error(`getPositions failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  getAssetType(): 'crypto' | 'stock' | 'futures' | 'option' | 'dex' {
+    return 'crypto';
+  }
+
+  supportsLeverage(): boolean {
+    return false;
+  }
+
+  getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
+    return ['MARKET', 'LIMIT', 'STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'];
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      await ex.fetchTime();
+      return true;
+    } catch (error: any) {
+      this.logger.error(`testConnection failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  async getExchangeInfo(): Promise<Record<string, unknown>> {
+    try {
+      const ex = this.getExchangeInstance('binance', false);
+      const markets = await ex.fetchMarkets();
+      return { markets, exchange: ex.id, has: ex.has };
+    } catch (error: any) {
+      this.logger.error(`getExchangeInfo failed: ${error.message}`);
+      return {};
+    }
+  }
+
+  // ── IExchangeAdapter legacy methods (kept for compatibility) ──
+
   async placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
     try {
       const exchange = this.getExchangeInstance(params.exchange || 'binance', params.testnet ?? false);
@@ -97,28 +260,17 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       const orderType = params.type === 'MARKET' ? 'market' : 'limit';
       const side = params.side.toLowerCase();
 
-      const orderParams: any = {
-        symbol: params.symbol,
-        type: orderType,
-        side,
-        amount: params.quantity,
-      };
-
-      if (params.price && orderType === 'limit') {
-        orderParams.price = params.price;
-      }
-
       if (!params.testnet && process.env.ENABLE_LIVE_TRADING !== 'true') {
         this.logger.warn('Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.');
         return { success: false, message: 'Live trading is currently disabled for safety.' };
       }
 
       const result = await exchange.createOrder(
-        orderParams.symbol,
-        orderParams.type,
-        orderParams.side,
-        orderParams.amount,
-        orderParams.price,
+        params.symbol,
+        orderType,
+        side,
+        params.quantity,
+        params.price,
       );
 
       return {
@@ -150,20 +302,15 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     try {
       const ex = this.getExchangeInstance('binance', false);
       const balance = await ex.fetchBalance();
-      return balance.total || 0;
+      return balance.total?.USDT || balance.total || 0;
     } catch (error: any) {
       this.logger.error(`getBalance failed: ${error.message}`);
       return 0;
     }
   }
 
-  async getPositions(exchangeAccountId: string): Promise<any[]> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      return await ex.fetchPositions().catch(() => []);
-    } catch (error: any) {
-      return [];
-    }
+  async getPositionsLegacy(exchangeAccountId: string): Promise<any[]> {  // renamed to avoid conflict
+    return this.getPositions() as any;
   }
 
   async getOrderStatus(exchangeAccountId: string, exchangeOrderId: string): Promise<OrderStatusResult | null> {
@@ -183,14 +330,9 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     }
   }
 
-  async getOpenOrders(exchangeAccountId: string, symbol?: string): Promise<any[]> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      return await ex.fetchOpenOrders(symbol).catch(() => []);
-    } catch (error: any) {
-      this.logger.error(`getOpenOrders failed: ${error.message}`);
-      return [];
-    }
+  async getOpenOrdersLegacy(exchangeAccountId: string, symbol?: string): Promise<any[]> {
+    const trades = await this.getOpenOrders(symbol);
+    return trades;
   }
 
   async getTicker(symbol: string, exchange = 'binance', testnet = false) {
@@ -206,55 +348,10 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   async getOHLCV(symbol: string, timeframe = '1m', limit = 100, exchange = 'binance', testnet = false) {
     try {
       const ex = this.getExchangeInstance(exchange, testnet);
-      return await ex.fetchOHLCV(symbol, timeframe, limit);
+      return await ex.fetchOHLCV(symbol, timeframe, undefined, limit);
     } catch (error: any) {
       this.logger.error(`getOHLCV failed: ${error.message}`);
       return [];
-    }
-  }
-
-  // ── BaseTradingAdapter implementations using CCXT ──
-
-  async getOrder(exchangeOrderId: string, symbol: string): Promise<any> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      const order = await ex.fetchOrder(exchangeOrderId, symbol);
-      return order;
-    } catch (error: any) {
-      this.handleError(error, 'getOrder');
-    }
-  }
-
-  async getOpenOrders(symbol?: string): Promise<any[]> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      return await ex.fetchOpenOrders(symbol).catch(() => []);
-    } catch (error: any) {
-      this.logger.error(`getOpenOrders failed: ${error.message}`);
-      return [];
-    }
-  }
-
-  getAssetType(): 'crypto' | 'stock' | 'futures' | 'option' | 'dex' {
-    return 'crypto';
-  }
-
-  supportsLeverage(): boolean {
-    return false; // spot by default; futures would be true via options
-  }
-
-  getSupportedOrderTypes(): Array<'MARKET' | 'LIMIT' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'> {
-    return ['MARKET', 'LIMIT', 'STOP_LOSS', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT', 'TAKE_PROFIT_LIMIT'];
-  }
-
-  async getExchangeInfo(): Promise<Record<string, unknown>> {
-    try {
-      const ex = this.getExchangeInstance('binance', false);
-      const markets = await ex.fetchMarkets();
-      return { markets, exchange: ex.id, has: ex.has };
-    } catch (error: any) {
-      this.logger.error(`getExchangeInfo failed: ${error.message}`);
-      return {};
     }
   }
 }
