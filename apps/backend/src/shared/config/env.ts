@@ -23,8 +23,13 @@ export function loadEnv(): EnvConfig {
 
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
+    // Fatal bootstrap error — console.error is appropriate here as no logger/DI exists yet.
     console.error('❌ Invalid environment configuration:');
-    console.error(result.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n'));
+    console.error(
+      result.error.issues
+        .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+        .join('\n'),
+    );
     process.exit(1);
   }
 

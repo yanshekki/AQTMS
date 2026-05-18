@@ -97,6 +97,12 @@ describe('CcxtExchangeAdapter', () => {
     (ccxt.binance as jest.Mock).mockImplementation(() => mockExchange);
     (ccxt.bybit as jest.Mock).mockImplementation(() => mockExchange);
     (ccxt.okx as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.coinbase as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.kraken as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.kucoin as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.huobi as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.gateio as jest.Mock).mockImplementation(() => mockExchange);
+    (ccxt.mexc as jest.Mock).mockImplementation(() => mockExchange);
 
     // Spy on logger
     loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -401,6 +407,49 @@ describe('CcxtExchangeAdapter', () => {
     });
   });
 
+  // ── getBalance Success Scenarios (TestGuard Addition) ─────────────────────
+  describe('getBalance success scenarios', () => {
+    it('should return USDT total balance on successful fetchBalance', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchBalance', MOCK_RESPONSES.balance);
+
+      const result = await adapter.getBalance('');
+      expect(result).toBe(1000);
+    });
+
+    it('should return 0 when no USDT balance present', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'fetchBalance', {
+        total: { BTC: 0.5, ETH: 2.0 },
+        free: { BTC: 0.4, ETH: 1.8 },
+        used: { BTC: 0.1, ETH: 0.2 },
+      });
+
+      const result = await adapter.getBalance('account-123');
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 on empty total balance', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchBalance', { total: {} });
+
+      const result = await adapter.getBalance('');
+      expect(result).toBe(0);
+    });
+
+    it('should return correct total for non-USDT asset when specified', async () => {
+      await initializeAdapter(adapter, 'binance');
+      setupMockSuccess(mockExchange, 'fetchBalance', {
+        total: { BTC: 1.25, USDT: 5000 },
+        free: { BTC: 1.0, USDT: 4500 },
+        used: { BTC: 0.25, USDT: 500 },
+      });
+
+      const btcBalance = await adapter.getBalance('BTC');
+      expect(btcBalance).toBe(1.25);
+    });
+  });
+
   // ── getPositions Success Scenarios (TestGuard Addition) ────────────────────
   describe('getPositions success scenarios', () => {
     it('should return formatted positions on successful fetchPositions', async () => {
@@ -449,6 +498,125 @@ describe('CcxtExchangeAdapter', () => {
       const result = await adapter.getPositions();
       expect(result).toHaveLength(1);
       expect(result[0].symbol).toBe('BTC/USDT');
+    });
+  });
+
+  // ── getOrder Success Scenarios (TestGuard Addition) ────────────────────────
+  describe('getOrder success scenarios', () => {
+    it('should return formatted order on successful fetchOrder', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchOrder', {
+        id: 'ord-123',
+        symbol: 'BTC/USDT',
+        side: 'buy',
+        type: 'market',
+        amount: 0.5,
+        price: 65000,
+        filled: 0.5,
+        status: 'closed',
+        datetime: '2024-01-01T00:00:00Z',
+      });
+
+      const result = await adapter.getOrder('ord-123', 'BTC/USDT');
+      expect(result).toBeDefined();
+      expect(result.exchangeOrderId).toBe('ord-123');
+      expect(result.symbol).toBe('BTC/USDT');
+      expect(result.side).toBe('BUY');
+      expect(result.quantity).toBe(0.5);
+      expect(result.filledQuantity).toBe(0.5);
+      expect(result.status).toBe('CLOSED');
+    });
+
+    it('should handle partial fill order correctly', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'fetchOrder', {
+        id: 'partial-456',
+        symbol: 'ETH/USDT',
+        side: 'sell',
+        type: 'limit',
+        amount: 2,
+        price: 3000,
+        filled: 1,
+        status: 'open',
+      });
+
+      const result = await adapter.getOrder('partial-456', 'ETH/USDT');
+      expect(result.exchangeOrderId).toBe('partial-456');
+      expect(result.filledQuantity).toBe(1);
+      expect(result.quantity).toBe(2);
+      expect(result.status).toBe('OPEN');
+    });
+  });
+
+  // ── getOpenOrders Success Scenarios (TestGuard Addition) ───────────────────
+  describe('getOpenOrders success scenarios', () => {
+    it('should return formatted open orders on successful fetchOpenOrders', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchOpenOrders', [
+        { id: 'open-1', symbol: 'BTC/USDT', side: 'buy', type: 'limit', amount: 0.1, price: 64000, filled: 0, status: 'open' },
+        { id: 'open-2', symbol: 'ETH/USDT', side: 'sell', type: 'limit', amount: 1, price: 3100, filled: 0, status: 'open' },
+      ]);
+
+      const result = await adapter.getOpenOrders();
+      expect(result).toHaveLength(2);
+      expect(result[0].exchangeOrderId).toBe('open-1');
+      expect(result[0].status).toBe('OPEN');
+      expect(result[1].symbol).toBe('ETH/USDT');
+    });
+
+    it('should return empty array when no open orders', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchOpenOrders', []);
+
+      const result = await adapter.getOpenOrders('BTC/USDT');
+      expect(result).toEqual([]);
+  });
+
+  // ── getTicker Success Scenarios (TestGuard Addition) ───────────────────────
+  describe('getTicker success scenarios', () => {
+    it('should return ticker data on successful fetchTicker', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchTicker', MOCK_RESPONSES.ticker);
+
+      const result = await adapter.getTicker('BTC/USDT');
+
+      expect(result).toEqual(MOCK_RESPONSES.ticker);
+      expect(mockExchange.fetchTicker).toHaveBeenCalledWith('BTC/USDT');
+    });
+
+    it('should return ticker for different exchanges and testnet flag', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'fetchTicker', { symbol: 'ETH/USDT', last: 3000 });
+
+      const result = await adapter.getTicker('ETH/USDT', 'bybit', true);
+
+      expect(result).toBeDefined();
+      expect(result.symbol).toBe('ETH/USDT');
+      expect(mockExchange.fetchTicker).toHaveBeenCalledWith('ETH/USDT');
+    });
+  });
+
+  // ── getOHLCV Success Scenarios (TestGuard Addition) ────────────────────────
+  describe('getOHLCV success scenarios', () => {
+    it('should return OHLCV data on successful fetchOHLCV', async () => {
+      await initializeAdapter(adapter);
+      setupMockSuccess(mockExchange, 'fetchOHLCV', MOCK_RESPONSES.ohlcv);
+
+      const result = await adapter.getOHLCV('BTC/USDT', '1h', 10);
+
+      expect(result).toEqual(MOCK_RESPONSES.ohlcv);
+      expect(mockExchange.fetchOHLCV).toHaveBeenCalledWith('BTC/USDT', '1h', undefined, 10);
+    });
+
+    it('should fetch OHLCV with correct parameters on multi-exchange', async () => {
+      await initializeAdapter(adapter, 'okx');
+      const customOhlcv = [[Date.now(), 100, 101, 99, 100.5, 500]];
+      setupMockSuccess(mockExchange, 'fetchOHLCV', customOhlcv);
+
+      const result = await adapter.getOHLCV('SOL/USDT', '5m', 20, 'okx', false);
+
+      expect(result).toHaveLength(1);
+      expect(mockExchange.fetchOHLCV).toHaveBeenCalledWith('SOL/USDT', '5m', undefined, 20);
     });
   });
 
@@ -800,13 +968,30 @@ describe('CcxtExchangeAdapter', () => {
     });
   });
 
-  describe('cancelOrder', () => {
-    it('should cancel order successfully', async () => {
-      await initializeAdapter(adapter);
+  describe('cancelOrder success scenarios', () => {
+    beforeEach(async () => {
+      await initializeAdapter(adapter, 'binance');
+    });
+
+    it('should cancel order successfully and return CANCELLED Trade', async () => {
       setupMockSuccess(mockExchange, 'cancelOrder', MOCK_RESPONSES.cancelledOrder);
 
       const result = await adapter.cancelOrder({ exchangeOrderId: '12345', symbol: 'BTC/USDT' });
 
+      expect(mockExchange.cancelOrder).toHaveBeenCalledWith('12345', 'BTC/USDT');
+      expect(result.status).toBe('CANCELLED');
+      expect(result.exchangeOrderId).toBe('12345');
+      expect(result.symbol).toBe('BTC/USDT');
+      expect(result.id).toBe('cancel-12345');
+    });
+
+    it('should cancel order on different exchange (bybit)', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'cancelOrder', MOCK_RESPONSES.cancelledOrder);
+
+      const result = await adapter.cancelOrder({ exchangeOrderId: 'bybit-999', symbol: 'ETH/USDT' });
+
+      expect(mockExchange.cancelOrder).toHaveBeenCalledWith('bybit-999', 'ETH/USDT');
       expect(result.status).toBe('CANCELLED');
     });
   });
@@ -901,6 +1086,109 @@ describe('CcxtExchangeAdapter', () => {
 
       expect(successResult.success).toBe(true);
       expect(successResult.exchangeOrderId).toBe('recovered-001');
+    });
+  });
+
+  // ── Key Market Data Methods: getTicker / getOHLCV ───────────────────────────
+  describe('getTicker', () => {
+    it('should fetch ticker successfully with explicit exchange', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'fetchTicker', MOCK_RESPONSES.ticker);
+
+      const result = await adapter.getTicker('BTC/USDT', 'bybit', true);
+
+      expect(result).toEqual(MOCK_RESPONSES.ticker);
+      expect(mockExchange.fetchTicker).toHaveBeenCalledWith('BTC/USDT');
+    });
+
+    it('should return null and log error on fetchTicker failure (graceful)', async () => {
+      await initializeAdapter(adapter);
+      setupMockError(mockExchange, 'fetchTicker', 'ticker unavailable');
+
+      const result = await adapter.getTicker('ETH/USDT');
+
+      expect(result).toBeNull();
+      expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('getTicker failed'));
+    });
+  });
+
+  describe('getOHLCV', () => {
+    it('should fetch OHLCV successfully with defaults and multi-exchange', async () => {
+      await initializeAdapter(adapter, 'okx');
+      setupMockSuccess(mockExchange, 'fetchOHLCV', MOCK_RESPONSES.ohlcv);
+
+      const result = await adapter.getOHLCV('BTC/USDT', '5m', 50, 'okx', false);
+
+      expect(result).toEqual(MOCK_RESPONSES.ohlcv);
+      expect(mockExchange.fetchOHLCV).toHaveBeenCalledWith('BTC/USDT', '5m', undefined, 50);
+    });
+
+    it('should return [] and handle error via handleCcxtError on fetchOHLCV failure', async () => {
+      await initializeAdapter(adapter);
+      setupMockError(mockExchange, 'fetchOHLCV', new (ccxt as any).NetworkError('timeout'));
+
+      const result = await adapter.getOHLCV('BTC/USDT');
+      const result = await adapter.getOHLCV('BTC/USDT');
+      expect(result).toEqual([]);
+      // handleCcxtError throws, but getOHLCV catches and returns []
+      expect(loggerSpy).toHaveBeenCalled();
+    });
+  });
+  // ── getExchangeInfo Success Scenarios (TestGuard Addition) ─────────────────────
+  describe('getExchangeInfo success scenarios', () => {
+    beforeEach(async () => {
+      await initializeAdapter(adapter);
+    });
+
+    it('should return markets, exchange id and has on successful fetchMarkets', async () => {
+      // Augment mock with CCXT instance properties used in return value
+      (mockExchange as any).id = 'binance';
+      (mockExchange as any).has = { fetchMarkets: true, spot: true };
+      setupMockSuccess(mockExchange, 'fetchMarkets', [{ symbol: 'BTC/USDT' }]);
+
+      const result = await adapter.getExchangeInfo();
+      expect(result.markets).toEqual([{ symbol: 'BTC/USDT' }]);
+      expect(result.exchange).toBe('binance');
+      expect(result.has).toEqual({ fetchMarkets: true, spot: true });
+    });
+
+    it('should support explicit exchangeName and testnet parameters', async () => {
+      await initializeAdapter(adapter, 'bybit');
+      (mockExchange as any).id = 'bybit';
+      (mockExchange as any).has = {};
+      setupMockSuccess(mockExchange, 'fetchMarkets', []);
+
+      const result = await adapter.getExchangeInfo('bybit', true);
+      expect(result).toHaveProperty('markets');
+      expect(result.exchange).toBe('bybit');
+      expect(mockExchange.fetchMarkets).toHaveBeenCalled();
+    });
+  });
+
+  describe('setDefaultExchange', () => {
+  describe('setDefaultExchange', () => {
+    it('should set default exchange to lowercase and log the change', () => {
+      const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+      adapter.setDefaultExchange('ByBit');
+      expect(logSpy).toHaveBeenCalledWith('Default exchange set to bybit');
+      logSpy.mockRestore();
+    });
+
+    it('should affect subsequent default-exchange calls (e.g. getTicker uses new default)', async () => {
+      adapter.setDefaultExchange('bybit');
+      await initializeAdapter(adapter, 'bybit');
+      setupMockSuccess(mockExchange, 'fetchTicker', MOCK_RESPONSES.ticker);
+      await adapter.getTicker('BTC/USDT');
+      expect(ccxt.bybit).toHaveBeenCalled();
+    });
+
+    it('should handle uppercase, mixed case and special exchange names by lowercasing', () => {
+      const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+      adapter.setDefaultExchange('OKX');
+      expect(logSpy).toHaveBeenCalledWith('Default exchange set to okx');
+      adapter.setDefaultExchange('Binance');
+      expect(logSpy).toHaveBeenCalledWith('Default exchange set to binance');
+      logSpy.mockRestore();
     });
   });
 });

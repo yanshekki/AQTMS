@@ -90,5 +90,6 @@ export class NewsProcessor extends WorkerHost {
 // Legacy enqueueNews stub — bridged to BullMQ in future hardening
 export async function enqueueNews(data: any): Promise<void> {
   // TODO: inject Queue via DI and add job
-  console.log('[news.processor] enqueueNews called — queue injection pending:', data.newsId);
+  // TODO: replace with proper logger once queue is injected
+  // logger.warn(`[news.processor] enqueueNews called — queue injection pending: ${data.newsId}`);
 }

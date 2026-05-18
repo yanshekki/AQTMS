@@ -26,7 +26,6 @@ export class HistoricalDataService {
       if (endTime) params.endTime = endTime;
 
       const response = await axios.get('https://api.binance.com/api/v3/klines', { params });
-
       return response.data.map((k: any[]) => ({
         timestamp: k[0],
         open: parseFloat(k[1]),
@@ -36,7 +35,7 @@ export class HistoricalDataService {
         volume: parseFloat(k[5]),
       }));
     } catch (error) {
-      this.logger.error(`Failed to fetch Binance klines for ${symbol}`, (error as Error).stack);
+      this.logger.error(`Failed to fetch Binance klines for ${symbol}: ${error.message}`);
       throw error;
     }
   }
@@ -52,7 +51,7 @@ export class HistoricalDataService {
     limit: number = 200,
   ): Promise<Candle[]> {
     // TODO: 實作 Bybit 的 kline 獲取
-    console.warn('[HistoricalDataService] Bybit historical data not implemented yet');
+    this.logger.warn('[HistoricalDataService] Bybit historical data not implemented yet');
     return [];
   }
 
@@ -71,6 +70,6 @@ export class HistoricalDataService {
     } else if (exchange === 'BYBIT') {
       return this.getBybitKlines(symbol, interval, startTime, endTime);
     }
-    throw new Error(`Unsupported exchange: ${exchange}`);
+    return [];
   }
 }

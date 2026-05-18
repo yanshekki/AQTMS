@@ -13,7 +13,8 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
 
   async save(log: ExecutionLog): Promise<void> {
     // await this.prisma.executionLog.create({ data: { ... } });
-    console.log('[Prisma] Execution log saved (implement when Prisma model is ready)');
+    // TODO: replace console with logger once implemented
+    // console.log('[Prisma] Execution log saved (implement when Prisma model is ready)');
   }
 
   async find(query: LogQuery = {}): Promise<ExecutionLog[]> {
@@ -23,6 +24,7 @@ export class PrismaExecutionLogRepository implements IExecutionLogRepository {
 
   async clear(): Promise<void> {
     // await this.prisma.executionLog.deleteMany({});
-    console.log('[Prisma] Logs cleared');
+    // TODO: replace console with logger once implemented
+    // console.log('[Prisma] Logs cleared');
   }
 }

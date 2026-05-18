@@ -48,10 +48,11 @@ export async function withRetry<T>(
         opts.maxDelayMs,
       );
 
-      console.warn(
-        `[Retry] Attempt ${attempt}/${opts.maxAttempts} failed. Retrying in ${delay}ms...`,
-        error?.message,
-      );
+      // TODO: integrate with StructuredLoggerService or pino for production
+      // console.warn(
+      //   `[Retry] Attempt ${attempt}/${opts.maxAttempts} failed. Retrying in ${delay}ms...`,
+      //   error?.message,
+      // );
 
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

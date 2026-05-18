@@ -12,9 +12,16 @@ interface ExchangeConfig {
   passphrase?: string;     // For some exchanges (e.g. Coinbase)
   uid?: string;
   testnet?: boolean;
-  options?: Record<string, any>; // Extra CCXT options
+  options?: Record<string, any>; // Extra CCXT options (merged into inner `options` e.g. defaultType, fetchCurrencies)
+  customOptions?: Record<string, any>; // Custom top-level exchange constructor options (e.g. proxy, headers, agent, timeout)
   enableRateLimit?: boolean;
+  rateLimit?: number; // Exchange-specific rate limit override in ms (better support for per-exchange throttling, e.g. stricter for Binance, looser for others)
   features?: Record<string, boolean>; // Per-exchange feature flags (e.g. { stopLoss: true, takeProfit: true, leverage: false })
+  proxy?: string; // Exchange-specific HTTP(S) proxy URL (e.g. 'http://127.0.0.1:8080' or 'socks5://...')
+  httpProxy?: string;
+  httpsProxy?: string;
+  timeout?: number; // Exchange-specific request timeout in milliseconds (e.g. 30000 for slow networks or high-latency proxies)
+  version?: string; // Exchange-specific API version override (e.g. 'v2', 'v3' for Binance/OKX endpoint selection)
 }
 
 @Injectable()
@@ -25,6 +32,7 @@ interface ExchangeConfig {
  * Features:
  * - Automatic initialization caching per exchange + testnet/mainnet
  * - Production-grade error handling with rate limit, auth, and network categorization
+ * - Exchange-specific rateLimit override support via ExchangeConfig (MethodMaster addition)
  * - Graceful degradation on initialization failures
  * - Consistent safe return values for read operations on error
  */
@@ -32,6 +40,7 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
   public readonly exchangeName = 'CCXT';
   private readonly logger = new Logger(CcxtExchangeAdapter.name);
   private exchangeInstances: Map<string, any> = new Map();
+  private initializingPromises: Map<string, Promise<void>> = new Map();
   private defaultExchange = 'binance';
   private defaultTestnet = false;
 
@@ -52,12 +61,21 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     const exchangeName = config.exchange.trim().toLowerCase();
     const cacheKey = `${exchangeName}-${config.testnet ? 'testnet' : 'mainnet'}`;
 
+    // Robust concurrent caching (MethodMaster): prevent duplicate inits / thundering-herd
+    // on initialization failures, races, or rapid retries. Uses initializingPromises guard.
     if (this.exchangeInstances.has(cacheKey)) {
-      this.logger.log(`Exchange ${exchangeName} already initialized (cache hit)`);
+      this.logger.log(
+        `Reusing cached exchange instance for ${exchangeName} (cacheKey=${cacheKey}, testnet=${!!config.testnet}) - no re-initialization needed`,
+      );
       return;
     }
+    if (this.initializingPromises.has(cacheKey)) {
+      this.logger.log(`Exchange ${exchangeName} initialization already in progress (awaiting)`);
+      return this.initializingPromises.get(cacheKey)!;
+    }
 
-    // Basic validation and logging (never log actual credentials)
+    const initPromise = (async () => {
+      // Basic validation and logging (never log actual credentials)
     const maskedKey = config.apiKey ? `${config.apiKey.slice(0, 4)}...${config.apiKey.slice(-4)}` : 'none';
     if (!config.apiKey) {
       this.logger.warn(`Initializing ${exchangeName} without API key - limited functionality`);
@@ -75,7 +93,13 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       passphrase: config.passphrase,
       uid: config.uid,
       enableRateLimit: config.enableRateLimit ?? true,
+      ...(config.rateLimit !== undefined ? { rateLimit: config.rateLimit } : {}),
+      ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
+      ...(config.proxy !== undefined ? { proxy: config.proxy } : {}),
+      ...(config.httpProxy !== undefined ? { httpProxy: config.httpProxy } : {}),
+      ...(config.httpsProxy !== undefined ? { httpsProxy: config.httpsProxy } : {}),
       sandbox: config.testnet ?? false,
+      ...(config.customOptions || {}),
       options: {
         defaultType: 'spot',
         ...(config.options || {}),
@@ -89,11 +113,12 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       if (typeof ExchangeClass === 'function') {
         exchange = new ExchangeClass(commonOptions);
 
-        // Rate limit logging for production observability
+        // Rate limit and proxy logging for production observability (MethodMaster)
         const rateLimitEnabled = commonOptions.enableRateLimit;
         const rateLimitMs = (exchange as any).rateLimit || 'default';
+        const proxyInfo = config.proxy || config.httpProxy || config.httpsProxy ? 'with proxy' : 'no proxy';
         this.logger.log(
-          `${exchangeName} initialized with rateLimit=${rateLimitEnabled} (${rateLimitMs}ms between requests)`,
+          `${exchangeName} initialized with rateLimit=${rateLimitEnabled} (${rateLimitMs}ms between requests), proxy=${proxyInfo}`,
         );
 
         // Production readiness: async connectivity verification (non-blocking)
@@ -545,18 +570,45 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
       throw new Error(`Network error connecting to ${exchangeName}. Check connectivity and exchange status.`);
     }
 
-    // Order / insufficient funds etc.
-    if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+    // Explicit CCXT error class categorization (improved MethodMaster refinement)
+    if (error instanceof (ccxt as any).InsufficientFunds || msg.toLowerCase().includes('insufficient')) {
+      this.logger.warn(`[INSUFFICIENT_FUNDS] ${exchangeName} ${operation}: ${msg}`);
       throw new Error(`Insufficient balance or funds for ${operation} on ${exchangeName}.`);
     }
 
-    if (msg.toLowerCase().includes('invalid order') || msg.toLowerCase().includes('order not found')) {
+    if (error instanceof (ccxt as any).InvalidOrder || error instanceof (ccxt as any).OrderNotFound ||
+        msg.toLowerCase().includes('invalid order') || msg.toLowerCase().includes('order not found')) {
+      this.logger.warn(`[ORDER_ERROR] ${exchangeName} ${operation}: ${msg}`);
       throw new Error(`Order error on ${exchangeName}: ${msg}`);
     }
 
+    if (error instanceof (ccxt as any).PermissionDenied) {
+      this.logger.error(`[PERMISSION_DENIED] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`Permission denied for ${operation} on ${exchangeName}. Check API key scopes.`);
+    }
+
+    if (error instanceof (ccxt as any).ArgumentsRequired || error instanceof (ccxt as any).BadRequest) {
+      this.logger.warn(`[BAD_REQUEST] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`Invalid arguments or bad request for ${operation} on ${exchangeName}: ${msg}`);
+    }
+
+    if (error instanceof (ccxt as any).BadSymbol) {
+      this.logger.warn(`[BAD_SYMBOL] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`Invalid or unsupported symbol for ${operation} on ${exchangeName}.`);
+    }
+
+    if (error instanceof (ccxt as any).ExchangeNotAvailable) {
+      this.logger.warn(`[EXCHANGE_UNAVAILABLE] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`Exchange ${exchangeName} is temporarily unavailable.`);
+    }
+
+    if (error instanceof (ccxt as any).InvalidNonce) {
+      this.logger.warn(`[INVALID_NONCE] ${exchangeName} ${operation}: ${msg}`);
+      throw new Error(`Invalid nonce/timestamp on ${exchangeName}. Check system clock sync.`);
+    }
+
     // Better handling for unknown / unclassified CCXT error types (MethodMaster)
-    // Covers other CCXT subclasses (ExchangeError, DDoSProtection, InvalidNonce, etc.)
-    // or any error whose constructor name indicates a CCXT origin.
+    // Covers other CCXT subclasses (ExchangeError, DDoSProtection, etc.)
     const isCcxtError =
       error instanceof (ccxt as any).BaseError ||
       (error && typeof error.constructor?.name === 'string' && error.constructor.name.endsWith('Error'));

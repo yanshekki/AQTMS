@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, ValidateIf, IsPositive } from 'class-validator';
 
 export enum OrderSide {
   BUY = 'BUY',
@@ -25,8 +25,9 @@ export class CreateOrderDto {
   @IsNumber()
   quantity: number;
 
-  @IsOptional()
+  @ValidateIf((o) => o.type === OrderType.LIMIT)
   @IsNumber()
+  @IsPositive()
   price?: number;
 
   @IsOptional()

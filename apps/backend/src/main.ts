@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 
@@ -28,6 +29,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`🚀 AQTMS Backend running on: http://localhost:${port}/api/v1`);
+  const logger = new Logger('Bootstrap');
+  logger.log(`🚀 AQTMS Backend running on: http://localhost:${port}/api/v1`);
 }
 bootstrap();
