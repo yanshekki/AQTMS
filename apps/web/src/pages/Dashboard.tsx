@@ -168,7 +168,7 @@ export default function Dashboard() {
       timeScale: { borderColor: '#30363d' },
     });
 
-    const lineSeries = chart.addLineSeries({
+    try { const lineSeries = chart.addLineSeries({
       color: '#58a6ff',
       lineWidth: 2,
     });
@@ -178,7 +178,7 @@ export default function Dashboard() {
       value: item.price,
     }));
 
-    lineSeries.setData(formattedData);
+    lineSeries.setData(formattedData); } catch(e) { console.error("Chart error", e); }
 
     chartRef.current = chart;
     lineSeriesRef.current = lineSeries;
