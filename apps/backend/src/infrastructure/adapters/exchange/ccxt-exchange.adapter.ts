@@ -257,7 +257,8 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
         createdAt: now,
         updatedAt: now,
       };
-    } catch (error) {
+    } catch (error: any) {
+      this.logger.error(`cancelOrder failed for ${request.exchangeOrderId}: ${error?.message || error}`);
       this.handleCcxtError(error, 'cancelOrder');
     }
   }
@@ -340,8 +341,6 @@ export class CcxtExchangeAdapter extends BaseTradingAdapter implements IExchange
     } catch (error: any) {
       this.logger.error(`getBalances failed: ${error.message}`);
       return [];
-    }
-  }
     }
   }
 
