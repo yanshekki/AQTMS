@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AQTMS — Automated Quantitative Trading Management System</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Polyfill for crypto.randomUUID (robust version for extension-heavy environments) -->
+    <script>
+      (function() {
+        try {
+          const c = window.crypto || (window.crypto = {});
+          if (typeof c.randomUUID !== "function") {
+            c.randomUUID = function() {
+              return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(ch) {
+                const r = Math.random() * 16 | 0;
+                const v = ch === "x" ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              });
+            };
+            console.log("[AQTMS] crypto.randomUUID polyfill applied");
+          }
+        } catch (e) {
+          console.warn("[AQTMS] Failed to apply crypto.randomUUID polyfill:", e);
+        }
+      })();
+    </script>
   </head>
   <body class="bg-gray-950 text-white">
     <div id="root"></div>
