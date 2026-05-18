@@ -45,8 +45,8 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [wsConnected, setWsConnected] = useState(false);
 
-  // WebSocket connection for real-time updates
-  useEffect(() => {
+  // WebSocket connection for real-time updates (TEMPORARILY DISABLED due to missing priceData)
+  /* useEffect(() => {
     if (!chartContainerRef.current || !Array.isArray(priceData) || safePriceData.length === 0) return;
 
     if (chartRef.current) {
@@ -101,17 +101,17 @@ export default function Dashboard() {
         chartRef.current = null;
       }
     };
-  }, [priceData, orderForm.symbol]);
+  */ }, [priceData, orderForm.symbol]);
 
-  // Real-time price update on chart from query
-  useEffect(() => {
+  // Real-time price update on chart from query (TEMPORARILY DISABLED)
+  /* useEffect(() => {
     if (lineSeriesRef.current && currentPrice && safePriceData.length > 0) {
       const lastTime = priceData[safePriceData.length - 1]?.time;
       if (lastTime) {
         lineSeriesRef.current.update({ time: lastTime, value: currentPrice });
       }
     }
-  }, [currentPrice, priceData]);
+  */ }, [currentPrice, priceData]);
 
   const placeOrder = useMutation({
     mutationFn: (orderData: any) => axios.post('/api/execution/execute', orderData),
