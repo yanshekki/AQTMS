@@ -46,154 +46,59 @@ export default function Dashboard() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const socket = io(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3000/trading`, {
-      transports: ['websocket'],
-      autoConnect: true,
-    });
-
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setWsConnected(true);
-      // Authenticate (in production use real JWT)
-      socket.emit('auth', { userId: 'demo-user' });
-    });
-
-    socket.on('disconnect', () => {
-      setWsConnected(false);
-    });
-
-    // Real-time price update
-    socket.on('price:update', (data: { symbol: string; price: number; timestamp: number }) => {
-      if (data.symbol === orderForm.symbol) {
-        // Update chart in real-time
-        if (lineSeriesRef.current) {
-          const time = Math.floor(data.timestamp / 1000);
-          lineSeriesRef.current.update({ time, value: data.price });
-        }
-        setLastUpdated(new Date());
-      }
-    });
-
-    // Real-time position update
-    socket.on('position:update', () => {
-      queryClient.invalidateQueries({ queryKey: ['positions'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio-summary'] });
-      setLastUpdated(new Date());
-    });
-
-    // Real-time order update
-    socket.on('order:update', () => {
-      queryClient.invalidateQueries({ queryKey: ['positions'] });
-      setLastUpdated(new Date());
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [orderForm.symbol, queryClient]);
-
-  // ... (rest of the component remains similar, with real data focus)
-
-  const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary, error: summaryError } = useQuery({
-    queryKey: ['portfolio-summary'],
-    queryFn: async () => {
-      const res = await axios.get('/api/portfolio/summary');
-      setLastUpdated(new Date());
-      return Array.isArray(res.data) ? res.data : [];
-    },
-    refetchInterval: 15000,
-    retry: 2,
-  });
-
-  const { data: positions = [], isLoading: isLoadingPositions, refetch: refetchPositions, error: positionsError } = useQuery({
-    queryKey: ['positions'],
-    queryFn: async () => {
-      const res = await axios.get('/api/portfolio/positions');
-      setLastUpdated(new Date());
-      return Array.isArray(res.data) ? res.data : [];
-    },
-    refetchInterval: 10000,
-    retry: 2,
-  });
-
-  const { data: priceData = [] } = useQuery({
-    queryKey: ['price-history', orderForm.symbol],
-    queryFn: async () => {
-      const res = await axios.get(`/api/market-data/price-history?symbol=${orderForm.symbol}&limit=200`);
-      return res.data || [];
-    },
-    refetchInterval: 8000,
-  });
-
-  const { data: currentPrice } = useQuery({
-    queryKey: ['price', orderForm.symbol],
-    queryFn: async () => {
-      const res = await axios.get(`/api/market-data/price?symbol=${orderForm.symbol}`);
-      return res.data.price;
-    },
-    refetchInterval: 4000,
-  });
-
-  const { data: depthData = [] } = useQuery({
-    queryKey: ['depth', orderForm.symbol],
-    queryFn: async () => {
-      const res = await axios.get(`/api/market-data/depth?symbol=${orderForm.symbol}`);
-      return res.data || [];
-    },
-    refetchInterval: 6000,
-  });
-
-  // TradingView Lightweight Chart (same as before)
-  useEffect(() => {
-    if (!chartContainerRef.current || priceData.length === 0) return;
+    if (!chartContainerRef.current || !Array.isArray(priceData) || priceData.length === 0) return;
 
     if (chartRef.current) {
       chartRef.current.remove();
+      chartRef.current = null;
     }
 
-    if (!chartContainerRef.current) return;
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 320,
-      layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#c9d1d9',
-      },
-      grid: {
-        vertLines: { color: '#21262d' },
-        horzLines: { color: '#21262d' },
-      },
-      crosshair: { mode: 0 },
-      timeScale: { borderColor: '#30363d' },
-    });
+    try {
+      const chart = createChart(chartContainerRef.current, {
+        width: chartContainerRef.current.clientWidth,
+        height: 320,
+        layout: {
+          background: { type: ColorType.Solid, color: "#0d1117" },
+          textColor: "#c9d1d9",
+        },
+        grid: {
+          vertLines: { color: "#21262d" },
+          horzLines: { color: "#21262d" },
+        },
+        crosshair: { mode: 0 },
+        timeScale: { borderColor: "#30363d" },
+      });
 
-    try { const lineSeries = chart.addLineSeries({
-      color: '#58a6ff',
-      lineWidth: 2,
-    });
+      const lineSeries = chart.addLineSeries({
+        color: "#58a6ff",
+        lineWidth: 2,
+      });
 
-    const formattedData = priceData.map((item: any) => ({
-      time: item.time,
-      value: item.price,
-    }));
+      const formattedData = priceData
+        .filter((item: any) => item && item.time != null && item.price != null)
+        .map((item: any) => ({ time: item.time, value: item.price }));
 
-    lineSeries.setData(formattedData); } catch(e) { console.error("Chart error", e); }
+      lineSeries.setData(formattedData);
 
-    chartRef.current = chart;
-    lineSeriesRef.current = lineSeries;
+      chartRef.current = chart;
+      lineSeriesRef.current = lineSeries;
+    } catch (err) {
+      console.error("Chart init failed:", err);
+    }
 
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         chartRef.current.resize(chartContainerRef.current.clientWidth, 320);
       }
     };
-
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      if (chartRef.current) chartRef.current.remove();
+      window.removeEventListener("resize", handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
     };
   }, [priceData, orderForm.symbol]);
 
