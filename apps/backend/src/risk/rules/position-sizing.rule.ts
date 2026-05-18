@@ -15,29 +15,37 @@ export class PositionSizingRule implements RiskRule {
   private readonly riskPerTradePercent = 0.01; // 1%
 
   async check(context: RiskCheckContext): Promise<RiskCheckResult> {
-    const { accountBalance, price, quantity } = context;
+    try {
+      const { accountBalance, price, quantity } = context;
 
-    // 如果沒有帳戶餘額或價格，則不進行調整
-    if (!accountBalance || !price || price <= 0) {
-      return { passed: true };
-    }
+      // 如果沒有帳戶餘額或價格，則不進行調整
+      if (!accountBalance || !price || price <= 0) {
+        return { passed: true };
+      }
 
-    const riskAmount = accountBalance * this.riskPerTradePercent;
-    const suggestedQuantity = riskAmount / price;
+      const riskAmount = accountBalance * this.riskPerTradePercent;
+      const suggestedQuantity = riskAmount / price;
 
-    // 如果用戶輸入的數量明顯過大，則建議調整
-    if (quantity > suggestedQuantity * 1.5) {
+      // 如果用戶輸入的數量明顯過大，則建議調整
+      if (quantity > suggestedQuantity * 1.5) {
+        return {
+          passed: true, // 先通過，後續可改為 false 並強制調整
+          reason: `建議倉位大小為 ${suggestedQuantity.toFixed(4)}`,
+          adjustedQuantity: parseFloat(suggestedQuantity.toFixed(4)),
+          riskAmount,
+        };
+      }
+
       return {
-        passed: true, // 先通過，之後可以改為 false 並強制調整
-        reason: `建議倉位大小為 ${suggestedQuantity.toFixed(4)}`,
-        adjustedQuantity: parseFloat(suggestedQuantity.toFixed(4)),
+        passed: true,
         riskAmount,
       };
+    } catch (error) {
+      this.logger.error(
+        `PositionSizingRule check failed`,
+        error instanceof Error ? error.stack : error,
+      );
+      return { passed: true, reason: "Risk check error - using defaults" };
     }
-
-    return {
-      passed: true,
-      riskAmount,
-    };
   }
 }

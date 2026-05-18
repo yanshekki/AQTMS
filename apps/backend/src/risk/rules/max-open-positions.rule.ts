@@ -14,19 +14,27 @@ export class MaxOpenPositionsRule implements RiskRule {
   private readonly maxOpenPositions = 5;
 
   async check(context: RiskCheckContext): Promise<RiskCheckResult> {
-    const currentOpenPositions = (context as any).currentOpenPositions;
+    try {
+      const currentOpenPositions = (context as any).currentOpenPositions;
 
-    if (currentOpenPositions === undefined) {
-      return { passed: true }; // 資料不足時先通過
+      if (currentOpenPositions === undefined) {
+        return { passed: true }; // 資料不足時先通過
+      }
+
+      if (currentOpenPositions >= this.maxOpenPositions) {
+        return {
+          passed: false,
+          reason: `已達到最大持倉數量上限（${this.maxOpenPositions}），請先平倉`,
+        };
+      }
+
+      return { passed: true };
+    } catch (error) {
+      this.logger.error(
+        `MaxOpenPositionsRule check failed`,
+        error instanceof Error ? error.stack : error,
+      );
+      return { passed: true, reason: "Risk check error - proceeding safely" };
     }
-
-    if (currentOpenPositions >= this.maxOpenPositions) {
-      return {
-        passed: false,
-        reason: `已達到最大持倉數量上限（${this.maxOpenPositions}），請先平倉`,
-      };
-    }
-
-    return { passed: true };
   }
 }

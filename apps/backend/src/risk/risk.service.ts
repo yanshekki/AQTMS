@@ -111,7 +111,15 @@ export class RiskService {
           riskScore += 20; // increase risk score per violation
         }
       } catch (e) {
-        this.logger.warn(`Rule ${rule.name} check failed: ${e.message}`);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        this.logger.error(
+          `Rule ${rule.name} threw unexpected error during risk evaluation for order ${orderData?.symbol || "unknown"}`,
+          e instanceof Error ? e.stack : e,
+        );
+        // Fail-safe: treat rule failure as high-risk violation instead of silently ignoring
+        passed = false;
+        reasons.push(`[${rule.name}] Rule execution failed: ${errorMsg}`);
+        riskScore += 30;
       }
     }
 

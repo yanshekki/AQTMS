@@ -1,6 +1,6 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, Logger } from '@nestjs/common';
 import WebSocket from 'ws';
-import { StructuredLoggerService } from '../../common/logger/logger.service';
+
 import { MarketDataService } from '../../market-data/market-data.service';
 
 export enum ConnectionState {
@@ -12,7 +12,7 @@ export enum ConnectionState {
 
 @Injectable()
 export class BinanceWebsocketClient {
-  private structuredLogger = new StructuredLoggerService();
+  private readonly logger = new Logger(BinanceWebsocketClient.name);
   private ws: WebSocket | null = null;
   private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private reconnectAttempts = 0;
@@ -29,7 +29,7 @@ export class BinanceWebsocketClient {
     @Inject(forwardRef(() => MarketDataService))
     private readonly marketDataService: MarketDataService,
   ) {
-    this.structuredLogger.setContext('BinanceWebsocketClient');
+    
   }
 
   getConnectionState(): ConnectionState {
@@ -38,7 +38,7 @@ export class BinanceWebsocketClient {
 
   private setState(state: ConnectionState) {
     if (this.connectionState !== state) {
-      this.structuredLogger.log(`Connection state changed: ${this.connectionState} -> ${state}`);
+      this.logger.log(`Connection state changed: ${this.connectionState} -> ${state}`);
       this.connectionState = state;
     }
   }
@@ -47,7 +47,7 @@ export class BinanceWebsocketClient {
     if (this.connectionState === ConnectionState.CONNECTED) return;
 
     this.setState(ConnectionState.CONNECTING);
-    this.structuredLogger.log('Connecting to Binance WebSocket...');
+    this.logger.log('Connecting to Binance WebSocket...');
 
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.baseUrl);
@@ -56,7 +56,7 @@ export class BinanceWebsocketClient {
         this.setState(ConnectionState.CONNECTED);
         this.reconnectAttempts = 0;
         this.resubscribeStreams();
-        this.structuredLogger.log('Connected to Binance WebSocket');
+        this.logger.log('Connected to Binance WebSocket');
         resolve();
       });
 
@@ -69,19 +69,19 @@ export class BinanceWebsocketClient {
             this.messageCallback(parsed);
           }
         } catch (e) {
-          this.structuredLogger.error('Failed to parse WebSocket message');
+          this.logger.error('Failed to parse WebSocket message');
         }
       });
 
       this.ws.on('error', (error: any) => {
-        this.structuredLogger.error(`WebSocket error: ${error?.message || error}`);
+        this.logger.error(`WebSocket error: ${error?.message || error}`);
         this.setState(ConnectionState.RECONNECTING);
         if (this.errorCallback) this.errorCallback(error as Error);
         this.scheduleReconnect();
       });
 
       this.ws.on('close', () => {
-        this.structuredLogger.warn('WebSocket disconnected');
+        this.logger.warn('WebSocket disconnected');
         this.setState(ConnectionState.DISCONNECTED);
         if (this.closeCallback) this.closeCallback();
         this.scheduleReconnect();
@@ -108,7 +108,7 @@ export class BinanceWebsocketClient {
     }
 
     this.setState(ConnectionState.DISCONNECTED);
-    this.structuredLogger.log('WebSocket manually disconnected');
+    this.logger.log('WebSocket manually disconnected');
   }
 
   private scheduleReconnect(): void {
@@ -117,13 +117,13 @@ export class BinanceWebsocketClient {
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     this.reconnectAttempts++;
 
-    this.structuredLogger.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    this.logger.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       if (this.connectionState !== ConnectionState.CONNECTED) {
         this.connect().catch(err => {
-          this.structuredLogger.error('Reconnect failed', err);
+          this.logger.error('Reconnect failed', err);
         });
       }
     }, delay);
@@ -131,7 +131,7 @@ export class BinanceWebsocketClient {
 
   subscribeToMiniTicker(symbols: string[]) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.structuredLogger.warn('WebSocket not connected, cannot subscribe yet');
+      this.logger.warn('WebSocket not connected, cannot subscribe yet');
       return;
     }
 
@@ -147,7 +147,7 @@ export class BinanceWebsocketClient {
 
     this.ws.send(JSON.stringify(payload));
     newStreams.forEach(s => this.subscribedStreams.add(s));
-    this.structuredLogger.log(`Subscribed to miniTicker: ${newStreams.join(', ')}`);
+    this.logger.log(`Subscribed to miniTicker: ${newStreams.join(', ')}`);
   }
 
   private handlePriceUpdate(parsed: any) {
@@ -166,7 +166,7 @@ export class BinanceWebsocketClient {
         }
       }
     } catch (error) {
-      this.structuredLogger.debug('Ignored non-price WebSocket message', { error: error instanceof Error ? error.message : error });
+      this.logger.debug('Ignored non-price WebSocket message', { error: error instanceof Error ? error.message : error });
     }
   }
 
@@ -179,7 +179,7 @@ export class BinanceWebsocketClient {
         id: Date.now(),
       };
       this.ws.send(JSON.stringify(payload));
-      this.structuredLogger.log(`Resubscribed to streams: ${streams.join(', ')}`);
+      this.logger.log(`Resubscribed to streams: ${streams.join(', ')}`);
     }
   }
 }

@@ -2,10 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import WebSocket from 'ws';
 import * as crypto from 'crypto';
 
+export enum ConnectionState {
+  DISCONNECTED = 'DISCONNECTED',
+  CONNECTING = 'CONNECTING',
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+}
+
 @Injectable()
 export class BybitWebsocketClient {
   private ws: WebSocket | null = null;
   private privateWs: WebSocket | null = null;
+
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
 
   private messageCallback?: (data: any) => void;
   private errorCallback?: (error: Error) => void;
@@ -32,16 +43,47 @@ export class BybitWebsocketClient {
     this.apiSecret = process.env.BYBIT_API_SECRET || '';
   }
 
-  // ... existing public stream methods ...
+  getConnectionState(): ConnectionState {
+    return this.connectionState;
+  }
+
+  private setState(state: ConnectionState) {
+    if (this.connectionState !== state) {
+      this.logger.log(`Connection state changed: ${this.connectionState} -> ${state}`);
+      this.connectionState = state;
+    }
+  }
+
+  private scheduleReconnect(isPrivate = false): void {
+    if (this.reconnectTimer) return;
+
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    this.reconnectAttempts++;
+
+    this.logger.warn(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.connectionState !== ConnectionState.CONNECTED) {
+        this.connectPrivateStream().catch(err => {
+          this.logger.error('Reconnect failed', err);
+        });
+      }
+    }, delay);
+  }
 
   /**
    * Connect to Bybit Private WebSocket (requires API Key)
    */
   async connectPrivateStream(): Promise<void> {
+    this.setState(ConnectionState.CONNECTING);
+
     return new Promise((resolve, reject) => {
       this.privateWs = new WebSocket(this.privateUrl);
 
       this.privateWs.on('open', () => {
+        this.setState(ConnectionState.CONNECTED);
+        this.reconnectAttempts = 0;
         this.logger.log('Private stream connected, sending auth...');
         this.sendAuth();
         resolve();
@@ -67,14 +109,18 @@ export class BybitWebsocketClient {
         }
       });
 
-      this.privateWs.on('error', (error) => {
-        this.logger.error('Private stream error', error as Error);
+      this.privateWs.on('error', (error: any) => {
+        this.logger.error(`Private stream error: ${error?.message || error}`);
+        this.setState(ConnectionState.RECONNECTING);
         if (this.errorCallback) this.errorCallback(error as Error);
+        this.scheduleReconnect(true);
       });
 
       this.privateWs.on('close', () => {
-        this.logger.log('Private stream closed');
+        this.logger.warn('Private stream disconnected');
+        this.setState(ConnectionState.DISCONNECTED);
         if (this.closeCallback) this.closeCallback();
+        this.scheduleReconnect(true);
       });
     });
   }
@@ -119,16 +165,24 @@ export class BybitWebsocketClient {
     this.logger.log(`Subscribed to private topic: ${topic}`);
   }
 
-  // ... keep existing public methods and disconnect ...
-
   disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     if (this.ws) {
+      this.ws.removeAllListeners();
       this.ws.close();
       this.ws = null;
     }
     if (this.privateWs) {
+      this.privateWs.removeAllListeners();
       this.privateWs.close();
       this.privateWs = null;
     }
+
+    this.setState(ConnectionState.DISCONNECTED);
+    this.logger.log('WebSocket manually disconnected');
   }
 }

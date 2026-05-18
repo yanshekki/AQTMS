@@ -1191,4 +1191,158 @@ describe('CcxtExchangeAdapter', () => {
       logSpy.mockRestore();
     });
   });
+
+  // ── Expanded Error & Edge Case Tests for Core Methods (placeOrder, cancelOrder, getBalance, getPositions) ──
+  describe('expanded error scenarios and edge cases', () => {
+    describe('placeOrder error and edge cases', () => {
+      beforeEach(async () => {
+        await initializeAdapter(adapter, 'binance');
+      });
+
+      it('should handle insufficient funds error in placeOrder gracefully', async () => {
+        setupMockError(mockExchange, 'createOrder', new ccxt.InsufficientFunds('not enough balance'));
+        const result = await adapter.placeOrder({
+          symbol: 'BTC/USDT',
+          side: 'BUY',
+          type: 'MARKET',
+          quantity: 10,
+          testnet: true,
+        });
+        expect(result.success).toBe(false);
+        expect(result.message).toMatch(/Insufficient funds|balance/i);
+      });
+
+      it('should return failure for placeOrder with zero or negative quantity (edge)', async () => {
+        setupMockError(mockExchange, 'createOrder', 'Invalid quantity');
+        const result = await adapter.placeOrder({
+          symbol: 'BTC/USDT',
+          side: 'BUY',
+          type: 'MARKET',
+          quantity: 0,
+          testnet: true,
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('should handle invalid symbol error on placeOrder', async () => {
+        setupMockError(mockExchange, 'createOrder', 'Invalid symbol');
+        const result = await adapter.placeOrder({
+          symbol: 'INVALID/PAIR',
+          side: 'BUY',
+          type: 'MARKET',
+          quantity: 0.1,
+          testnet: true,
+        });
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Invalid symbol');
+      });
+
+      it('should handle missing price for LIMIT order edge case', async () => {
+        setupMockError(mockExchange, 'createOrder', 'Price required for limit orders');
+        const result = await adapter.placeOrder({
+          symbol: 'BTC/USDT',
+          side: 'SELL',
+          type: 'LIMIT',
+          quantity: 0.1,
+          testnet: true,
+        });
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe('cancelOrder error and edge cases', () => {
+      beforeEach(async () => {
+        await initializeAdapter(adapter, 'binance');
+      });
+
+      it('should handle order already cancelled or closed error', async () => {
+        setupMockError(mockExchange, 'cancelOrder', 'Order already closed');
+        await expect(
+          adapter.cancelOrder({ exchangeOrderId: 'closed-123', symbol: 'BTC/USDT' })
+        ).rejects.toThrow(/cancelOrder failed/);
+      });
+
+      it('should handle invalid order id format edge case', async () => {
+        setupMockError(mockExchange, 'cancelOrder', 'Invalid order id');
+        await expect(
+          adapter.cancelOrder({ exchangeOrderId: '', symbol: 'BTC/USDT' })
+        ).rejects.toThrow(/cancelOrder failed/);
+      });
+
+      it('should propagate specific cancel error for non-existent order', async () => {
+        const notFoundErr = new Error('Order not found or does not exist');
+        setupMockError(mockExchange, 'cancelOrder', notFoundErr);
+        await expect(
+          adapter.cancelOrder({ exchangeOrderId: 'nonexistent-999', symbol: 'ETH/USDT' })
+        ).rejects.toThrow(/\\[CCXT\\] cancelOrder failed/);
+      });
+    });
+
+    describe('getBalance error and edge cases', () => {
+      beforeEach(async () => {
+        await initializeAdapter(adapter);
+      });
+
+      it('should return 0 for getBalance on unknown asset', async () => {
+        setupMockSuccess(mockExchange, 'fetchBalance', {
+          total: { USDT: 1000 },
+          free: { USDT: 900 },
+          used: { USDT: 100 },
+        });
+        const result = await adapter.getBalance('UNKNOWN');
+        expect(result).toBe(0);
+      });
+
+      it('should handle malformed balance response gracefully', async () => {
+        setupMockSuccess(mockExchange, 'fetchBalance', { total: null, free: undefined });
+        const result = await adapter.getBalance('');
+        expect(result).toBe(0);
+      });
+
+      it('should return 0 and log on network error during getBalance for specific asset', async () => {
+        setupMockError(mockExchange, 'fetchBalance', 'Connection error');
+        const result = await adapter.getBalance('BTC');
+        expect(result).toBe(0);
+        expect(loggerSpy).toHaveBeenCalled();
+      });
+    });
+
+    describe('getPositions error and edge cases', () => {
+      beforeEach(async () => {
+        await initializeAdapter(adapter, 'bybit');
+      });
+
+      it('should return empty array and log on permission error for getPositions', async () => {
+        setupMockError(mockExchange, 'fetchPositions', new ccxt.PermissionDenied('no futures permission'));
+        const result = await adapter.getPositions('bybit', true);
+        expect(result).toEqual([]);
+        expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('getPositions failed'));
+      });
+
+      it('should filter invalid position data (missing symbol/contracts) as edge case', async () => {
+        setupMockSuccess(mockExchange, 'fetchPositions', [
+          { contracts: 0.5 },
+          { symbol: 'BTC/USDT' },
+          null,
+          { symbol: 'ETH/USDT', contracts: 1.0 },
+        ]);
+        const result = await adapter.getPositions();
+        expect(result).toHaveLength(1);
+        expect(result[0].symbol).toBe('ETH/USDT');
+      });
+
+      it('should handle empty or null response from fetchPositions', async () => {
+        setupMockSuccess(mockExchange, 'fetchPositions', null);
+        const result = await adapter.getPositions();
+        expect(result).toEqual([]);
+      });
+
+      it('should gracefully handle rate limit during getPositions on specific exchange', async () => {
+        const rateErr = new ccxt.RateLimitExceeded('positions rate limit');
+        setupMockError(mockExchange, 'fetchPositions', rateErr);
+        const result = await adapter.getPositions('binance', false);
+        expect(result).toEqual([]);
+      });
+    });
+  });
 });
