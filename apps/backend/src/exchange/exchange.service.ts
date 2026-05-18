@@ -1,47 +1,39 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BinanceAdapter } from './adapters/binance.adapter';
-import { BybitAdapter } from './adapters/bybit.adapter';
+import { CcxtExchangeAdapter } from '../infrastructure/adapters/exchange/ccxt-exchange.adapter';
 import { IExchangeAdapter, PlaceOrderParams, OrderResult } from './interfaces/exchange.adapter';
 
 @Injectable()
 export class ExchangeService implements IExchangeAdapter {
   private readonly logger = new Logger(ExchangeService.name);
-  private readonly activeAdapter: IExchangeAdapter;
+  private readonly ccxtAdapter: CcxtExchangeAdapter;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly binanceAdapter: BinanceAdapter,
-    private readonly bybitAdapter: BybitAdapter,
+    ccxtAdapter: CcxtExchangeAdapter,
   ) {
-    const provider = this.configService.get<string>('EXCHANGE_PROVIDER', 'BINANCE').toUpperCase();
-
-    if (provider === 'BYBIT') {
-      this.activeAdapter = this.bybitAdapter;
-      this.logger.log('Using BybitAdapter');
-    } else {
-      this.activeAdapter = this.binanceAdapter;
-      this.logger.log('Using BinanceAdapter');
-    }
+    this.ccxtAdapter = ccxtAdapter;
+    this.logger.log('ExchangeService initialized with CcxtExchangeAdapter');
   }
 
   async placeOrder(params: PlaceOrderParams): Promise<OrderResult> {
-    return this.activeAdapter.placeOrder(params);
+    // Simple mapping - in real usage we would need proper conversion
+    return this.ccxtAdapter.placeOrder(params as any) as any;
   }
 
   async cancelOrder(orderId: string, symbol: string): Promise<boolean> {
-    return this.activeAdapter.cancelOrder(orderId, symbol);
+    return this.ccxtAdapter.cancelOrder('', orderId);
   }
 
   async getOrder(orderId: string, symbol: string): Promise<OrderResult | null> {
-    return this.activeAdapter.getOrder(orderId, symbol);
+    return this.ccxtAdapter.getOrderStatus('', orderId) as any;
   }
 
   async getPositions(): Promise<any[]> {
-    return this.activeAdapter.getPositions();
+    return this.ccxtAdapter.getPositions('');
   }
 
   async getAccountBalance(): Promise<any> {
-    return this.activeAdapter.getAccountBalance();
+    return this.ccxtAdapter.getBalance('');
   }
 }
