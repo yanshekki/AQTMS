@@ -46,7 +46,7 @@ export default function Dashboard() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    if (!chartContainerRef.current || !Array.isArray(priceData) || priceData.length === 0) return;
+    if (!chartContainerRef.current || !Array.isArray(priceData) || safePriceData.length === 0) return;
 
     if (chartRef.current) {
       chartRef.current.remove();
@@ -104,8 +104,8 @@ export default function Dashboard() {
 
   // Real-time price update on chart from query
   useEffect(() => {
-    if (lineSeriesRef.current && currentPrice && priceData.length > 0) {
-      const lastTime = priceData[priceData.length - 1]?.time;
+    if (lineSeriesRef.current && currentPrice && safePriceData.length > 0) {
+      const lastTime = priceData[safePriceData.length - 1]?.time;
       if (lastTime) {
         lineSeriesRef.current.update({ time: lastTime, value: currentPrice });
       }
@@ -168,7 +168,7 @@ export default function Dashboard() {
     );
   }
 
-  const totalUnrealizedPnl = positions.reduce((sum: number, p: any) => sum + (p.unrealizedPnl || 0), 0);
+  const totalUnrealizedPnl = safePositions.reduce((sum: number, p: any) => sum + (p.unrealizedPnl || 0), 0);
 
   return (
     <Box sx={{ p: 3, backgroundColor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
@@ -259,10 +259,10 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {positions.length === 0 ? (
+                    {safePositions.length === 0 ? (
                       <TableRow><TableCell colSpan={4} align="center">No open positions</TableCell></TableRow>
                     ) : (
-                      positions.map((pos: any) => (
+                      safePositions.map((pos: any) => (
                         <TableRow key={pos.symbol}>
                           <TableCell><strong>{pos.symbol}</strong></TableCell>
                           <TableCell align="right">{pos.quantity}</TableCell>
@@ -297,9 +297,9 @@ export default function Dashboard() {
             <CardContent>
               <Typography variant="h6" gutterBottom>Market Depth (Real Data Only)</Typography>
               <Box sx={{ height: 320 }}>
-                {depthData.length > 0 ? (
+                {safeDepthData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={depthData}>
+                    <ComposedChart data={safeDepthData}>
                       <CartesianGrid strokeDasharray="2 2" />
                       <XAxis dataKey="price" />
                       <YAxis />
